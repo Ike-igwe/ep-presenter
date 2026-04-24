@@ -1,7 +1,7 @@
 {
   "name": "ep-presenter",
   "productName": "EP Presenter",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Eze Profit Presenter — forex trading education presentation tool",
   "author": {
     "name": "Ike Igwe",
@@ -44,8 +44,18 @@
     ],
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "build/icon.ico",
       "artifactName": "EP-Presenter-${version}-${arch}-${ext}.${ext}"
