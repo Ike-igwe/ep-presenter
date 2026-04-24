@@ -6,7 +6,7 @@
 // and wires up auto-update checking.
 // =========================================================
 
-const { app, BrowserWindow, Menu, shell, dialog, ipcMain, session } = require('electron');
+const { app, BrowserWindow, Menu, shell, dialog, ipcMain, session, desktopCapturer } = require('electron');
 const path = require('path');
 
 // Auto-update support (loaded lazily so dev mode doesn't crash without a signed build)
@@ -339,6 +339,13 @@ app.whenReady().then(() => {
     callback(allowed.includes(permission));
   });
 
+  // No setDisplayMediaRequestHandler — this makes getDisplayMedia() reject in the
+  // packaged build, which triggers our renderer's fallback to the custom picker
+  // built on top of desktopCapturer. We do this because:
+  // 1. Windows 11's native picker (useSystemPicker: true) had inconsistent behavior
+  // 2. Our custom picker gives us full UI control, branding, refresh button, etc.
+  // 3. Predictable behavior across Windows 10 and 11
+
   buildAppMenu();
   createMainWindow();
 
@@ -365,4 +372,26 @@ ipcMain.handle('ep:open-external', (_event, url) => {
     return true;
   }
   return false;
+});
+
+// List the user's available screens and windows so the renderer can
+// show a custom picker UI. Thumbnails are returned as data URLs.
+ipcMain.handle('ep:list-desktop-sources', async () => {
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ['screen', 'window'],
+      thumbnailSize: { width: 320, height: 180 },
+      fetchWindowIcons: true
+    });
+    return sources.map((s) => ({
+      id: s.id,
+      name: s.name,
+      display_id: s.display_id,
+      thumbnail: s.thumbnail ? s.thumbnail.toDataURL() : null,
+      appIcon: s.appIcon ? s.appIcon.toDataURL() : null
+    }));
+  } catch (err) {
+    console.error('list-desktop-sources failed:', err);
+    return [];
+  }
 });

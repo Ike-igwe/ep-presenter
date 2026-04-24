@@ -39,5 +39,6 @@ window.addEventListener('DOMContentLoaded', () => {
 contextBridge.exposeInMainWorld('epElectron', {
   getVersion: () => ipcRenderer.invoke('ep:get-version'),
   openExternal: (url) => ipcRenderer.invoke('ep:open-external', url),
+  listDesktopSources: () => ipcRenderer.invoke('ep:list-desktop-sources'),
   platform: process.platform
 });

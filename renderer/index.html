@@ -39,8 +39,8 @@ body{font-family:'Outfit',sans-serif;background:var(--d1);color:var(--w);overflo
 .sp-btn.del{color:var(--red)}.sp-btn.del:hover{border-color:var(--red)}
 
 /* ========= TOOLBAR ========= */
-.tb{height:56px;background:var(--d2);border-bottom:1px solid var(--brd);display:flex;align-items:center;padding:0 10px;gap:3px;flex-shrink:0;overflow-x:auto}
-.tb-g{display:flex;align-items:center;background:var(--d3);border-radius:10px;padding:3px;gap:2px;margin:0 3px}
+.tb{height:56px;background:var(--d2);border-bottom:1px solid var(--brd);display:flex;align-items:center;padding:0 10px;gap:3px;flex-shrink:0;position:relative;z-index:100;overflow:visible}
+.tb-g{display:flex;align-items:center;background:var(--d3);border-radius:10px;padding:3px;gap:2px;margin:0 3px;overflow:visible}
 .tb-b{width:40px;height:40px;border-radius:8px;border:none;background:transparent;color:var(--gray);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s;position:relative;flex-shrink:0;font-family:'Outfit'}
 .tb-b:hover{background:var(--d5);color:var(--w)}
 .tb-b.a{background:rgba(126,217,87,.18);color:var(--g)}
@@ -52,7 +52,7 @@ body{font-family:'Outfit',sans-serif;background:var(--d1);color:var(--w);overflo
 .tb-spacer{flex:1;min-width:8px}
 /* Generic tooltip for any element with data-tip attribute */
 [data-tip]{position:relative}
-[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:-30px;left:50%;transform:translateX(-50%);background:rgba(10,10,12,0.96);backdrop-filter:blur(8px);border:1px solid var(--brd);color:var(--w);padding:5px 10px;border-radius:6px;font-size:11px;font-weight:500;white-space:nowrap;z-index:9999;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,0.4);letter-spacing:0.3px}
+[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:-34px;left:50%;transform:translateX(-50%);background:rgba(10,10,12,0.96);backdrop-filter:blur(8px);border:1px solid var(--brd);color:var(--w);padding:5px 10px;border-radius:6px;font-size:11px;font-weight:500;white-space:nowrap;z-index:99999;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,0.4);letter-spacing:0.3px}
 /* When inside pres-bar at bottom: flip tooltip to top so it doesn't go off-screen */
 .pres-bar.pos-bottom [data-tip]:hover::after{bottom:auto;top:-30px}
 /* When inside pres-bar at right edge: flip tooltip to left */
@@ -137,18 +137,86 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 .rec-indicator button.stop{background:rgba(255,40,40,0.2);border-color:rgba(255,40,40,0.5);color:#ff6b6b}
 .rec-indicator button.stop:hover{background:rgba(255,40,40,0.35)}
 
+/* ========= STARTUP MODAL ========= */
+#ep-startup-overlay{position:fixed;inset:0;z-index:9999;background:rgba(10,10,12,0.85);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:20px;font-family:Outfit,sans-serif;animation:ep-startup-fade 0.25s ease}
+#ep-startup-overlay.closing{opacity:0;transition:opacity 0.2s ease}
+@keyframes ep-startup-fade{from{opacity:0}to{opacity:1}}
+.ep-startup-card{background:var(--d2);border:1px solid var(--brd);border-radius:16px;padding:36px 38px 28px;max-width:460px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.6);animation:ep-startup-slide 0.3s cubic-bezier(0.2,0.9,0.3,1)}
+@keyframes ep-startup-slide{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+.ep-startup-logo{width:64px;height:64px;border-radius:14px;background:rgba(126,217,87,0.1);border:1px solid rgba(126,217,87,0.25);display:flex;align-items:center;justify-content:center;margin-bottom:20px}
+.ep-startup-title{font-size:22px;font-weight:700;color:var(--w);margin:0 0 4px;letter-spacing:-0.3px}
+.ep-startup-sub{font-size:13px;color:var(--muted);margin:0 0 24px}
+.ep-startup-opts{display:flex;flex-direction:column;gap:8px;margin-bottom:18px}
+.ep-startup-opt{display:flex;align-items:center;gap:14px;padding:14px 14px;background:var(--d3);border:1px solid var(--brd);border-radius:10px;color:var(--w);cursor:pointer;text-align:left;width:100%;transition:all 0.15s ease;font-family:inherit}
+.ep-startup-opt:hover{background:var(--d4);border-color:var(--gray)}
+.ep-startup-opt-primary{border-color:rgba(126,217,87,0.35);background:rgba(126,217,87,0.06)}
+.ep-startup-opt-primary:hover{border-color:var(--g);background:rgba(126,217,87,0.12)}
+.ep-startup-opt-primary .ep-startup-opt-icon{color:var(--g)}
+.ep-startup-opt-icon{width:36px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.ep-startup-opt-icon svg{width:20px;height:20px}
+.ep-startup-opt-body{flex:1;min-width:0}
+.ep-startup-opt-t{font-size:14px;font-weight:600;color:var(--w);margin-bottom:2px}
+.ep-startup-opt-d{font-size:11px;color:var(--muted);line-height:1.4}
+.ep-startup-remember{display:flex;align-items:center;gap:9px;padding:10px 2px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none}
+.ep-startup-remember input{cursor:pointer;accent-color:var(--g)}
+.ep-startup-remember span{flex:1}
+.ep-startup-footer{font-size:10.5px;color:var(--muted);text-align:center;margin-top:4px;opacity:0.7;line-height:1.5}
+
+/* ========= SCREEN SOURCE PICKER (Electron) ========= */
+#ep-source-picker{position:fixed;inset:0;z-index:99998;background:rgba(10,10,12,0.88);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:24px;font-family:Outfit,sans-serif;animation:ep-sp-fade 0.2s ease}
+#ep-source-picker.closing{opacity:0;transition:opacity 0.15s ease}
+@keyframes ep-sp-fade{from{opacity:0}to{opacity:1}}
+.ep-sp-card{background:var(--d2);border:1px solid var(--brd);border-radius:14px;width:100%;max-width:860px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.6);animation:ep-sp-slide 0.25s cubic-bezier(0.2,0.9,0.3,1);overflow:hidden}
+@keyframes ep-sp-slide{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+.ep-sp-header{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--brd);flex-shrink:0}
+.ep-sp-actions{display:flex;align-items:center;gap:6px}
+.ep-sp-refresh{background:var(--d3);border:1px solid var(--brd);color:var(--w);padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:0.3px;transition:all 0.12s}
+.ep-sp-refresh:hover{background:var(--d4);border-color:var(--g)}
+.ep-sp-footnote{font-size:11px;color:var(--muted);margin-top:18px;padding:10px 12px;background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.2);border-radius:6px;line-height:1.5}
+.ep-sp-footnote strong{color:var(--o)}
+.ep-sp-title{font-size:17px;font-weight:600;margin:0;color:var(--w)}
+.ep-sp-close{background:transparent;border:none;color:var(--muted);font-size:28px;line-height:1;cursor:pointer;padding:0 4px;font-family:inherit}
+.ep-sp-close:hover{color:var(--w)}
+.ep-sp-body{padding:18px 22px 22px;overflow-y:auto;flex:1}
+.ep-sp-section-label{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin:4px 0 10px;font-weight:600}
+.ep-sp-section-label:not(:first-child){margin-top:18px}
+.ep-sp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.ep-sp-tile{background:var(--d3);border:2px solid var(--brd);border-radius:8px;padding:0;cursor:pointer;overflow:hidden;display:flex;flex-direction:column;text-align:left;font-family:inherit;color:var(--w);transition:border-color 0.15s ease,transform 0.1s ease}
+.ep-sp-tile:hover{border-color:var(--g)}
+.ep-sp-tile:active{transform:scale(0.98)}
+.ep-sp-thumb{width:100%;height:100px;object-fit:cover;background:#0a0a0c;display:block}
+.ep-sp-thumb.empty{background:repeating-linear-gradient(45deg,#1a1a1e,#1a1a1e 8px,#222 8px,#222 16px)}
+.ep-sp-name{display:flex;align-items:center;gap:6px;padding:8px 10px;font-size:11.5px;color:var(--w);overflow:hidden}
+.ep-sp-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.ep-sp-icon{width:14px;height:14px;flex-shrink:0}
+
 /* ========= SCREEN SHARE ELEMENT ========= */
 .ss-el{width:100%;height:100%;border-radius:inherit;overflow:hidden;background:#0a0a0c;position:relative}
 .ss-el video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
-.ss-placeholder{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#a0a0b0;cursor:pointer;background:repeating-linear-gradient(45deg,rgba(255,255,255,0.015) 0 10px,rgba(255,255,255,0.04) 10px 20px);transition:background 0.15s}
-.ss-placeholder:hover{background:repeating-linear-gradient(45deg,rgba(126,217,87,0.05) 0 10px,rgba(126,217,87,0.1) 10px 20px)}
+.ss-placeholder{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#a0a0b0;background:repeating-linear-gradient(45deg,rgba(255,255,255,0.015) 0 10px,rgba(255,255,255,0.04) 10px 20px);transition:background 0.15s}
 .ss-placeholder svg{width:48px;height:48px;color:#7ed957;opacity:0.8}
 .ss-placeholder .ss-title{font-size:15px;font-weight:700;color:#f0f0f5;letter-spacing:0.3px}
 .ss-placeholder .ss-hint{font-size:12px;color:#a0a0b0;text-align:center;padding:0 12px;line-height:1.4}
 .ss-placeholder .ss-connect{margin-top:4px;padding:8px 18px;background:#7ed957;color:#000;border:none;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;font-family:Outfit;letter-spacing:0.3px}
 .ss-placeholder .ss-connect:hover{background:#6bc946}
-.ss-live-badge{position:absolute;top:8px;left:8px;display:flex;align-items:center;gap:5px;background:rgba(0,0,0,0.75);padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;color:#ff5555;letter-spacing:1px;pointer-events:none;z-index:2}
+.ss-live-badge{position:absolute;display:flex;align-items:center;gap:5px;background:rgba(0,0,0,0.75);padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;color:#ff5555;letter-spacing:1px;pointer-events:none;z-index:2}
 .ss-live-badge:before{content:'';width:7px;height:7px;border-radius:50%;background:#ff2a2a;box-shadow:0 0 6px rgba(255,40,40,0.7);animation:rec-pulse 1.4s ease-in-out infinite}
+.ss-live-badge-tl{top:8px;left:8px}
+.ss-live-badge-tr{top:8px;right:8px}
+.ss-live-badge-bl{bottom:8px;left:8px}
+.ss-live-badge-br{bottom:8px;right:8px}
+.ss-live-badge-dot-only{padding:0;background:transparent}
+.ss-live-badge-dot-only:before{width:10px;height:10px;box-shadow:0 0 8px rgba(255,40,40,0.9),0 0 2px rgba(0,0,0,0.5)}
+
+/* ========= WEBCAM SLIDE ELEMENT ========= */
+.wc-el{width:100%;height:100%;overflow:hidden;background:#0a0a0c;position:relative}
+.wc-placeholder{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#a0a0b0;background:repeating-linear-gradient(135deg,rgba(255,255,255,0.015) 0 10px,rgba(255,255,255,0.04) 10px 20px);padding:12px;box-sizing:border-box;text-align:center}
+.wc-placeholder svg{width:40px;height:40px;color:#7ed957;opacity:0.8}
+.wc-controls{position:absolute;top:8px;right:8px;display:flex;gap:6px;opacity:0;transition:opacity 0.15s;z-index:3}
+.wc-el:hover .wc-controls{opacity:1}
+.wc-controls button{background:rgba(10,10,12,0.85);backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,0.15);color:var(--w);padding:5px 10px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:Outfit;letter-spacing:0.3px}
+.wc-controls button:hover{background:rgba(30,30,36,0.95);border-color:var(--g)}
+.wc-controls button.disconnect:hover{background:rgba(255,40,40,0.35)}
 .ss-controls{position:absolute;top:6px;right:6px;display:flex;gap:4px;opacity:0;transition:opacity 0.15s;z-index:3}
 .ss-el:hover .ss-controls{opacity:1}
 .ss-controls button{padding:5px 10px;background:rgba(0,0,0,0.75);border:1px solid rgba(255,255,255,0.15);color:#fff;border-radius:5px;cursor:pointer;font-family:Outfit;font-size:10px;font-weight:600;letter-spacing:0.3px}
@@ -506,7 +574,11 @@ function mkLine(x1,y1,x2,y2,arrow){return{id:uid(),type:'line',x1:x1,y1:y1,x2:x2
 function mkShape(sh,x,y){return{id:uid(),type:'shape',shape:sh,x:x,y:y,w:140,h:140,fill:'transparent',fillOp:1,stroke:'#7ed957',sw:3,lk:false}}
 function mkImage(src,x,y,w,h){return{id:uid(),type:'image',x:x,y:y,w:w,h:h,src:src,bc:'transparent',bw:0,br:0,op:1,lk:false}}
 function mkNote(x,y){return{id:uid(),type:'note',x:x,y:y,w:200,h:160,text:'Note...',bg:NOTE_COLORS[0],lk:false}}
-function mkScreenShare(x,y){return{id:uid(),type:'screenshare',x:x,y:y,w:640,h:360,label:'Screen Share',bc:'#7ed957',bw:2,br:10,lk:false}}
+function mkScreenShare(x,y){return{id:uid(),type:'screenshare',x:x,y:y,w:640,h:360,label:'Screen Share',bc:'#7ed957',bw:2,br:10,badgeStyle:'full',badgePos:'tl',lk:false}}
+// Webcam element: a placeholder on the slide that fills with live camera feed.
+// Unlike the floating webcam overlay (toggled via W key), this is per-slide,
+// positionable, resizable, with its own shape/border/mirror settings.
+function mkWebcam(x,y){return{id:uid(),type:'webcam',x:x,y:y,w:280,h:280,label:'Webcam',shape:'circle',bc:'#7ed957',bw:3,br:14,mirror:true,badgeStyle:'off',badgePos:'tl',deviceId:'',lk:false}}
 function mkTradingView(x,y){
   return{
     id:uid(), type:'tradingview',
@@ -1100,6 +1172,9 @@ var _recCacheGeneration = 0; // bumped on any invalidation — guarantees freshn
 // Runtime-only: map of elementId → MediaStream for active screen shares.
 // Not persisted; browsers can't rehydrate streams across reloads.
 var _screenShareStreams = {};
+// Runtime-only: map of webcam-element-id → MediaStream.
+// Like screen shares, these are not persisted — browsers don't serialize MediaStreams.
+var _webcamElStreams = {};
 
 // Most recent rendered slide bitmap for the recording loop.
 // Used regardless of cache policy so the compose frame always has SOMETHING to draw.
@@ -1902,21 +1977,51 @@ window.addScreenShare = function(){
   S.tool = 'select';
 };
 
-// Connect a screen share element to a live stream via getDisplayMedia.
-// The stream is stored in _screenShareStreams[id], keyed by element id.
+// Connect a screen share element to a live stream.
+//
+// In packaged Electron: use our custom picker (desktopCapturer + getUserMedia with
+// chromeMediaSourceId). We control the UI, thumbnails, refresh, everything.
+//
+// In browser / dev mode: use getDisplayMedia() which gives Chrome's native picker.
 window.connectScreenShare = async function(id, evt){
   if(evt) evt.stopPropagation();
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
-    showToast('Screen capture not supported in this browser');
-    return;
-  }
+
+  var stream = null;
   try {
-    var stream = await navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: { ideal: 30, max: 60 } },
-      audio: false
-    });
+    if(window.epElectron && typeof window.epElectron.listDesktopSources === 'function'){
+      // Electron packaged build — always use custom picker
+      var source = await showScreenSourcePicker();
+      if(!source) return; // user cancelled
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          mandatory: {
+            chromeMediaSource: 'desktop',
+            chromeMediaSourceId: source.id,
+            maxFrameRate: 30
+          }
+        }
+      });
+    } else if(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia){
+      // Browser / dev mode
+      try {
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { frameRate: { ideal: 30, max: 60 } },
+          audio: false
+        });
+      } catch(err){
+        if(err.name === 'NotAllowedError' || err.name === 'AbortError') return;
+        throw err;
+      }
+    } else {
+      showToast('Screen capture not supported');
+      return;
+    }
+
+    if(!stream) return;
+
     _screenShareStreams[id] = stream;
-    // Auto-disconnect when user stops sharing via browser UI
+    // Auto-disconnect when the track ends (user closes the picker or the shared window)
     var vTrack = stream.getVideoTracks()[0];
     if(vTrack){
       vTrack.addEventListener('ended', function(){
@@ -1934,9 +2039,104 @@ window.connectScreenShare = async function(id, evt){
   } catch(e){
     console.error('Screen share failed:', e);
     if(e.name === 'NotAllowedError') showToast('Screen share permission denied');
-    else showToast('Screen share error: ' + e.message);
+    else showToast('Screen share error: ' + (e.message || e.name || 'unknown'));
   }
 };
+
+// Custom screen-source picker for Electron. Shows a modal grid of screens+windows.
+// Returns the selected source object (with .id) or null if cancelled.
+function showScreenSourcePicker(){
+  return new Promise(async function(resolve){
+    var sources = [];
+    try {
+      sources = await window.epElectron.listDesktopSources();
+    } catch(e){
+      console.error('Failed to list sources:', e);
+      showToast('Could not list screens');
+      resolve(null);
+      return;
+    }
+    if(!sources || !sources.length){
+      showToast('No screens found');
+      resolve(null);
+      return;
+    }
+
+    function buildHTML(){
+      var screens = sources.filter(function(s){ return s.id.indexOf('screen:') === 0; });
+      var windows = sources.filter(function(s){ return s.id.indexOf('window:') === 0; });
+      return '<div class="ep-sp-card">' +
+        '<div class="ep-sp-header">' +
+          '<h2 class="ep-sp-title">Choose what to share</h2>' +
+          '<div class="ep-sp-actions">' +
+            '<button class="ep-sp-refresh" data-act="refresh" title="Refresh the source list">↻ Refresh</button>' +
+            '<button class="ep-sp-close" data-act="cancel" title="Cancel (Esc)">&times;</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="ep-sp-body">' +
+          (screens.length ? '<div class="ep-sp-section-label">Screens</div><div class="ep-sp-grid">' +
+            screens.map(renderSourceTile).join('') + '</div>' : '') +
+          (windows.length ? '<div class="ep-sp-section-label">Windows</div><div class="ep-sp-grid">' +
+            windows.map(renderSourceTile).join('') + '</div>' : '') +
+          '<div class="ep-sp-footnote">Some apps (WhatsApp, Teams, Discord) use private rendering and don\'t appear here. To share one of them, pick the <strong>screen</strong> containing it.</div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    var overlay = document.createElement('div');
+    overlay.id = 'ep-source-picker';
+    overlay.innerHTML = buildHTML();
+    document.body.appendChild(overlay);
+
+    function renderSourceTile(s){
+      var safeName = (s.name || 'Untitled').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      return '<button class="ep-sp-tile" data-act="pick" data-id="' + s.id + '">' +
+        (s.thumbnail ? '<img class="ep-sp-thumb" src="' + s.thumbnail + '" alt="">' : '<div class="ep-sp-thumb empty"></div>') +
+        '<div class="ep-sp-name" title="' + safeName + '">' +
+          (s.appIcon ? '<img class="ep-sp-icon" src="' + s.appIcon + '">' : '') +
+          '<span>' + safeName + '</span>' +
+        '</div>' +
+      '</button>';
+    }
+
+    function done(result){
+      overlay.classList.add('closing');
+      document.removeEventListener('keydown', keyHandler);
+      setTimeout(function(){
+        if(overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        resolve(result);
+      }, 150);
+    }
+
+    function keyHandler(e){
+      if(e.key === 'Escape'){ e.preventDefault(); done(null); }
+    }
+    document.addEventListener('keydown', keyHandler);
+
+    overlay.addEventListener('click', async function(e){
+      var tile = e.target.closest('[data-act="pick"]');
+      if(tile){
+        var id = tile.getAttribute('data-id');
+        var src = sources.find(function(s){ return s.id === id; });
+        done(src || null);
+        return;
+      }
+      if(e.target.closest('[data-act="refresh"]')){
+        try {
+          var fresh = await window.epElectron.listDesktopSources();
+          if(fresh && fresh.length){
+            sources = fresh;
+            overlay.innerHTML = buildHTML();
+          }
+        } catch(err){ console.error('Refresh failed:', err); }
+        return;
+      }
+      if(e.target.closest('[data-act="cancel"]') || e.target === overlay){
+        done(null);
+      }
+    });
+  });
+}
 
 window.disconnectScreenShare = function(id, evt, silent){
   if(evt) evt.stopPropagation();
@@ -1952,6 +2152,142 @@ window.disconnectScreenShare = function(id, evt, silent){
 window.updateScreenShareLabel = function(id, label){
   updateEl(id, {label: label});
 };
+
+// =========================================================
+// WEBCAM SLIDE ELEMENT
+// =========================================================
+
+window.addWebcam = function(){
+  var el = mkWebcam(280 + Math.random()*80, 120 + Math.random()*80);
+  updateSlide(function(s){s.els.push(el); return s;});
+  S.sel = el.id;
+  S.tool = 'select';
+};
+
+// Connect a webcam element to a live camera stream.
+window.connectWebcamEl = async function(id, evt){
+  if(evt) evt.stopPropagation();
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    showToast('Camera not supported'); return;
+  }
+
+  // Find the element so we can honour a stored deviceId if present
+  var el = null;
+  var slide = cs();
+  if(slide){
+    for(var i=0; i<slide.els.length; i++){
+      if(slide.els[i].id === id){ el = slide.els[i]; break; }
+    }
+  }
+  var deviceId = el && el.deviceId ? el.deviceId : null;
+
+  try {
+    var constraints = {
+      audio: false,
+      video: deviceId
+        ? { deviceId: { exact: deviceId }, width:{ideal:1280}, height:{ideal:720} }
+        : { width:{ideal:1280}, height:{ideal:720}, facingMode: 'user' }
+    };
+    var stream = await navigator.mediaDevices.getUserMedia(constraints);
+    _webcamElStreams[id] = stream;
+    // Auto-disconnect if the user disconnects their camera device mid-session
+    var vTrack = stream.getVideoTracks()[0];
+    if(vTrack){
+      vTrack.addEventListener('ended', function(){
+        disconnectWebcamEl(id, null, true);
+      });
+    }
+    if(S.pres) renderPres(); else render();
+    setTimeout(function(){
+      var v = document.getElementById('wc-video-' + id);
+      if(v){ v.srcObject = stream; v.play().catch(function(){}); }
+    }, 50);
+    showToast('Camera connected');
+  } catch(e){
+    console.error('Camera failed:', e);
+    if(e.name === 'NotAllowedError') showToast('Camera permission denied');
+    else if(e.name === 'NotFoundError') showToast('No camera found');
+    else showToast('Camera error: ' + (e.message || e.name));
+  }
+};
+
+window.disconnectWebcamEl = function(id, evt, silent){
+  if(evt) evt.stopPropagation();
+  var stream = _webcamElStreams[id];
+  if(stream){
+    try { stream.getTracks().forEach(function(t){ t.stop(); }); } catch(e){}
+  }
+  delete _webcamElStreams[id];
+  if(S.pres) renderPres(); else render();
+  if(!silent) showToast('Camera disconnected');
+};
+
+window.updateWebcamLabel = function(id, label){
+  updateEl(id, {label: label});
+};
+
+// List available video input devices for the dropdown picker
+window.listWebcamDevices = async function(){
+  try {
+    // enumerateDevices returns labels only after permission granted,
+    // so prompt + immediately release if we don't already have a stream
+    if(!navigator.mediaDevices) return [];
+    var devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter(function(d){ return d.kind === 'videoinput'; });
+  } catch(e){ return []; }
+};
+
+// Switch camera device for a specific webcam element. Reconnects with new device.
+window.switchWebcamDevice = async function(id, deviceId){
+  updateEl(id, {deviceId: deviceId});
+  // Tear down current stream
+  var old = _webcamElStreams[id];
+  if(old){ try { old.getTracks().forEach(function(t){ t.stop(); }); } catch(e){} }
+  delete _webcamElStreams[id];
+  // Reconnect (connectWebcamEl reads the saved deviceId from the element)
+  await connectWebcamEl(id);
+};
+
+// Re-attach active webcam streams to their video elements after re-render
+function reattachWebcamStreams(){
+  var ids = Object.keys(_webcamElStreams);
+  for(var i=0; i<ids.length; i++){
+    var id = ids[i];
+    var v = document.getElementById('wc-video-' + id);
+    if(v && _webcamElStreams[id] && v.srcObject !== _webcamElStreams[id]){
+      v.srcObject = _webcamElStreams[id];
+      v.play().catch(function(){});
+    }
+  }
+}
+
+// Populate the camera-device dropdown for a specific webcam element's props panel.
+// Called after render; reads enumerated devices and populates the container.
+async function populateWebcamDeviceList(elId){
+  var container = document.getElementById('wc-devices-' + elId);
+  if(!container) return;
+  try {
+    var devs = await listWebcamDevices();
+    if(!devs || !devs.length){ container.innerHTML = ''; return; }
+    // Find current element's deviceId
+    var currentDeviceId = '';
+    var slide = cs();
+    if(slide){
+      for(var i=0; i<slide.els.length; i++){
+        if(slide.els[i].id === elId){ currentDeviceId = slide.els[i].deviceId || ''; break; }
+      }
+    }
+    var html = '<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Camera Device</div>';
+    html += '<select class="pr-i" style="width:100%" onchange="switchWebcamDevice(\''+elId+'\',this.value)">';
+    devs.forEach(function(d, idx){
+      var sel = d.deviceId === currentDeviceId;
+      var label = (d.label || 'Camera ' + (idx + 1)).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      html += '<option value="'+d.deviceId+'"'+(sel?' selected':'')+'>'+label+'</option>';
+    });
+    html += '</select>';
+    container.innerHTML = html;
+  } catch(e){ console.error('populateWebcamDeviceList:', e); }
+}
 
 // =========================================================
 // TRADINGVIEW WIDGETS
@@ -3375,6 +3711,86 @@ async function renderSlideToCanvas(s, scale){
         }
       }
     }
+    if(el.type === 'webcam'){
+      // Composite live camera feed onto recording canvas
+      var wcStream = _webcamElStreams[el.id];
+      var wcVideo = wcStream ? document.getElementById('wc-video-' + el.id) : null;
+      var wcShape = el.shape || 'circle';
+      var wcMirror = el.mirror !== false;
+      // Background fill (so even disconnected we get a visible shape)
+      x.fillStyle = '#0a0a0c';
+      // Determine clip path based on shape
+      x.save();
+      x.beginPath();
+      if(wcShape === 'circle'){
+        var cx = el.x + el.w/2, cy = el.y + el.h/2;
+        var rad = Math.min(el.w, el.h) / 2;
+        x.arc(cx, cy, rad, 0, Math.PI*2);
+      } else if(wcShape === 'rounded'){
+        var wcBr = Math.min(el.br || 14, el.w/2, el.h/2);
+        x.moveTo(el.x + wcBr, el.y);
+        x.lineTo(el.x + el.w - wcBr, el.y);
+        x.quadraticCurveTo(el.x + el.w, el.y, el.x + el.w, el.y + wcBr);
+        x.lineTo(el.x + el.w, el.y + el.h - wcBr);
+        x.quadraticCurveTo(el.x + el.w, el.y + el.h, el.x + el.w - wcBr, el.y + el.h);
+        x.lineTo(el.x + wcBr, el.y + el.h);
+        x.quadraticCurveTo(el.x, el.y + el.h, el.x, el.y + el.h - wcBr);
+        x.lineTo(el.x, el.y + wcBr);
+        x.quadraticCurveTo(el.x, el.y, el.x + wcBr, el.y);
+        x.closePath();
+      } else {
+        x.rect(el.x, el.y, el.w, el.h);
+      }
+      x.fill();
+      x.clip();
+      if(wcVideo && wcVideo.readyState >= 2){
+        try {
+          if(wcMirror){
+            x.save();
+            x.translate(el.x + el.w, el.y);
+            x.scale(-1, 1);
+            x.drawImage(wcVideo, 0, 0, el.w, el.h);
+            x.restore();
+          } else {
+            x.drawImage(wcVideo, el.x, el.y, el.w, el.h);
+          }
+        } catch(e){}
+      } else {
+        // Placeholder text
+        x.fillStyle = '#66667a';
+        x.font = '500 16px Outfit, sans-serif';
+        x.textAlign = 'center';
+        x.textBaseline = 'middle';
+        x.fillText(el.label || 'Camera (not connected)', el.x + el.w/2, el.y + el.h/2);
+      }
+      x.restore();
+      // Border (draw outside clip)
+      if(el.bw > 0){
+        x.strokeStyle = el.bc || '#7ed957';
+        x.lineWidth = el.bw;
+        x.beginPath();
+        if(wcShape === 'circle'){
+          var bcx = el.x + el.w/2, bcy = el.y + el.h/2;
+          var brad = Math.min(el.w, el.h) / 2;
+          x.arc(bcx, bcy, brad, 0, Math.PI*2);
+        } else if(wcShape === 'rounded'){
+          var wbr = Math.min(el.br || 14, el.w/2, el.h/2);
+          x.moveTo(el.x + wbr, el.y);
+          x.lineTo(el.x + el.w - wbr, el.y);
+          x.quadraticCurveTo(el.x + el.w, el.y, el.x + el.w, el.y + wbr);
+          x.lineTo(el.x + el.w, el.y + el.h - wbr);
+          x.quadraticCurveTo(el.x + el.w, el.y + el.h, el.x + el.w - wbr, el.y + el.h);
+          x.lineTo(el.x + wbr, el.y + el.h);
+          x.quadraticCurveTo(el.x, el.y + el.h, el.x, el.y + el.h - wbr);
+          x.lineTo(el.x, el.y + wbr);
+          x.quadraticCurveTo(el.x, el.y, el.x + wbr, el.y);
+          x.closePath();
+        } else {
+          x.rect(el.x, el.y, el.w, el.h);
+        }
+        x.stroke();
+      }
+    }
     if(el.type === 'tradingview'){
       var tvWt = el.widget || 'advanced';
       var tvLabel = (TV_WIDGET_TYPES.find(function(x){return x.v===tvWt}) || {l:'Chart'}).l;
@@ -3697,6 +4113,18 @@ document.addEventListener('keydown', function(evt){
     else { S.selIds = []; S.ed = null; render(); }
   }
   if(evt.key === 'F5'){ evt.preventDefault(); startPresent(); }
+  // X in editor mode clears annotations on current slide (when no input focused)
+  if((evt.key === 'x' || evt.key === 'X') && !evt.ctrlKey && !evt.metaKey && !evt.altKey){
+    var tgt = evt.target;
+    if(!tgt || (tgt.tagName !== 'INPUT' && tgt.tagName !== 'TEXTAREA' && !tgt.isContentEditable)){
+      var cs_ = cs();
+      if(cs_ && cs_.draws && cs_.draws.length){
+        evt.preventDefault();
+        clearDraws();
+        showToast('Annotations cleared');
+      }
+    }
+  }
 });
 
 window.setPresTool = function(t){
@@ -3770,6 +4198,9 @@ function renderElInner(el, isPres){
   if(el.type === 'screenshare'){
     h += renderScreenShare(el, isPres);
   }
+  if(el.type === 'webcam'){
+    h += renderWebcam(el, isPres);
+  }
   if(el.type === 'tradingview'){
     h += renderTradingViewElement(el, isPres);
   }
@@ -3800,7 +4231,13 @@ function renderScreenShare(el, isPres){
   var label = el.label || 'Screen Share';
   var h = '<div class="ss-el" style="width:'+el.w+'px;height:'+el.h+'px;border:'+(el.bw||2)+'px solid '+(el.bc||'#7ed957')+';border-radius:'+(el.br||10)+'px;box-sizing:border-box">';
   if(hasStream){
-    h += '<div class="ss-live-badge">LIVE</div>';
+    // Render live badge based on per-element preferences
+    var badgeStyle = el.badgeStyle || 'full';
+    var badgePos = el.badgePos || 'tl';
+    if(badgeStyle !== 'off'){
+      var badgeClass = 'ss-live-badge ss-live-badge-' + badgePos + (badgeStyle === 'dot' ? ' ss-live-badge-dot-only' : '');
+      h += '<div class="'+badgeClass+'">' + (badgeStyle === 'full' ? 'LIVE' : '') + '</div>';
+    }
     // Controls overlay — only visible when element is selected in editor (to avoid clutter)
     if(!isPres){
       h += '<div class="ss-controls">';
@@ -3810,12 +4247,53 @@ function renderScreenShare(el, isPres){
     }
     h += '<video id="ss-video-'+el.id+'" autoplay muted playsinline></video>';
   } else {
-    // Placeholder — clickable card
-    h += '<div class="ss-placeholder" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();connectScreenShare(\''+el.id+'\',event)">';
+    // Placeholder — the CARD itself is NOT clickable so users can drag/select it.
+    // Only the explicit "Connect Source" button triggers the picker.
+    h += '<div class="ss-placeholder">';
     h += I.monitor;
     h += '<div class="ss-title">'+esc(label)+'</div>';
-    h += '<div class="ss-hint">Click to pick a screen / window / tab to share</div>';
+    h += '<div class="ss-hint">Use the panel on the right or click the button below</div>';
     h += '<button class="ss-connect" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();connectScreenShare(\''+el.id+'\',event)">Connect Source</button>';
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+// Render webcam slide element. Mirrors renderScreenShare but uses camera stream
+// and supports shape variants (circle / rounded / sharp rect) + mirror transform.
+function renderWebcam(el, isPres){
+  var hasStream = !!_webcamElStreams[el.id];
+  var label = el.label || 'Webcam';
+  var shape = el.shape || 'circle';
+  var mirror = el.mirror !== false;
+  // Shape → border-radius
+  var borderRadius;
+  if(shape === 'circle') borderRadius = '50%';
+  else if(shape === 'rect') borderRadius = '0px';
+  else borderRadius = (el.br || 14) + 'px';
+  var h = '<div class="wc-el" style="width:'+el.w+'px;height:'+el.h+'px;border:'+(el.bw||3)+'px solid '+(el.bc||'#7ed957')+';border-radius:'+borderRadius+';box-sizing:border-box">';
+  if(hasStream){
+    var badgeStyle = el.badgeStyle || 'off';
+    var badgePos = el.badgePos || 'tl';
+    if(badgeStyle !== 'off'){
+      var badgeClass = 'ss-live-badge ss-live-badge-' + badgePos + (badgeStyle === 'dot' ? ' ss-live-badge-dot-only' : '');
+      h += '<div class="'+badgeClass+'">' + (badgeStyle === 'full' ? 'LIVE' : '') + '</div>';
+    }
+    if(!isPres){
+      h += '<div class="wc-controls">';
+      h += '<button onmousedown="event.stopPropagation()" onclick="event.stopPropagation();connectWebcamEl(\''+el.id+'\',event)" title="Reconnect camera">Reconnect</button>';
+      h += '<button class="disconnect" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();disconnectWebcamEl(\''+el.id+'\',event)">Disconnect</button>';
+      h += '</div>';
+    }
+    var videoStyle = 'width:100%;height:100%;object-fit:cover;display:block;background:#000;' + (mirror ? 'transform:scaleX(-1);' : '');
+    h += '<video id="wc-video-'+el.id+'" autoplay muted playsinline style="'+videoStyle+'"></video>';
+  } else {
+    h += '<div class="wc-placeholder">';
+    h += I.webcam;
+    h += '<div class="ss-title">'+esc(label)+'</div>';
+    h += '<div class="ss-hint">Click the button below to connect your camera</div>';
+    h += '<button class="ss-connect" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();connectWebcamEl(\''+el.id+'\',event)">Connect Camera</button>';
     h += '</div>';
   }
   h += '</div>';
@@ -4171,6 +4649,7 @@ function render(){
   h += '<button class="tb-b" onclick="triggerImageInput()" data-tip="Image">'+I.image+'</button>';
   h += '<button class="tb-b" onclick="addNote()" data-tip="Sticky Note">'+I.note+'</button>';
   h += '<button class="tb-b" onclick="addScreenShare()" data-tip="Screen Share element (live feed on slide)" style="color:var(--g)">'+I.monitor+'</button>';
+  h += '<button class="tb-b" onclick="addWebcam()" data-tip="Camera element (live webcam on slide)" style="color:#9b59ff">'+I.webcam+'</button>';
   h += '<button class="tb-b" onclick="addTradingView()" data-tip="TradingView chart / widget" style="color:var(--o)">'+I.chart+'</button>';
   h += '<button class="tb-b'+(S.pop==='addList'?' a':'')+'" onclick="togglePop(\'addList\',event)" data-tip="Lists &amp; Tables">'+I.list+'</button>';
   h += '<button class="tb-b'+(S.pop==='templates'?' a':'')+'" onclick="togglePop(\'templates\',event)" data-tip="Slide Templates">'+I.template+'</button>';
@@ -4190,7 +4669,12 @@ function render(){
   h += '</div>';
   if(S.tool === 'pen' || S.tool === 'highlighter' || S.tool === 'eraser'){
     h += '<button class="tb-b'+(S.pop==='ink'?' a':'')+'" onclick="togglePop(\'ink\',event)" data-tip="Ink Settings"><div class="tb-swatch" style="background:'+S.penColor+'"></div></button>';
-    h += '<button class="tb-b" onclick="clearDraws()" data-tip="Clear All Ink">'+I.clear+'</button>';
+  }
+  // Clear-ink button is always shown when the current slide has any drawings,
+  // regardless of which tool is active — lets users wipe markings without switching tools.
+  var _curSlide = cs();
+  if(_curSlide && _curSlide.draws && _curSlide.draws.length){
+    h += '<button class="tb-b" onclick="clearDraws()" data-tip="Clear All Ink (X)" style="color:#ff5a5a">'+I.clear+'</button>';
   }
   h += '<div class="tb-sep"></div>';
   h += '<div class="tb-g">';
@@ -4322,6 +4806,7 @@ function render(){
 
   // Re-attach active screen-share streams to their video elements (innerHTML wipes srcObject)
   reattachScreenShareStreams();
+  reattachWebcamStreams();
 
   // Mount TradingView widgets for elements on the current slide
   mountAllTradingViewOnSlide(cs());
@@ -4459,6 +4944,90 @@ function renderPropsPanel(el){
     h += '</div>';
     h += propRow('Width', el.bw, "updateEl('"+el.id+"',{bw:+this.value})", 'number');
     h += propRow('Radius', el.br, "updateEl('"+el.id+"',{br:+this.value})", 'number');
+    h += '</div>';
+    // Live Badge section — style + position
+    var curBadgeStyle = el.badgeStyle || 'full';
+    var curBadgePos = el.badgePos || 'tl';
+    h += '<div class="ps"><div class="ps-t">Live Badge</div>';
+    h += '<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Style</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-bottom:10px">';
+    [{v:'full',l:'● LIVE'},{v:'dot',l:'●'},{v:'off',l:'Off'}].forEach(function(bs){
+      var active = curBadgeStyle === bs.v;
+      h += '<button class="sp-btn" style="padding:6px 2px;font-size:10px'+(active?';border-color:var(--g);color:var(--g)':'')+'" onclick="updateEl(\''+el.id+'\',{badgeStyle:\''+bs.v+'\'})">'+bs.l+'</button>';
+    });
+    h += '</div>';
+    if(curBadgeStyle !== 'off'){
+      h += '<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Position</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">';
+      [{v:'tl',l:'↖ Top L'},{v:'tr',l:'↗ Top R'},{v:'bl',l:'↙ Bot L'},{v:'br',l:'↘ Bot R'}].forEach(function(bp){
+        var active = curBadgePos === bp.v;
+        h += '<button class="sp-btn" style="padding:6px 4px;font-size:10px'+(active?';border-color:var(--g);color:var(--g)':'')+'" onclick="updateEl(\''+el.id+'\',{badgePos:\''+bp.v+'\'})">'+bp.l+'</button>';
+      });
+      h += '</div>';
+    }
+    h += '</div>';
+  }
+
+  if(el.type === 'webcam'){
+    var wcConnected = !!_webcamElStreams[el.id];
+    var curShape = el.shape || 'circle';
+    var curMirror = el.mirror !== false;
+    var curBadgeStyleW = el.badgeStyle || 'off';
+    var curBadgePosW = el.badgePos || 'tl';
+    // Connection state + connect/disconnect + label
+    h += '<div class="ps"><div class="ps-t">Camera</div>';
+    h += '<div style="font-size:11px;color:'+(wcConnected?'var(--g)':'var(--muted)')+';margin-bottom:8px;font-weight:600">'+(wcConnected?'● Live':'○ Not connected')+'</div>';
+    if(wcConnected){
+      h += '<button class="sp-btn" style="width:100%;margin-bottom:5px" onclick="connectWebcamEl(\''+el.id+'\')">Reconnect</button>';
+      h += '<button class="sp-btn del" style="width:100%;margin-bottom:5px" onclick="disconnectWebcamEl(\''+el.id+'\')">Disconnect</button>';
+      h += '<div id="wc-devices-'+el.id+'" style="margin-top:6px"></div>';
+      // Populate device list asynchronously after DOM lands (populateWebcamDeviceList is defined globally)
+      setTimeout(function(){ populateWebcamDeviceList(el.id); }, 10);
+    } else {
+      h += '<button class="sp-btn" style="width:100%;margin-bottom:5px;border-color:var(--g);color:var(--g)" onclick="connectWebcamEl(\''+el.id+'\')">Connect Camera</button>';
+    }
+    h += '<div class="pr"><span class="pr-l">Label</span><input type="text" class="pr-i" value="'+esc(el.label||'')+'" placeholder="Webcam" oninput="updateWebcamLabel(\''+el.id+'\',this.value)"></div>';
+    h += '</div>';
+    // Shape selector
+    h += '<div class="ps"><div class="ps-t">Shape</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-bottom:8px">';
+    [{v:'circle',l:'Circle'},{v:'rounded',l:'Rounded'},{v:'rect',l:'Sharp'}].forEach(function(sh){
+      var active = curShape === sh.v;
+      h += '<button class="sp-btn" style="padding:6px 4px;font-size:10px'+(active?';border-color:var(--g);color:var(--g)':'')+'" onclick="updateEl(\''+el.id+'\',{shape:\''+sh.v+'\'})">'+sh.l+'</button>';
+    });
+    h += '</div>';
+    if(curShape === 'rounded'){
+      h += propRow('Radius', el.br || 14, "updateEl('"+el.id+"',{br:+this.value})", 'number');
+    }
+    h += '<div class="pr"><span class="pr-l">Mirror</span><input type="checkbox" '+(curMirror?'checked':'')+' onchange="updateEl(\''+el.id+'\',{mirror:this.checked})"></div>';
+    h += '</div>';
+    // Border
+    h += '<div class="ps"><div class="ps-t">Border</div><div class="bcs">';
+    for(var wci=0; wci<BORDER_COLORS.length; wci++){
+      var wcc = BORDER_COLORS[wci];
+      h += '<div class="bcs-d'+(el.bc===wcc?' a':'')+'" style="background:'+wcc+'" onclick="updateEl(\''+el.id+'\',{bc:\''+wcc+'\'})"></div>';
+    }
+    h += '</div>';
+    h += propRow('Width', el.bw, "updateEl('"+el.id+"',{bw:+this.value})", 'number');
+    h += '</div>';
+    // Live Badge (same as screen share but default to off for camera)
+    h += '<div class="ps"><div class="ps-t">Live Badge</div>';
+    h += '<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Style</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-bottom:10px">';
+    [{v:'full',l:'● LIVE'},{v:'dot',l:'●'},{v:'off',l:'Off'}].forEach(function(bs){
+      var active = curBadgeStyleW === bs.v;
+      h += '<button class="sp-btn" style="padding:6px 2px;font-size:10px'+(active?';border-color:var(--g);color:var(--g)':'')+'" onclick="updateEl(\''+el.id+'\',{badgeStyle:\''+bs.v+'\'})">'+bs.l+'</button>';
+    });
+    h += '</div>';
+    if(curBadgeStyleW !== 'off'){
+      h += '<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Position</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">';
+      [{v:'tl',l:'↖ Top L'},{v:'tr',l:'↗ Top R'},{v:'bl',l:'↙ Bot L'},{v:'br',l:'↘ Bot R'}].forEach(function(bp){
+        var active = curBadgePosW === bp.v;
+        h += '<button class="sp-btn" style="padding:6px 4px;font-size:10px'+(active?';border-color:var(--g);color:var(--g)':'')+'" onclick="updateEl(\''+el.id+'\',{badgePos:\''+bp.v+'\'})">'+bp.l+'</button>';
+      });
+      h += '</div>';
+    }
     h += '</div>';
   }
 
@@ -4877,6 +5446,7 @@ function renderPres(){
 
   // Re-attach active screen-share streams too
   reattachScreenShareStreams();
+  reattachWebcamStreams();
 
   // Mount TradingView widgets on current pres slide
   mountAllTradingViewOnSlide(S.slides[S.presSlide]);
@@ -4930,30 +5500,136 @@ document.addEventListener('click', function(evt){
 // =========================================================
 // BOOT
 // =========================================================
-var savedDraft = loadAutoSave();
-if(savedDraft && savedDraft.slides && savedDraft.slides.length){
-  // Only prompt if the saved draft has actual content (more than just one empty slide)
-  var hasContent = savedDraft.slides.some(function(s){
-    return (s.els && s.els.length) || (s.draws && s.draws.length);
-  });
-  if(hasContent){
-    var ageMs = Date.now() - (savedDraft.savedAt || 0);
-    var ageMin = Math.floor(ageMs / 60000);
-    var ageText = ageMin < 1 ? 'less than a minute ago' : ageMin < 60 ? ageMin + ' minute' + (ageMin>1?'s':'') + ' ago' : Math.floor(ageMin/60) + ' hour' + (ageMin>=120?'s':'') + ' ago';
-    if(confirm('Restore auto-saved draft from ' + ageText + '?\n\n(' + savedDraft.slides.length + ' slide' + (savedDraft.slides.length>1?'s':'') + ')')){
-      S.slides = savedDraft.slides;
-      S.si = Math.min(savedDraft.si || 0, S.slides.length - 1);
-      S.slides.forEach(function(s){
-        if(!s.draws) s.draws = [];
-        if(!s.els) s.els = [];
-        if(s.notes == null) s.notes = '';
-      });
+var STARTUP_PREF_KEY = 'epPresenterStartupPref';
+// Possible values:
+//   null / 'ask'        → show the startup modal every launch (default)
+//   'always-new'        → skip modal, start blank deck
+//   'always-restore'    → skip modal, auto-restore the latest autosave if any
+
+(function boot(){
+  var savedDraft = loadAutoSave();
+  var hasValidDraft = !!(savedDraft && savedDraft.slides && savedDraft.slides.length &&
+    savedDraft.slides.some(function(s){ return (s.els && s.els.length) || (s.draws && s.draws.length); }));
+
+  var pref = 'ask';
+  try {
+    var stored = localStorage.getItem(STARTUP_PREF_KEY);
+    if(stored === 'always-new' || stored === 'always-restore') pref = stored;
+  } catch(e){}
+
+  // Fast paths: skip the modal if the user chose a durable preference
+  if(pref === 'always-new'){
+    finishBoot();
+    return;
+  }
+  if(pref === 'always-restore' && hasValidDraft){
+    applyDraft(savedDraft);
+    finishBoot();
+    return;
+  }
+  // No valid draft and no specific pref → just start blank silently
+  if(!hasValidDraft){
+    finishBoot();
+    return;
+  }
+
+  // Otherwise show the startup modal
+  showStartupModal(savedDraft, finishBoot);
+
+  function applyDraft(d){
+    S.slides = d.slides;
+    S.si = Math.min(d.si || 0, S.slides.length - 1);
+    S.slides.forEach(function(s){
+      if(!s.draws) s.draws = [];
+      if(!s.els) s.els = [];
+      if(s.notes == null) s.notes = '';
+    });
+  }
+
+  function finishBoot(){
+    pushHist();
+    render();
+  }
+
+  // Expose the applyDraft helper so the modal's Restore button can use it
+  window._epApplyDraft = applyDraft;
+})();
+
+function showStartupModal(savedDraft, onDone){
+  var ageMs = Date.now() - (savedDraft.savedAt || 0);
+  var ageMin = Math.floor(ageMs / 60000);
+  var ageText = ageMin < 1 ? 'less than a minute ago' :
+                ageMin < 60 ? ageMin + ' minute' + (ageMin>1?'s':'') + ' ago' :
+                Math.floor(ageMin/60) + ' hour' + (ageMin>=120?'s':'') + ' ago';
+  var slideCount = savedDraft.slides.length;
+
+  var overlay = document.createElement('div');
+  overlay.id = 'ep-startup-overlay';
+  overlay.innerHTML =
+    '<div class="ep-startup-card">' +
+      '<div class="ep-startup-logo">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:40px;height:40px;color:var(--g)"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 10h10M7 14h6"/></svg>' +
+      '</div>' +
+      '<h2 class="ep-startup-title">Welcome to EP Presenter</h2>' +
+      '<p class="ep-startup-sub">How would you like to start?</p>' +
+      '<div class="ep-startup-opts">' +
+        '<button class="ep-startup-opt" data-action="new">' +
+          '<div class="ep-startup-opt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></div>' +
+          '<div class="ep-startup-opt-body"><div class="ep-startup-opt-t">New Deck</div><div class="ep-startup-opt-d">Start with a blank slide</div></div>' +
+        '</button>' +
+        '<button class="ep-startup-opt ep-startup-opt-primary" data-action="restore">' +
+          '<div class="ep-startup-opt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></div>' +
+          '<div class="ep-startup-opt-body"><div class="ep-startup-opt-t">Restore Autosaved</div><div class="ep-startup-opt-d">' + slideCount + ' slide' + (slideCount>1?'s':'') + ' · saved ' + ageText + '</div></div>' +
+        '</button>' +
+        '<button class="ep-startup-opt" data-action="open">' +
+          '<div class="ep-startup-opt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>' +
+          '<div class="ep-startup-opt-body"><div class="ep-startup-opt-t">Open from File…</div><div class="ep-startup-opt-d">Load a saved .json deck</div></div>' +
+        '</button>' +
+      '</div>' +
+      '<label class="ep-startup-remember"><input type="checkbox" id="ep-startup-remember-cb"><span>Remember my choice and don\'t ask next time</span></label>' +
+      '<div class="ep-startup-footer">You can change this later from <strong>File → Startup Preferences</strong></div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', function(e){
+    var btn = e.target.closest('[data-action]');
+    if(!btn) return;
+    var action = btn.getAttribute('data-action');
+    var remember = document.getElementById('ep-startup-remember-cb').checked;
+
+    if(action === 'new'){
+      if(remember){ try { localStorage.setItem(STARTUP_PREF_KEY, 'always-new'); } catch(e){} }
+      closeOverlay();
+      onDone();
+    } else if(action === 'restore'){
+      if(remember){ try { localStorage.setItem(STARTUP_PREF_KEY, 'always-restore'); } catch(e){} }
+      window._epApplyDraft(savedDraft);
+      closeOverlay();
+      onDone();
+    } else if(action === 'open'){
+      // Close overlay first, then trigger file picker
+      closeOverlay();
+      onDone();
+      // Trigger the open file dialog
+      setTimeout(function(){
+        var inp = document.querySelector('input[type="file"][accept=".json"]');
+        if(inp) inp.click();
+        else if(typeof window.openPresentation === 'function') window.openPresentation();
+      }, 100);
     }
+  });
+
+  function closeOverlay(){
+    overlay.classList.add('closing');
+    setTimeout(function(){ if(overlay.parentNode) overlay.parentNode.removeChild(overlay); }, 200);
   }
 }
 
-pushHist();
-render();
+// Lets users reset their startup preference from a menu / keyboard shortcut
+window.resetStartupPreference = function(){
+  try { localStorage.removeItem(STARTUP_PREF_KEY); } catch(e){}
+  showToast('Startup preference cleared — you will be asked next launch');
+};
 
 })();
 </script>
