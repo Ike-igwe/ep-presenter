@@ -137,6 +137,120 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 .rec-indicator button.stop{background:rgba(255,40,40,0.2);border-color:rgba(255,40,40,0.5);color:#ff6b6b}
 .rec-indicator button.stop:hover{background:rgba(255,40,40,0.35)}
 
+/* ========= LIST ITEM REVEAL BADGE & ANIMATIONS ========= */
+.ep-item-reveal-badge{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:#ffa500;color:#000;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;z-index:5;box-shadow:0 2px 8px rgba(0,0,0,0.4);font-family:Outfit;pointer-events:none}
+
+/* Animation duration variables — controlled by Global Preferences > Speed.
+   Default is 'normal' (set by JS on body). */
+:root{--ep-trans-dur:0.6s;--ep-reveal-dur:0.55s}
+body.ep-speed-fast{--ep-trans-dur:0.3s;--ep-reveal-dur:0.28s}
+body.ep-speed-normal{--ep-trans-dur:0.6s;--ep-reveal-dur:0.55s}
+body.ep-speed-slow{--ep-trans-dur:1.1s;--ep-reveal-dur:0.85s}
+
+/* Reveal-on-click animations (applied to elements + list items as they appear) */
+.ep-revealing{animation:ep-reveal-fade var(--ep-reveal-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+@keyframes ep-reveal-fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* Reveal animation styles — applied via class on the slide root */
+.ep-anim-fade .ep-revealing{animation-name:ep-reveal-fade}
+.ep-anim-slide-up .ep-revealing{animation:ep-reveal-slide-up var(--ep-reveal-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+@keyframes ep-reveal-slide-up{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+.ep-anim-slide-left .ep-revealing{animation:ep-reveal-slide-left var(--ep-reveal-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+@keyframes ep-reveal-slide-left{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:translateX(0)}}
+.ep-anim-slide-right .ep-revealing{animation:ep-reveal-slide-right var(--ep-reveal-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+@keyframes ep-reveal-slide-right{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:translateX(0)}}
+.ep-anim-zoom .ep-revealing{animation:ep-reveal-zoom var(--ep-reveal-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+@keyframes ep-reveal-zoom{from{opacity:0;transform:scale(0.85)}to{opacity:1;transform:scale(1)}}
+.ep-anim-pop .ep-revealing{animation:ep-reveal-pop var(--ep-reveal-dur) cubic-bezier(0.34,1.56,0.64,1) both}
+@keyframes ep-reveal-pop{0%{opacity:0;transform:scale(0.6)}60%{opacity:1;transform:scale(1.05)}100%{opacity:1;transform:scale(1)}}
+.ep-anim-none .ep-revealing{animation:none}
+
+/* Per-element reveal animation override (when both ep-anim-X and ep-revealing are on same element) */
+.ep-revealing.ep-anim-fade{animation:ep-reveal-fade var(--ep-reveal-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+.ep-revealing.ep-anim-slide-up{animation:ep-reveal-slide-up var(--ep-reveal-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+.ep-revealing.ep-anim-slide-left{animation:ep-reveal-slide-left var(--ep-reveal-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+.ep-revealing.ep-anim-slide-right{animation:ep-reveal-slide-right var(--ep-reveal-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+.ep-revealing.ep-anim-zoom{animation:ep-reveal-zoom var(--ep-reveal-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+.ep-revealing.ep-anim-pop{animation:ep-reveal-pop var(--ep-reveal-dur) cubic-bezier(0.34,1.56,0.64,1) both}
+.ep-revealing.ep-anim-none{animation:none}
+
+/* ========= SLIDE TRANSITIONS ========= */
+.ep-slide-transition{animation:ep-slide-fade var(--ep-trans-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+@keyframes ep-slide-fade{from{opacity:0}to{opacity:1}}
+
+.ep-trans-fade .ep-slide-transition{animation:ep-slide-fade var(--ep-trans-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+.ep-trans-slide-left .ep-slide-transition{animation:ep-slide-slide-left var(--ep-trans-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+@keyframes ep-slide-slide-left{from{opacity:0;transform:translateX(280px)}to{opacity:1;transform:translateX(0)}}
+.ep-trans-slide-right .ep-slide-transition{animation:ep-slide-slide-right var(--ep-trans-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+@keyframes ep-slide-slide-right{from{opacity:0;transform:translateX(-280px)}to{opacity:1;transform:translateX(0)}}
+.ep-trans-slide-up .ep-slide-transition{animation:ep-slide-slide-up var(--ep-trans-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+@keyframes ep-slide-slide-up{from{opacity:0;transform:translateY(220px)}to{opacity:1;transform:translateY(0)}}
+.ep-trans-slide-down .ep-slide-transition{animation:ep-slide-slide-down var(--ep-trans-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+@keyframes ep-slide-slide-down{from{opacity:0;transform:translateY(-220px)}to{opacity:1;transform:translateY(0)}}
+.ep-trans-zoom .ep-slide-transition{animation:ep-slide-zoom var(--ep-trans-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+@keyframes ep-slide-zoom{from{opacity:0;transform:scale(1.18)}to{opacity:1;transform:scale(1)}}
+.ep-trans-zoom-out .ep-slide-transition{animation:ep-slide-zoom-out var(--ep-trans-dur) cubic-bezier(0.2,0.9,0.3,1) both}
+@keyframes ep-slide-zoom-out{from{opacity:0;transform:scale(0.82)}to{opacity:1;transform:scale(1)}}
+.ep-trans-none .ep-slide-transition{animation:none}
+
+/* Element group dashed bounding box (shown in editor when any group member is selected) */
+.ep-group-box{position:absolute;border:1.5px dashed #ffa500;border-radius:4px;pointer-events:none;z-index:1;box-shadow:0 0 0 1px rgba(255,165,0,0.15);animation:ep-group-pulse 2.4s ease-in-out infinite}
+@keyframes ep-group-pulse{0%,100%{border-color:#ffa500}50%{border-color:rgba(255,165,0,0.5)}}
+
+/* Fill preset chips (for propFillRow palette) */
+.ep-fill-preset{width:100%;aspect-ratio:1;border-radius:4px;border:1px solid var(--brd);cursor:pointer;transition:all 0.12s;background-clip:padding-box}
+.ep-fill-preset:hover{transform:scale(1.15);border-color:var(--g);z-index:2;position:relative}
+.ep-fill-preset.active{border:2px solid var(--g);box-shadow:0 0 0 2px rgba(126,217,87,0.25)}
+
+/* ========= RECORDING EXPORT DIALOG ========= */
+.ep-export-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);z-index:10000;display:flex;align-items:center;justify-content:center;animation:ep-gp-fade 0.18s ease-out both}
+.ep-export-card{width:min(560px,94vw);max-height:88vh;overflow-y:auto;background:#1a1a22;border:1px solid var(--brd);border-radius:14px;box-shadow:0 24px 80px rgba(0,0,0,0.6);animation:ep-gp-pop 0.22s cubic-bezier(0.34,1.4,0.64,1) both}
+.ep-export-header{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--brd)}
+.ep-export-header h2{margin:0;font-size:17px;font-weight:700;color:var(--w);letter-spacing:0.3px;font-family:Outfit}
+.ep-export-close{background:transparent;border:none;color:var(--gray);font-size:26px;line-height:1;cursor:pointer;padding:0 6px;border-radius:6px;transition:all 0.12s;font-family:Outfit}
+.ep-export-close:hover{color:var(--w);background:rgba(255,255,255,0.06)}
+.ep-export-info{padding:10px 22px;border-bottom:1px solid var(--brd);font-size:12px;color:var(--gray)}
+.ep-export-info strong{color:var(--w);font-weight:600}
+.ep-export-body{padding:14px 18px 18px}
+.ep-export-q{font-size:11px;color:var(--w);text-transform:uppercase;letter-spacing:1.2px;font-weight:600;margin-bottom:10px;font-family:Outfit;padding:0 4px}
+.ep-export-fmt{display:flex;align-items:center;gap:14px;width:100%;padding:12px 14px;background:rgba(255,255,255,0.02);border:1px solid var(--brd);border-radius:10px;cursor:pointer;transition:all 0.15s;text-align:left;margin-bottom:8px;color:var(--w);font-family:Outfit}
+.ep-export-fmt:hover:not(.disabled){background:rgba(126,217,87,0.06);border-color:rgba(126,217,87,0.4);transform:translateX(2px)}
+.ep-export-fmt.recommended{border-color:rgba(126,217,87,0.4);background:rgba(126,217,87,0.04)}
+.ep-export-fmt.disabled{opacity:0.4;cursor:not-allowed}
+.ep-export-fmt-icon{font-size:24px;flex-shrink:0;width:36px;text-align:center}
+.ep-export-fmt-text{flex:1;min-width:0}
+.ep-export-fmt-name{font-size:14px;font-weight:700;color:var(--w);margin-bottom:3px;display:flex;align-items:center;gap:6px}
+.ep-export-fmt-desc{font-size:11px;color:var(--muted);line-height:1.4}
+.ep-export-rec{display:inline-block;background:var(--g);color:#000;font-size:9px;padding:2px 6px;border-radius:3px;font-weight:800;letter-spacing:1px}
+
+/* Quality picker (Fast / Balanced / High) */
+.ep-export-quality-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px}
+.ep-export-quality-btn{padding:10px 8px;background:rgba(255,255,255,0.02);border:1px solid var(--brd);border-radius:8px;cursor:pointer;transition:all 0.15s;text-align:center;color:var(--w);font-family:Outfit}
+.ep-export-quality-btn:hover:not(:disabled){background:rgba(126,217,87,0.06);border-color:rgba(126,217,87,0.4)}
+.ep-export-quality-btn.active{background:rgba(126,217,87,0.12);border-color:var(--g);box-shadow:0 0 0 2px rgba(126,217,87,0.18)}
+.ep-export-quality-name{font-size:13px;font-weight:700;color:var(--w);margin-bottom:2px}
+.ep-export-quality-desc{font-size:10px;color:var(--muted);line-height:1.3}
+.ep-export-progress{padding:18px 22px 22px;border-top:1px solid var(--brd);background:rgba(126,217,87,0.04)}
+.ep-export-progress-label{font-size:12px;color:var(--w);font-weight:600;margin-bottom:8px}
+.ep-export-progress-bar{width:100%;height:8px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;margin-bottom:6px}
+.ep-export-progress-fill{height:100%;background:linear-gradient(90deg,var(--g),#aef0a0);transition:width 0.2s ease-out;width:0%}
+.ep-export-progress-pct{font-size:11px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+
+/* ========= GLOBAL PREFERENCES MODAL ========= */
+#ep-global-prefs{position:fixed;inset:0;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;animation:ep-gp-fade 0.18s ease-out both}
+@keyframes ep-gp-fade{from{opacity:0}to{opacity:1}}
+.ep-gp-card{width:min(440px,92vw);max-height:85vh;overflow-y:auto;background:#1a1a22;border:1px solid var(--brd);border-radius:14px;box-shadow:0 24px 80px rgba(0,0,0,0.6);animation:ep-gp-pop 0.22s cubic-bezier(0.34,1.4,0.64,1) both}
+@keyframes ep-gp-pop{from{opacity:0;transform:scale(0.92) translateY(12px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.ep-gp-header{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--brd)}
+.ep-gp-header h2{margin:0;font-size:16px;font-weight:700;color:var(--w);letter-spacing:0.3px;font-family:Outfit}
+.ep-gp-close{background:transparent;border:none;color:var(--gray);font-size:26px;line-height:1;cursor:pointer;padding:0 6px;border-radius:6px;transition:all 0.12s;font-family:Outfit}
+.ep-gp-close:hover{color:var(--w);background:rgba(255,255,255,0.06)}
+.ep-gp-body{padding:18px 22px 22px}
+.ep-gp-section{margin-bottom:18px}
+.ep-gp-section:last-child{margin-bottom:0}
+.ep-gp-label{font-size:11px;color:var(--w);text-transform:uppercase;letter-spacing:1.2px;font-weight:600;margin-bottom:4px;font-family:Outfit}
+.ep-gp-hint{font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.4}
+
 /* ========= STARTUP MODAL ========= */
 #ep-startup-overlay{position:fixed;inset:0;z-index:9999;background:rgba(10,10,12,0.85);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:20px;font-family:Outfit,sans-serif;animation:ep-startup-fade 0.25s ease}
 #ep-startup-overlay.closing{opacity:0;transition:opacity 0.2s ease}
@@ -207,6 +321,24 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 .ss-live-badge-br{bottom:8px;right:8px}
 .ss-live-badge-dot-only{padding:0;background:transparent}
 .ss-live-badge-dot-only:before{width:10px;height:10px;box-shadow:0 0 8px rgba(255,40,40,0.9),0 0 2px rgba(0,0,0,0.5)}
+
+/* Inside-circle inset: corners of a circle are clipped, so push badges in ~15% */
+.ss-live-badge-circle.ss-live-badge-tl{top:15%;left:15%}
+.ss-live-badge-circle.ss-live-badge-tr{top:15%;right:15%}
+.ss-live-badge-circle.ss-live-badge-bl{bottom:15%;left:15%}
+.ss-live-badge-circle.ss-live-badge-br{bottom:15%;right:15%}
+
+/* Gradient border wrapper. Used by webcam + screen-share elements when
+   borderStyle is 'gradient' or 'animated'. The wrapper has the gradient as a
+   background and the inner element is inset by `padding`, creating a border
+   that follows any shape (circle, rounded rect, sharp rect). */
+.ep-grad-border{display:block;position:relative}
+.ep-grad-border.ep-border-anim{animation:ep-border-shift 4s linear infinite}
+@keyframes ep-border-shift{
+  0%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0% 50%}
+}
 
 /* ========= WEBCAM SLIDE ELEMENT ========= */
 .wc-el{width:100%;height:100%;overflow:hidden;background:#0a0a0c;position:relative}
@@ -574,11 +706,11 @@ function mkLine(x1,y1,x2,y2,arrow){return{id:uid(),type:'line',x1:x1,y1:y1,x2:x2
 function mkShape(sh,x,y){return{id:uid(),type:'shape',shape:sh,x:x,y:y,w:140,h:140,fill:'transparent',fillOp:1,stroke:'#7ed957',sw:3,lk:false}}
 function mkImage(src,x,y,w,h){return{id:uid(),type:'image',x:x,y:y,w:w,h:h,src:src,bc:'transparent',bw:0,br:0,op:1,lk:false}}
 function mkNote(x,y){return{id:uid(),type:'note',x:x,y:y,w:200,h:160,text:'Note...',bg:NOTE_COLORS[0],lk:false}}
-function mkScreenShare(x,y){return{id:uid(),type:'screenshare',x:x,y:y,w:640,h:360,label:'Screen Share',bc:'#7ed957',bw:2,br:10,badgeStyle:'full',badgePos:'tl',lk:false}}
+function mkScreenShare(x,y){return{id:uid(),type:'screenshare',x:x,y:y,w:640,h:360,label:'Screen Share',bc:'#7ed957',bc2:'#9b59ff',bw:2,br:10,borderStyle:'solid',badgeStyle:'full',badgePos:'tl',lk:false}}
 // Webcam element: a placeholder on the slide that fills with live camera feed.
 // Unlike the floating webcam overlay (toggled via W key), this is per-slide,
 // positionable, resizable, with its own shape/border/mirror settings.
-function mkWebcam(x,y){return{id:uid(),type:'webcam',x:x,y:y,w:280,h:280,label:'Webcam',shape:'circle',bc:'#7ed957',bw:3,br:14,mirror:true,badgeStyle:'off',badgePos:'tl',deviceId:'',lk:false}}
+function mkWebcam(x,y){return{id:uid(),type:'webcam',x:x,y:y,w:280,h:280,label:'Webcam',shape:'circle',bc:'#7ed957',bc2:'#9b59ff',bw:3,br:14,borderStyle:'solid',mirror:true,badgeStyle:'off',badgePos:'tl',deviceId:'',lk:false}}
 function mkTradingView(x,y){
   return{
     id:uid(), type:'tradingview',
@@ -791,6 +923,7 @@ window.startPresent = function(){
   S.tool = 'cursor';
   S.pop = null;
   S.sel = null;
+  if(window._resetSlideTransitionTracker) window._resetSlideTransitionTracker();
   renderPres();
   syncPresenterView();
 };
@@ -813,6 +946,9 @@ window.exitPresent = function(){
     S.webcamStream = null;
   }
   S.webcamActive = false;
+
+  // Stop any playing slide audio
+  stopSlideAudio();
 
   S.pres = false;
   S.si = S.presSlide;
@@ -1234,13 +1370,19 @@ function invalidateRecCache(){
   console.log('[EP] Rec cache invalidated. New gen=' + _recCacheGeneration);
 }
 
-// Composite loop — runs every frame while recording
+// Composite loop — runs every ~33ms (≈30fps) while recording.
+// IMPORTANT: We use setInterval instead of requestAnimationFrame because RAF
+// gets throttled or stopped entirely when the window is backgrounded, occluded,
+// or loses focus. Recording during presentation often involves the editor
+// window being behind a presenter view — RAF would stop firing and the canvas
+// would emit no new frames, producing a blob with audio but a static frozen
+// video stream (length reported as 00:00 because the encoder never sees motion).
 function recComposeFrame(){
-  if(!S.recActive || !S.recCanvas){ S.recRAF = null; return; }
-  if(S.recPaused){
-    S.recRAF = requestAnimationFrame(recComposeFrame);
+  if(!S.recActive || !S.recCanvas){
+    if(S.recInterval){ clearInterval(S.recInterval); S.recInterval = null; }
     return;
   }
+  if(S.recPaused) return; // setInterval keeps ticking; just skip drawing
   var cv = S.recCanvas;
   var ctx = cv.getContext('2d');
   var W = cv.width, H = cv.height;
@@ -1293,8 +1435,7 @@ function recComposeFrame(){
       ctx.restore();
     }
   }
-
-  S.recRAF = requestAnimationFrame(recComposeFrame);
+  // Note: no RAF reschedule — setInterval handles the next tick.
 }
 
 function formatRecTime(ms){
@@ -1310,10 +1451,252 @@ function currentRecMs(){
   return S.recElapsedBeforePause + (Date.now() - S.recStartTime);
 }
 
+// =========================================================
+// RECORDING EXPORT DIALOG (format picker + ffmpeg conversion)
+// =========================================================
+// After a recording stops, we keep the WebM blob in memory and ask the user
+// which format they want. WebM saves directly via blob download. MP4/MOV/GIF/MP3
+// hand off to the Electron main process (which spawns bundled ffmpeg).
+//
+// Quality is a per-export setting. We probe ffmpeg encoders once per session
+// and prefer hardware (NVENC/QSV/AMF) over CPU (libx264). Users can see the
+// detected encoder so they understand why exports are fast or slow.
+
+// Cached encoder list + chosen quality (stickies between dialogs)
+var _epEncoderList = null;
+var _epLastQuality = null; // 'fast' | 'balanced' | 'high'
+
+function epEncoderHumanName(enc){
+  switch(enc){
+    case 'h264_nvenc': return 'NVIDIA GPU';
+    case 'h264_qsv':   return 'Intel GPU';
+    case 'h264_amf':   return 'AMD GPU';
+    case 'libx264':    return 'CPU';
+    default:           return enc;
+  }
+}
+
+function showRecordingExportDialog(blob, durStr){
+  var hasFfmpeg = !!(window.epElectron && window.epElectron.convertVideo);
+  var sizeStr = (blob.size / 1024 / 1024).toFixed(1) + ' MB';
+  var suggestedName = 'ep-recording-' + Date.now();
+  var quality = _epLastQuality || 'fast';
+
+  // Kick off encoder probe (cached across the session)
+  if(hasFfmpeg && !_epEncoderList && window.epElectron.probeEncoders){
+    window.epElectron.probeEncoders().then(function(list){
+      _epEncoderList = list || ['libx264'];
+      // Update the badge in-place if dialog is still open
+      var badge = document.getElementById('epEncoderBadge');
+      if(badge) badge.textContent = epEncoderHumanName(_epEncoderList[0]);
+    }).catch(function(){ _epEncoderList = ['libx264']; });
+  }
+
+  var overlay = document.createElement('div');
+  overlay.id = 'ep-export-dialog';
+  overlay.className = 'ep-export-overlay';
+
+  var formats = [
+    { v:'webm', l:'WebM',  d:'Native, no conversion. Instant.', recommended:false, icon:'⚡', always:true },
+    { v:'mp4',  l:'MP4',   d:'H.264 + AAC. Best for After Effects, Camtasia, YouTube.', recommended:true,  icon:'🎬' },
+    { v:'mov',  l:'MOV',   d:'QuickTime container, H.264 + AAC.', recommended:false, icon:'🎞️' },
+    { v:'gif',  l:'GIF',   d:'Short clips only. Quality affects size dramatically.', recommended:false, icon:'🌀' },
+    { v:'mp3',  l:'MP3',   d:'Audio only (strips video).', recommended:false, icon:'🎵' }
+  ];
+
+  var qualities = [
+    { v:'fast',     l:'Fast',     d:'Quick exports, larger files. Best for daily lessons.' },
+    { v:'balanced', l:'Balanced', d:'Good size + quality. Default for most uses.' },
+    { v:'high',     l:'High',     d:'Slow but smallest, best for final renders.' }
+  ];
+
+  var encName = _epEncoderList ? epEncoderHumanName(_epEncoderList[0]) : 'detecting…';
+
+  var html = '<div class="ep-export-card">';
+  html += '<div class="ep-export-header"><h2>Export Recording</h2><button class="ep-export-close" onclick="closeExportDialog(true)" title="Cancel">&times;</button></div>';
+  html += '<div class="ep-export-info">Length: <strong>'+durStr+'</strong> · Size: <strong>'+sizeStr+'</strong> · Encoder: <strong id="epEncoderBadge">'+encName+'</strong></div>';
+  html += '<div class="ep-export-body">';
+
+  // Quality picker (only relevant when ffmpeg is in play)
+  if(hasFfmpeg){
+    html += '<div class="ep-export-q">Quality</div>';
+    html += '<div class="ep-export-quality-row">';
+    qualities.forEach(function(q){
+      var active = quality === q.v;
+      html += '<button class="ep-export-quality-btn'+(active?' active':'')+'" onclick="setExportQuality(\''+q.v+'\')" title="'+esc(q.d)+'">';
+      html += '<div class="ep-export-quality-name">'+q.l+'</div>';
+      html += '<div class="ep-export-quality-desc">'+q.d+'</div>';
+      html += '</button>';
+    });
+    html += '</div>';
+  }
+
+  html += '<div class="ep-export-q">Format</div>';
+  formats.forEach(function(f){
+    var disabled = !f.always && !hasFfmpeg;
+    var disabledLabel = disabled ? '<span style="color:var(--muted);font-size:10px;margin-left:6px">(needs Electron build)</span>' : '';
+    var recBadge = f.recommended ? '<span class="ep-export-rec">RECOMMENDED</span>' : '';
+    html += '<button class="ep-export-fmt'+(disabled?' disabled':'')+(f.recommended?' recommended':'')+'" '+(disabled?'disabled':'')+' data-format="'+f.v+'" onclick="handleExportFormat(\''+f.v+'\')">';
+    html += '<div class="ep-export-fmt-icon">'+f.icon+'</div>';
+    html += '<div class="ep-export-fmt-text">';
+    html += '<div class="ep-export-fmt-name">'+f.l+recBadge+disabledLabel+'</div>';
+    html += '<div class="ep-export-fmt-desc">'+f.d+'</div>';
+    html += '</div>';
+    html += '</button>';
+  });
+  html += '</div>';
+  // Progress area (hidden until conversion starts)
+  html += '<div class="ep-export-progress" id="epExportProgress" style="display:none">';
+  html += '<div class="ep-export-progress-label" id="epExportProgressLabel">Converting…</div>';
+  html += '<div class="ep-export-progress-bar"><div class="ep-export-progress-fill" id="epExportProgressFill"></div></div>';
+  html += '<div class="ep-export-progress-pct" id="epExportProgressPct">0%</div>';
+  html += '</div>';
+  html += '</div>';
+  overlay.innerHTML = html;
+  document.body.appendChild(overlay);
+
+  overlay._epBlob = blob;
+  overlay._epSuggestedName = suggestedName;
+  overlay._epDurStr = durStr;
+  overlay._epQuality = quality;
+
+  overlay._epKeyHandler = function(e){
+    if(e.key === 'Escape' && !overlay._epConverting) closeExportDialog(true);
+  };
+  document.addEventListener('keydown', overlay._epKeyHandler);
+}
+
+window.setExportQuality = function(q){
+  var overlay = document.getElementById('ep-export-dialog');
+  if(!overlay) return;
+  overlay._epQuality = q;
+  _epLastQuality = q;
+  // Re-style buttons
+  var btns = overlay.querySelectorAll('.ep-export-quality-btn');
+  for(var i=0; i<btns.length; i++){
+    var btn = btns[i];
+    var isActive = btn.getAttribute('onclick').indexOf("'"+q+"'") >= 0;
+    btn.classList.toggle('active', isActive);
+  }
+};
+
+window.closeExportDialog = function(userCancelled){
+  var overlay = document.getElementById('ep-export-dialog');
+  if(!overlay) return;
+  if(overlay._epKeyHandler) document.removeEventListener('keydown', overlay._epKeyHandler);
+  overlay.remove();
+  if(userCancelled) showToast('Export cancelled');
+};
+
+window.handleExportFormat = async function(format){
+  var overlay = document.getElementById('ep-export-dialog');
+  if(!overlay) return;
+  var blob = overlay._epBlob;
+  var name = overlay._epSuggestedName;
+  var quality = overlay._epQuality || 'fast';
+  if(!blob) return;
+
+  // WebM: skip ffmpeg, save directly
+  if(format === 'webm'){
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = name + '.webm';
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+    closeExportDialog(false);
+    showToast('Recording saved (WebM)');
+    return;
+  }
+
+  // Other formats need Electron
+  if(!window.epElectron || !window.epElectron.convertVideo){
+    showToast('Conversion only works in the desktop app');
+    return;
+  }
+
+  // Switch UI to "converting" state
+  overlay._epConverting = true;
+  var progressBox = document.getElementById('epExportProgress');
+  var progressFill = document.getElementById('epExportProgressFill');
+  var progressPct = document.getElementById('epExportProgressPct');
+  var progressLabel = document.getElementById('epExportProgressLabel');
+  if(progressBox) progressBox.style.display = 'block';
+  if(progressLabel) progressLabel.textContent = 'Converting to ' + format.toUpperCase() + ' (' + quality + ')…';
+  // Disable all format buttons
+  var btns = overlay.querySelectorAll('.ep-export-fmt, .ep-export-quality-btn');
+  for(var bi=0; bi<btns.length; bi++){
+    btns[bi].disabled = true;
+    btns[bi].style.opacity = '0.4';
+    btns[bi].style.cursor = 'not-allowed';
+  }
+  var closeBtn = overlay.querySelector('.ep-export-close');
+  if(closeBtn) closeBtn.style.display = 'none';
+
+  // Subscribe to progress
+  var unsubscribe = window.epElectron.onConvertProgress(function(data){
+    if(progressFill && data.pct != null){
+      progressFill.style.width = data.pct + '%';
+      if(progressPct) progressPct.textContent = data.pct + '%';
+    }
+    // GPU encoder fell back to CPU — let the user know
+    if(data.fellBack && progressLabel){
+      progressLabel.textContent = 'GPU encoder failed — retrying with CPU…';
+    } else if(data.encoder && progressLabel && !data.fellBack){
+      progressLabel.textContent = 'Converting to ' + format.toUpperCase() + ' (' + quality + ', ' + epEncoderHumanName(data.encoder) + ')…';
+    }
+  });
+
+  try {
+    var arrayBuffer = await blob.arrayBuffer();
+    var result = await window.epElectron.convertVideo(arrayBuffer, format, name, { quality: quality });
+    if(unsubscribe) unsubscribe();
+    if(result && result.ok){
+      if(progressFill) progressFill.style.width = '100%';
+      if(progressPct) progressPct.textContent = '100%';
+      if(progressLabel) progressLabel.textContent = 'Done!';
+      showToast('Saved: ' + result.outputPath);
+      setTimeout(function(){
+        if(window.epElectron && window.epElectron.showInFolder) {
+          window.epElectron.showInFolder(result.outputPath);
+        }
+        closeExportDialog(false);
+      }, 800);
+    } else if(result && result.canceled){
+      // User cancelled save dialog — restore picker UI
+      overlay._epConverting = false;
+      if(progressBox) progressBox.style.display = 'none';
+      for(var bi2=0; bi2<btns.length; bi2++){
+        btns[bi2].disabled = btns[bi2].classList.contains('disabled');
+        btns[bi2].style.opacity = '';
+        btns[bi2].style.cursor = '';
+      }
+      if(closeBtn) closeBtn.style.display = '';
+    } else {
+      var msg = (result && result.error) || 'Conversion failed';
+      if(progressLabel) progressLabel.textContent = 'Failed: ' + msg;
+      showToast('Export failed: ' + msg);
+      overlay._epConverting = false;
+      for(var bi3=0; bi3<btns.length; bi3++){
+        btns[bi3].disabled = btns[bi3].classList.contains('disabled');
+        btns[bi3].style.opacity = '';
+        btns[bi3].style.cursor = '';
+      }
+      if(closeBtn) closeBtn.style.display = '';
+    }
+  } catch(err){
+    if(unsubscribe) unsubscribe();
+    console.error('Export error:', err);
+    showToast('Export error: ' + (err.message || err));
+    overlay._epConverting = false;
+    if(closeBtn) closeBtn.style.display = '';
+  }
+};
+
 // Update indicator time display every second
 function tickRecIndicator(){
-  if(!S.recActive){
-    // Ensure indicator is removed when recording stops
+  if(!S.recActive && !S._recStopping){
+    // Ensure indicator is removed when recording stops AND finalization is done
     var existing = document.getElementById('recIndicator');
     if(existing) existing.remove();
     return;
@@ -1334,10 +1717,10 @@ function ensureRecIndicator(){
   }
   ind.innerHTML =
     '<div class="rec-dot'+(S.recPaused?' paused':'')+'"></div>' +
-    '<span>'+(S.recPaused?'PAUSED':'REC')+'</span>' +
+    '<span>'+(S.recPaused?'PAUSED':(S._recStopping?'STOPPING':'REC'))+'</span>' +
     '<span class="rec-time" id="recTime">'+formatRecTime(currentRecMs())+'</span>' +
-    '<button onclick="pauseRecording()">'+(S.recPaused?'Resume':'Pause')+'</button>' +
-    '<button class="stop" onclick="stopRecording()">Stop</button>';
+    '<button onclick="pauseRecording()"'+(S._recStopping?' disabled style="opacity:0.4;cursor:not-allowed"':'')+'>'+(S.recPaused?'Resume':'Pause')+'</button>' +
+    '<button class="stop" onclick="stopRecording()"'+(S._recStopping?' disabled style="opacity:0.4;cursor:not-allowed"':'')+'>'+(S._recStopping?'Stopping…':'Stop')+'</button>';
 }
 
 window.toggleRecAudio = function(evt){
@@ -1352,6 +1735,14 @@ window.toggleRecAudio = function(evt){
 window.startRecording = async function(){
   if(S.recActive){ return; }
   if(!S.pres){ showToast('Start recording from presentation mode'); return; }
+
+  // Detect whether any slide has audio attached — only then prompt
+  var hasAnyAudio = S.slides.some(function(s){ return s.audio && s.audio.data; });
+  var includeAudio = false;
+  if(hasAnyAudio){
+    includeAudio = confirm('Include slide voiceovers in the recording?\n\nClick OK to record narration audio together with the screen.\nClick Cancel for video only (or with mic if enabled).');
+  }
+  S.recIncludeSlideAudio = includeAudio;
 
   try {
     // 1. Create canvas (1920×1080)
@@ -1372,23 +1763,49 @@ window.startRecording = async function(){
       primeCtx.drawImage(bm, 0, 0, cv.width, cv.height);
     }
 
-    // 2. Set up composited stream: canvas video + optional mic audio
+    // 2. Set up composited stream: canvas video + optional mic + optional slide voiceover.
+    // When slide audio mixing is requested, we build an AudioContext destination that
+    // both mic and slide-audio tracks can feed into.
     var videoStream = cv.captureStream(30);
-    var combinedStream;
-    if(S.recAudio){
+    var combinedStream = new MediaStream();
+    videoStream.getVideoTracks().forEach(function(t){ combinedStream.addTrack(t); });
+
+    // AudioContext-based mixer (only created when needed)
+    if(S.recAudio || includeAudio){
       try {
-        S.recAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        combinedStream = new MediaStream();
-        videoStream.getVideoTracks().forEach(function(t){ combinedStream.addTrack(t); });
-        S.recAudioStream.getAudioTracks().forEach(function(t){ combinedStream.addTrack(t); });
+        S.recAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        S.recAudioDest = S.recAudioCtx.createMediaStreamDestination();
+
+        // Route mic if requested
+        if(S.recAudio){
+          try {
+            S.recAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            var micSrc = S.recAudioCtx.createMediaStreamSource(S.recAudioStream);
+            micSrc.connect(S.recAudioDest);
+          } catch(e){
+            console.warn('Mic denied or unavailable, recording without mic:', e);
+            showToast('Mic unavailable — continuing without mic');
+            S.recAudioStream = null;
+          }
+        }
+
+        // Route slide voiceover audio if requested.
+        // We hook the existing _slideAudio.audio element. When playSlideAudio
+        // creates a new <audio>, we need to also route it through the mixer.
+        // _routeSlideAudioToMixer is checked by playSlideAudio after it creates
+        // each element.
+        S.recRouteSlideAudio = !!includeAudio;
+
+        // Add the destination's audio track
+        S.recAudioDest.stream.getAudioTracks().forEach(function(t){
+          combinedStream.addTrack(t);
+        });
       } catch(e){
-        console.warn('Mic denied or unavailable, recording video-only:', e);
-        showToast('Mic unavailable — recording without audio');
-        combinedStream = videoStream;
+        console.error('Audio mixer setup failed:', e);
+        showToast('Audio setup failed — recording video only');
         S.recAudioStream = null;
+        S.recAudioCtx = null;
       }
-    } else {
-      combinedStream = videoStream;
     }
 
     // 3. Set up MediaRecorder — prefer vp9, fallback vp8, fallback default
@@ -1409,21 +1826,29 @@ window.startRecording = async function(){
       if(e.data && e.data.size > 0) S.recChunks.push(e.data);
     };
     rec.onstop = function(){
+      // Guard against double-fire (defensive timeout in stopRecording may have invoked us)
+      if(rec._epFinalized) return;
+      rec._epFinalized = true;
+      S._recStopping = false;
+      // Trigger the indicator's removal cycle
+      tickRecIndicator();
       var blob = new Blob(S.recChunks, { type: 'video/webm' });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = 'ep-recording-' + Date.now() + '.webm';
-      a.click();
-      setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
-      // Clean up
+      // Clean up resources first so they don't leak while user picks format
       if(S.recAudioStream){
         try { S.recAudioStream.getTracks().forEach(function(t){ t.stop(); }); } catch(e){}
         S.recAudioStream = null;
       }
+      if(S.recAudioCtx){
+        try { S.recAudioCtx.close(); } catch(e){}
+        S.recAudioCtx = null;
+        S.recAudioDest = null;
+      }
+      S.recRouteSlideAudio = false;
       S.recChunks = [];
       S.recCanvas = null;
-      showToast('Recording saved: ' + formatRecTime(currentRecMs()));
+      var durStr = formatRecTime(currentRecMs());
+      // Show format picker; user chooses WebM (direct), MP4, MOV, GIF, or MP3
+      showRecordingExportDialog(blob, durStr);
     };
     S.recorder = rec;
     rec.start(1000); // emit chunks every 1s
@@ -1433,7 +1858,11 @@ window.startRecording = async function(){
     S.recPaused = false;
     S.recStartTime = Date.now();
     S.recElapsedBeforePause = 0;
-    S.recRAF = requestAnimationFrame(recComposeFrame);
+    // setInterval at ~33ms (~30fps) — survives window backgrounding, unlike RAF.
+    if(S.recInterval){ clearInterval(S.recInterval); }
+    S.recInterval = setInterval(recComposeFrame, 33);
+    // Run one frame immediately so the canvas isn't blank before the first interval tick
+    recComposeFrame();
     renderPres();
     tickRecIndicator();
     showToast('Recording started' + (S.recAudio && S.recAudioStream ? ' (with mic)' : ' (video only)'));
@@ -1461,14 +1890,40 @@ window.pauseRecording = function(){
 };
 
 window.stopRecording = function(){
+  // Re-entrancy guard: ignore subsequent clicks while a stop is in progress.
+  if(S._recStopping) return;
   if(!S.recActive || !S.recorder) return;
+  S._recStopping = true;
+  // Stop the compositor interval immediately so canvas stops emitting frames.
+  if(S.recInterval){ clearInterval(S.recInterval); S.recInterval = null; }
+  if(S.recRAF){ try{ cancelAnimationFrame(S.recRAF); }catch(e){} S.recRAF = null; }
+  // Tell MediaRecorder to flush remaining data, then stop.
+  // requestData() forces an ondataavailable so the final 0-1 second isn't lost.
   try {
-    if(S.recorder.state !== 'inactive') S.recorder.stop();
-  } catch(e){ console.warn('stop() failed:', e); }
-  if(S.recRAF){ cancelAnimationFrame(S.recRAF); S.recRAF = null; }
+    if(S.recorder.state !== 'inactive'){
+      try { S.recorder.requestData(); } catch(e){}
+      S.recorder.stop();
+    }
+  } catch(e){
+    console.warn('stop() failed:', e);
+    // Even if stop throws, run onstop manually so user gets their blob.
+    if(typeof S.recorder.onstop === 'function'){
+      try { S.recorder.onstop(); } catch(e2){}
+    }
+  }
+  // Defensive timeout: if onstop doesn't fire within 4s, force-finalize so the
+  // user isn't stuck with the indicator removed but no export dialog.
+  setTimeout(function(){
+    if(S._recStopping && S.recChunks && S.recChunks.length){
+      console.warn('onstop never fired — finalizing manually');
+      try {
+        if(S.recorder && typeof S.recorder.onstop === 'function') S.recorder.onstop();
+      } catch(e){}
+    }
+    S._recStopping = false;
+  }, 4000);
   S.recActive = false;
   S.recPaused = false;
-  // recorder.onstop handles the download + cleanup
   if(S.pres) renderPres();
   else render();
 };
@@ -1480,6 +1935,12 @@ function maxRevealStep(slide){
   var max = 0;
   slide.els.forEach(function(el){
     if(el.reveal && el.reveal > max) max = el.reveal;
+    // Also count per-item reveals on list elements
+    if(el.type === 'list' && el.items){
+      el.items.forEach(function(it){
+        if(it.reveal && it.reveal > max) max = it.reveal;
+      });
+    }
   });
   return max;
 }
@@ -1819,11 +2280,14 @@ window.startElDrag = function(evt, id){
   // Shift-click: toggle selection, don't start drag
   if(evt.shiftKey){
     toggleSelect(id);
+    // Expand toggled selection to whole groups
+    S.selIds = expandSelectionToGroups(S.selIds);
+    render();
     return;
   }
-  // Locked: select only, no drag
+  // Locked: select only (entire group if grouped), no drag
   if(el.lk){
-    S.selIds = [id];
+    S.selIds = expandSelectionToGroups([id]);
     S.ctxMenu = null; S.pop = null;
     render();
     return;
@@ -1837,9 +2301,12 @@ window.startElDrag = function(evt, id){
   }
   lastClick = {id:id, time:now};
   // If clicking on an already-selected element in a multi-selection, keep selection
-  // Otherwise select only this one
+  // Otherwise select only this one (expanded to its group if any)
   if(S.selIds.indexOf(id) < 0){
-    S.selIds = [id];
+    S.selIds = expandSelectionToGroups([id]);
+  } else {
+    // Already in selection — make sure group siblings are still in there
+    S.selIds = expandSelectionToGroups(S.selIds);
   }
   S.ctxMenu = null;
   S.pop = null;
@@ -1971,7 +2438,8 @@ window.sendBackward = function(id){
 // ADD ELEMENTS
 // =========================================================
 window.addScreenShare = function(){
-  var el = mkScreenShare(200 + Math.random()*100, 200 + Math.random()*100);
+  var p = getNextSpawnPos(640, 360);
+  var el = mkScreenShare(p.x, p.y);
   updateSlide(function(s){s.els.push(el); return s;});
   S.sel = el.id;
   S.tool = 'select';
@@ -2158,7 +2626,8 @@ window.updateScreenShareLabel = function(id, label){
 // =========================================================
 
 window.addWebcam = function(){
-  var el = mkWebcam(280 + Math.random()*80, 120 + Math.random()*80);
+  var p = getNextSpawnPos(280, 280);
+  var el = mkWebcam(p.x, p.y);
   updateSlide(function(s){s.els.push(el); return s;});
   S.sel = el.id;
   S.tool = 'select';
@@ -2294,7 +2763,8 @@ async function populateWebcamDeviceList(elId){
 // =========================================================
 
 window.addTradingView = function(){
-  var el = mkTradingView(120 + Math.random()*100, 120 + Math.random()*80);
+  var p = getNextSpawnPos(800, 500);
+  var el = mkTradingView(p.x, p.y);
   updateSlide(function(s){s.els.push(el); return s;});
   S.sel = el.id;
   S.tool = 'select';
@@ -2523,8 +2993,31 @@ var TV_WIDGET_TYPES = [
 ];
 
 
+// Compute a spawn position for a new element on the current slide.
+// Returns {x, y} that cascades down-and-right based on existing element count,
+// so successive adds don't perfectly stack. Wraps after 12 elements to stay on canvas.
+// `w` / `h` are the new element's dimensions so we can center the cascade origin.
+function getNextSpawnPos(w, h){
+  var slide = cs();
+  var n = (slide && slide.els) ? slide.els.length : 0;
+  // Wrap after 12 elements so we don't drift off-screen
+  var step = n % 12;
+  // Base position: roughly 1/4 in from top-left of stage so cascade has room to grow
+  var baseX = 240, baseY = 160;
+  var dx = step * 35;
+  var dy = step * 30;
+  var x = baseX + dx;
+  var y = baseY + dy;
+  // Clamp inside stage so it's always visible
+  if(w && x + w > STAGE_W - 20) x = Math.max(20, STAGE_W - w - 20);
+  if(h && y + h > STAGE_H - 20) y = Math.max(20, STAGE_H - h - 20);
+  return { x: x, y: y };
+}
+window.getNextSpawnPos = getNextSpawnPos;
+
 window.addText = function(){
-  var el = mkText(120 + Math.random()*200, 120 + Math.random()*150);
+  var p = getNextSpawnPos(420, 70);
+  var el = mkText(p.x, p.y);
   updateSlide(function(s){s.els.push(el); return s;});
   S.sel = el.id;
   S.tool = 'select';
@@ -2533,9 +3026,11 @@ window.addText = function(){
 window.addShape = function(sh){
   var el;
   if(sh === 'line' || sh === 'arrow'){
-    el = mkLine(300, 300, 600, 300, sh === 'arrow');
+    var p = getNextSpawnPos(300, 0);
+    el = mkLine(p.x, p.y + 50, p.x + 300, p.y + 50, sh === 'arrow');
   } else {
-    el = mkShape(sh, 200 + Math.random()*200, 200 + Math.random()*150);
+    var p2 = getNextSpawnPos(140, 140);
+    el = mkShape(sh, p2.x, p2.y);
   }
   updateSlide(function(s){s.els.push(el); return s;});
   S.sel = el.id;
@@ -2555,7 +3050,8 @@ window.handleImageUpload = function(evt){
     img.onload = function(){
       var aspect = img.width / img.height;
       var w = Math.min(500, img.width), h = w / aspect;
-      var el = mkImage(ev.target.result, 100, 100, w, h);
+      var p = getNextSpawnPos(w, h);
+      var el = mkImage(ev.target.result, p.x, p.y, w, h);
       updateSlide(function(s){s.els.push(el); return s;});
       S.sel = el.id;
       S.tool = 'select';
@@ -2567,7 +3063,8 @@ window.handleImageUpload = function(evt){
 };
 
 window.addNote = function(){
-  var el = mkNote(150 + Math.random()*300, 150 + Math.random()*200);
+  var p = getNextSpawnPos(200, 160);
+  var el = mkNote(p.x, p.y);
   updateSlide(function(s){s.els.push(el); return s;});
   S.sel = el.id;
   S.tool = 'select';
@@ -2579,7 +3076,8 @@ window.setNoteColor = function(id, c){ window.updateEl(id, {bg:c}); };
 // LIST ELEMENT ACTIONS
 // =========================================================
 window.addList = function(style){
-  var el = mkList(style, 120, 100);
+  var p = getNextSpawnPos(720, 360);
+  var el = mkList(style, p.x, p.y);
   updateSlide(function(s){s.els.push(el); return s;});
   S.sel = el.id;
   S.tool = 'select';
@@ -2813,6 +3311,100 @@ window.toggleSelect = function(id){
 window.isSelected = function(id){ return S.selIds.indexOf(id) >= 0; };
 
 // =========================================================
+// ELEMENT GROUPS
+// =========================================================
+// Groups are represented by a `gid` field on each element. Elements sharing the
+// same gid form a group. There is no separate groups array — membership is
+// implicit. Selecting any member auto-selects all members.
+
+// Find all element IDs that share a gid with the given id.
+function getGroupMemberIds(id){
+  var slide = cs(); if(!slide) return [id];
+  var el = gEl(id);
+  if(!el || !el.gid) return [id];
+  return slide.els.filter(function(e){ return e.gid === el.gid; }).map(function(e){ return e.id; });
+}
+window.getGroupMemberIds = getGroupMemberIds;
+
+// Expand a selection to include all group siblings of any selected element.
+function expandSelectionToGroups(ids){
+  var slide = cs(); if(!slide) return ids;
+  var gidsTouched = {};
+  ids.forEach(function(id){
+    var el = gEl(id);
+    if(el && el.gid) gidsTouched[el.gid] = true;
+  });
+  var seen = {};
+  var out = [];
+  ids.forEach(function(id){ if(!seen[id]){ seen[id] = true; out.push(id); } });
+  slide.els.forEach(function(e){
+    if(e.gid && gidsTouched[e.gid] && !seen[e.id]){
+      seen[e.id] = true;
+      out.push(e.id);
+    }
+  });
+  return out;
+}
+window.expandSelectionToGroups = expandSelectionToGroups;
+
+// Group the currently-selected elements. Assigns them a fresh gid.
+window.groupSelection = function(){
+  if(S.selIds.length < 2){ showToast('Select 2 or more elements to group'); return; }
+  var newGid = 'g_' + uid();
+  updateSlide(function(s){
+    s.els.forEach(function(e){
+      if(S.selIds.indexOf(e.id) >= 0){ e.gid = newGid; }
+    });
+    return s;
+  });
+  showToast('Grouped ' + S.selIds.length + ' elements');
+};
+
+// Ungroup: remove gid from every selected element (and from any of their group siblings).
+window.ungroupSelection = function(){
+  if(!S.selIds.length){ showToast('Nothing selected'); return; }
+  var slide = cs(); if(!slide) return;
+  // Find all gids represented in current selection
+  var gids = {};
+  S.selIds.forEach(function(id){
+    var el = gEl(id);
+    if(el && el.gid) gids[el.gid] = true;
+  });
+  if(Object.keys(gids).length === 0){ showToast('No groups in selection'); return; }
+  updateSlide(function(s){
+    s.els.forEach(function(e){
+      if(e.gid && gids[e.gid]) delete e.gid;
+    });
+    return s;
+  });
+  showToast('Ungrouped');
+};
+
+// Get the bounding box of a group (min/max x/y of all members).
+function getGroupBounds(gid){
+  var slide = cs(); if(!slide) return null;
+  var members = slide.els.filter(function(e){ return e.gid === gid; });
+  if(!members.length) return null;
+  var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  members.forEach(function(e){
+    var x1, y1, x2, y2;
+    if(e.type === 'line'){
+      x1 = Math.min(e.x1, e.x2); y1 = Math.min(e.y1, e.y2);
+      x2 = Math.max(e.x1, e.x2); y2 = Math.max(e.y1, e.y2);
+    } else {
+      x1 = e.x; y1 = e.y;
+      x2 = e.x + (e.w || 0); y2 = e.y + (e.h || 0);
+    }
+    if(x1 < minX) minX = x1;
+    if(y1 < minY) minY = y1;
+    if(x2 > maxX) maxX = x2;
+    if(y2 > maxY) maxY = y2;
+  });
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+window.getGroupBounds = getGroupBounds;
+
+// =========================================================
 // CLIPBOARD (Copy / Paste / Duplicate)
 // =========================================================
 window.copySelection = function(){
@@ -2885,10 +3477,60 @@ function moveElTo(el, newX, newY){
 
 window.alignSelection = function(mode){
   if(S.selIds.length < 1) return;
+  // Detect if the entire selection is exactly one group — if so, alignment should
+  // treat the group as a single object (move the whole group, preserve relative
+  // positions of children). Otherwise members would all collapse to share the
+  // same edge/center, which is destructive.
+  var isWholeGroup = false;
+  if(S.selIds.length >= 2){
+    var slide0 = cs();
+    if(slide0){
+      var firstEl = gEl(S.selIds[0]);
+      var firstGid = firstEl ? firstEl.gid : null;
+      if(firstGid){
+        // All selected must be in this gid AND the group must have no other members
+        var allInGid = S.selIds.every(function(id){
+          var e = gEl(id);
+          return e && e.gid === firstGid;
+        });
+        var groupSize = slide0.els.filter(function(e){ return e.gid === firstGid; }).length;
+        if(allInGid && groupSize === S.selIds.length) isWholeGroup = true;
+      }
+    }
+  }
+
   updateSlide(function(s){
     var selected = s.els.filter(function(e){return S.selIds.indexOf(e.id) >= 0 && !e.lk});
     if(!selected.length) return s;
-    // Reference: if 1 selected, align to stage; if 2+, align to bounding box of selection
+
+    // Whole-group alignment: shift all members by the same delta so the group
+    // moves as one. Reference is the stage (or for distribute, no-op).
+    if(isWholeGroup){
+      // Compute group bounds
+      var bnds = selected.map(getElBounds);
+      var gx = Math.min.apply(null, bnds.map(function(b){return b.x}));
+      var gy = Math.min.apply(null, bnds.map(function(b){return b.y}));
+      var gxMax = Math.max.apply(null, bnds.map(function(b){return b.x+b.w}));
+      var gyMax = Math.max.apply(null, bnds.map(function(b){return b.y+b.h}));
+      var gw = gxMax - gx, gh = gyMax - gy;
+      var dx = 0, dy = 0;
+      if(mode === 'left')    dx = 0 - gx;
+      if(mode === 'right')   dx = (STAGE_W - gw) - gx;
+      if(mode === 'hcenter') dx = ((STAGE_W - gw)/2) - gx;
+      if(mode === 'top')     dy = 0 - gy;
+      if(mode === 'bottom')  dy = (STAGE_H - gh) - gy;
+      if(mode === 'vcenter') dy = ((STAGE_H - gh)/2) - gy;
+      // dist-h / dist-v are no-ops on a single group (can't distribute one thing)
+      if(dx !== 0 || dy !== 0){
+        selected.forEach(function(el){
+          var b = getElBounds(el);
+          moveElTo(el, b.x + dx, b.y + dy);
+        });
+      }
+      return s;
+    }
+
+    // Standard alignment: align members of selection to each other (or to stage if 1 selected)
     var refX, refY, refW, refH;
     if(selected.length === 1){
       refX = 0; refY = 0; refW = STAGE_W; refH = STAGE_H;
@@ -3035,6 +3677,205 @@ try {
   var pref = localStorage.getItem(AUTOSAVE_PREF_KEY);
   S.autoSaveEnabled = pref === null ? true : pref === 'true';
 } catch(e){ S.autoSaveEnabled = true; }
+
+// =========================================================
+// TRANSITION & ANIMATION PREFERENCES
+// =========================================================
+// Slide change transition (between slides) + reveal animation (when reveal-step advances)
+// can each have their own global default. Slides can override the slide-change transition.
+var TRANSITION_OPTIONS = [
+  {v:'fade', l:'Fade'},
+  {v:'slide-left', l:'Slide Left'},
+  {v:'slide-right', l:'Slide Right'},
+  {v:'slide-up', l:'Slide Up'},
+  {v:'slide-down', l:'Slide Down'},
+  {v:'zoom', l:'Zoom In'},
+  {v:'zoom-out', l:'Zoom Out'},
+  {v:'none', l:'None'}
+];
+var REVEAL_ANIM_OPTIONS = [
+  {v:'fade', l:'Fade'},
+  {v:'slide-up', l:'Slide Up'},
+  {v:'slide-left', l:'Slide Left'},
+  {v:'slide-right', l:'Slide Right'},
+  {v:'zoom', l:'Zoom In'},
+  {v:'pop', l:'Pop'},
+  {v:'none', l:'None'}
+];
+var GLOBAL_TRANS_KEY = 'ep-presenter-global-transition';
+var GLOBAL_REVEAL_KEY = 'ep-presenter-global-reveal-anim';
+var GLOBAL_SPEED_KEY = 'ep-presenter-global-speed';
+try {
+  S.globalTransition = localStorage.getItem(GLOBAL_TRANS_KEY) || 'fade';
+  S.globalRevealAnim = localStorage.getItem(GLOBAL_REVEAL_KEY) || 'fade';
+  S.globalSpeed = localStorage.getItem(GLOBAL_SPEED_KEY) || 'normal';
+} catch(e){ S.globalTransition = 'fade'; S.globalRevealAnim = 'fade'; S.globalSpeed = 'normal'; }
+
+// Apply speed class to body so CSS variables take effect
+function applyGlobalSpeed(){
+  if(!document.body) return;
+  document.body.classList.remove('ep-speed-fast','ep-speed-normal','ep-speed-slow');
+  document.body.classList.add('ep-speed-' + (S.globalSpeed || 'normal'));
+}
+// Apply on init (DOMContentLoaded already fired by the time this runs)
+if(document.body) applyGlobalSpeed();
+else document.addEventListener('DOMContentLoaded', applyGlobalSpeed);
+
+window.setGlobalTransition = function(t){
+  S.globalTransition = t;
+  try { localStorage.setItem(GLOBAL_TRANS_KEY, t); } catch(e){}
+  showToast('Default slide transition: ' + (TRANSITION_OPTIONS.find(function(x){return x.v===t})||{l:t}).l);
+};
+window.setGlobalRevealAnim = function(t){
+  S.globalRevealAnim = t;
+  try { localStorage.setItem(GLOBAL_REVEAL_KEY, t); } catch(e){}
+  showToast('Reveal animation: ' + (REVEAL_ANIM_OPTIONS.find(function(x){return x.v===t})||{l:t}).l);
+};
+window.setGlobalSpeed = function(s){
+  S.globalSpeed = s;
+  try { localStorage.setItem(GLOBAL_SPEED_KEY, s); } catch(e){}
+  applyGlobalSpeed();
+  showToast('Animation speed: ' + s.charAt(0).toUpperCase() + s.slice(1));
+};
+window.setSlideTransition = function(t){
+  var s = cs(); if(!s) return;
+  if(t === '__inherit'){ delete s.transition; }
+  else { s.transition = t; }
+  pushHist();
+  render();
+};
+
+// =========================================================
+// SLIDE AUDIO (per-slide voiceovers)
+// =========================================================
+// Each slide can carry an optional audio object:
+//   slide.audio = {
+//     data: 'data:audio/mp3;base64,...',  // the encoded audio
+//     name: 'voiceover-1.mp3',            // original filename (for display)
+//     autoplay: true,                     // play on slide open
+//     autoadvance: false,                 // jump to next slide when audio ends
+//     showControls: true                  // show play/pause UI on slide
+//   }
+// We keep ONE active <audio> element to avoid memory leaks. State is tracked in
+// _slideAudio so we can stop/swap cleanly when slides change.
+var _slideAudio = { audio: null, slideId: null };
+
+// Stop and discard the current playing audio (used on slide change / exit pres).
+function stopSlideAudio(){
+  if(_slideAudio.audio){
+    try { _slideAudio.audio.pause(); _slideAudio.audio.src = ''; _slideAudio.audio.load(); } catch(e){}
+  }
+  _slideAudio.audio = null;
+  _slideAudio.slideId = null;
+}
+
+// Play the audio attached to a given slide. If the same slide is already playing,
+// no-op. If no audio attached, no-op.
+function playSlideAudio(slide){
+  if(!slide || !slide.audio || !slide.audio.data) return;
+  // Already playing for this slide?
+  if(_slideAudio.slideId === slide.id && _slideAudio.audio && !_slideAudio.audio.ended){
+    return;
+  }
+  stopSlideAudio();
+  var a = new Audio(slide.audio.data);
+  _slideAudio.audio = a;
+  _slideAudio.slideId = slide.id;
+
+  // If we're recording AND the user opted to include slide audio, route through mixer.
+  // This lets the recorded webm capture the voiceover in sync with the visuals.
+  if(S.recActive && S.recRouteSlideAudio && S.recAudioCtx && S.recAudioDest){
+    try {
+      var srcNode = S.recAudioCtx.createMediaElementSource(a);
+      srcNode.connect(S.recAudioDest);
+      // Also keep audible output to speakers
+      srcNode.connect(S.recAudioCtx.destination);
+    } catch(e){
+      // createMediaElementSource throws if already connected; just log
+      console.warn('Slide audio routing failed:', e);
+    }
+  }
+
+  // Autoadvance: when audio ends, advance presentation
+  a.addEventListener('ended', function(){
+    if(slide.audio.autoadvance && S.pres && S.presSlide < S.slides.length - 1){
+      // Only advance if user hasn't already moved on
+      if(_slideAudio.slideId === slide.id){
+        if(typeof window.presNext === 'function') window.presNext();
+      }
+    }
+  });
+  a.play().catch(function(err){
+    console.warn('Slide audio play failed:', err);
+  });
+}
+
+// Toggle pause/resume on the current slide's audio (called from controls UI).
+window.toggleSlideAudio = function(){
+  var a = _slideAudio.audio;
+  if(!a) return;
+  if(a.paused) a.play().catch(function(){});
+  else a.pause();
+  // Re-render to update icon
+  if(S.pres) renderPres();
+};
+
+// File picker → reads selected audio file → stores as base64 data URL on the slide.
+window.uploadSlideAudio = function(slideIdx){
+  var inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'audio/*';
+  inp.onchange = function(e){
+    var file = e.target.files && e.target.files[0];
+    if(!file) return;
+    // Cap at 25 MB to keep deck files manageable
+    if(file.size > 25 * 1024 * 1024){
+      showToast('Audio file too large (max 25 MB)');
+      return;
+    }
+    var r = new FileReader();
+    r.onload = function(){
+      var slide = (slideIdx != null) ? S.slides[slideIdx] : cs();
+      if(!slide) return;
+      slide.audio = {
+        data: r.result,
+        name: file.name,
+        autoplay: true,
+        autoadvance: false,
+        showControls: true
+      };
+      pushHist();
+      render();
+      showToast('Audio attached: ' + file.name);
+    };
+    r.onerror = function(){ showToast('Could not read audio file'); };
+    r.readAsDataURL(file);
+  };
+  inp.click();
+};
+
+window.removeSlideAudio = function(slideIdx){
+  var slide = (slideIdx != null) ? S.slides[slideIdx] : cs();
+  if(!slide || !slide.audio) return;
+  delete slide.audio;
+  if(_slideAudio.slideId === slide.id) stopSlideAudio();
+  pushHist();
+  render();
+  showToast('Audio removed');
+};
+
+window.toggleSlideAudioSetting = function(setting){
+  var slide = cs();
+  if(!slide || !slide.audio) return;
+  slide.audio[setting] = !slide.audio[setting];
+  pushHist();
+  render();
+};
+// Resolve effective transition for a slide (slide override > global default)
+function getEffectiveTransition(slide){
+  if(!slide) return S.globalTransition || 'fade';
+  return slide.transition || S.globalTransition || 'fade';
+}
 
 // Load pres bar position pref
 try {
@@ -4099,6 +4940,12 @@ document.addEventListener('keydown', function(evt){
   if((evt.ctrlKey || evt.metaKey) && evt.key === 'v' && S.clipboard){ evt.preventDefault(); pasteClipboard(); }
   if((evt.ctrlKey || evt.metaKey) && evt.key === 'd' && S.selIds.length){ evt.preventDefault(); duplicateSelection(); }
   if((evt.ctrlKey || evt.metaKey) && evt.key === 'a'){ evt.preventDefault(); selectAll(); }
+  // Group / Ungroup
+  if((evt.ctrlKey || evt.metaKey) && (evt.key === 'g' || evt.key === 'G')){
+    evt.preventDefault();
+    if(evt.shiftKey) ungroupSelection();
+    else groupSelection();
+  }
   // Arrow key nudging
   if(S.selIds.length && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].indexOf(evt.key) >= 0){
     evt.preventDefault();
@@ -4229,7 +5076,23 @@ function renderTradingViewElement(el, isPres){
 function renderScreenShare(el, isPres){
   var hasStream = !!_screenShareStreams[el.id];
   var label = el.label || 'Screen Share';
-  var h = '<div class="ss-el" style="width:'+el.w+'px;height:'+el.h+'px;border:'+(el.bw||2)+'px solid '+(el.bc||'#7ed957')+';border-radius:'+(el.br||10)+'px;box-sizing:border-box">';
+  var borderStyle = el.borderStyle || 'solid';
+  var bw = el.bw != null ? el.bw : 2;
+  var bc1 = el.bc || '#7ed957';
+  var bc2 = el.bc2 || '#9b59ff';
+  var br = el.br != null ? el.br : 10;
+  var useGradient = (borderStyle === 'gradient' || borderStyle === 'animated') && bw > 0;
+
+  var h = '';
+  if(useGradient){
+    var gradBg = 'linear-gradient(135deg, '+bc1+' 0%, '+bc2+' 50%, '+bc1+' 100%)';
+    var animClass = (borderStyle === 'animated') ? ' ep-border-anim' : '';
+    h += '<div class="ep-grad-border'+animClass+'" style="width:'+el.w+'px;height:'+el.h+'px;background:'+gradBg+';background-size:300% 300%;border-radius:'+br+'px;padding:'+bw+'px;box-sizing:border-box">';
+    h += '<div class="ss-el" style="width:100%;height:100%;border:none;border-radius:'+Math.max(0, br - Math.min(bw,4))+'px;box-sizing:border-box">';
+  } else {
+    h += '<div class="ss-el" style="width:'+el.w+'px;height:'+el.h+'px;border:'+bw+'px solid '+bc1+';border-radius:'+br+'px;box-sizing:border-box">';
+  }
+
   if(hasStream){
     // Render live badge based on per-element preferences
     var badgeStyle = el.badgeStyle || 'full';
@@ -4257,6 +5120,7 @@ function renderScreenShare(el, isPres){
     h += '</div>';
   }
   h += '</div>';
+  if(useGradient) h += '</div>';
   return h;
 }
 
@@ -4267,17 +5131,39 @@ function renderWebcam(el, isPres){
   var label = el.label || 'Webcam';
   var shape = el.shape || 'circle';
   var mirror = el.mirror !== false;
+  var borderStyle = el.borderStyle || 'solid';
+  var bw = el.bw || 3;
+  var bc1 = el.bc || '#7ed957';
+  var bc2 = el.bc2 || '#9b59ff';
   // Shape → border-radius
   var borderRadius;
   if(shape === 'circle') borderRadius = '50%';
   else if(shape === 'rect') borderRadius = '0px';
   else borderRadius = (el.br || 14) + 'px';
-  var h = '<div class="wc-el" style="width:'+el.w+'px;height:'+el.h+'px;border:'+(el.bw||3)+'px solid '+(el.bc||'#7ed957')+';border-radius:'+borderRadius+';box-sizing:border-box">';
+
+  // Decide rendering strategy:
+  // - solid: standard CSS border on the .wc-el
+  // - gradient / animated: outer wrapper has gradient background, inner inset by bw
+  var useGradient = (borderStyle === 'gradient' || borderStyle === 'animated') && bw > 0;
+
+  var h = '';
+  if(useGradient){
+    var gradBg = 'linear-gradient(135deg, '+bc1+' 0%, '+bc2+' 50%, '+bc1+' 100%)';
+    var animClass = (borderStyle === 'animated') ? ' ep-border-anim' : '';
+    h += '<div class="ep-grad-border'+animClass+'" style="width:'+el.w+'px;height:'+el.h+'px;background:'+gradBg+';background-size:300% 300%;border-radius:'+borderRadius+';padding:'+bw+'px;box-sizing:border-box">';
+    h += '<div class="wc-el" style="width:100%;height:100%;border:none;border-radius:'+(shape==='rect'?'0':(shape==='circle'?'50%':((el.br||14)-Math.min(bw,4))+'px'))+';box-sizing:border-box">';
+  } else {
+    h += '<div class="wc-el" style="width:'+el.w+'px;height:'+el.h+'px;border:'+bw+'px solid '+bc1+';border-radius:'+borderRadius+';box-sizing:border-box">';
+  }
+
   if(hasStream){
     var badgeStyle = el.badgeStyle || 'off';
     var badgePos = el.badgePos || 'tl';
     if(badgeStyle !== 'off'){
-      var badgeClass = 'ss-live-badge ss-live-badge-' + badgePos + (badgeStyle === 'dot' ? ' ss-live-badge-dot-only' : '');
+      // For circle webcams, the corners are outside the visible area so badges
+      // need extra inset to land inside the circle. We add a modifier class.
+      var circleClass = (shape === 'circle') ? ' ss-live-badge-circle' : '';
+      var badgeClass = 'ss-live-badge ss-live-badge-' + badgePos + (badgeStyle === 'dot' ? ' ss-live-badge-dot-only' : '') + circleClass;
       h += '<div class="'+badgeClass+'">' + (badgeStyle === 'full' ? 'LIVE' : '') + '</div>';
     }
     if(!isPres){
@@ -4297,12 +5183,25 @@ function renderWebcam(el, isPres){
     h += '</div>';
   }
   h += '</div>';
+  if(useGradient) h += '</div>';
   return h;
 }
 
 // =========================================================
 // LIST RENDERERS - one function per style
 // =========================================================
+// Filter list items by reveal step in presentation mode.
+// In editor: show all items + a small number badge if a reveal value is set.
+// In presentation: hide items with reveal > current revealStep.
+// Items without a reveal value (or reveal === 0) are always shown.
+function filterListItemsByReveal(items, isPres){
+  if(!isPres || !S.pres) return items.map(function(it){ return { item: it, hidden: false }; });
+  return items.map(function(it){
+    var hidden = it.reveal && it.reveal > S.revealStep;
+    return { item: it, hidden: hidden };
+  });
+}
+
 function renderList(el, isPres){
   if(el.style === 'stacked-card') return renderStackedCardList(el, isPres);
   if(el.style === 'table') return renderTableList(el, isPres);
@@ -4321,11 +5220,19 @@ function renderStackedCardList(el, isPres){
   for(var i=0; i<items.length; i++){
     var it = items[i];
     var color = it.color || '#7ed957';
+    // Per-item reveal: hide in pres if reveal > current step
+    var hidden = isPres && S.pres && it.reveal && it.reveal > S.revealStep;
+    if(hidden) continue;
     var borderStyle = '';
     if(accentPos === 'left') borderStyle = 'border-left:5px solid '+color;
     else if(accentPos === 'top') borderStyle = 'border-top:5px solid '+color;
     else if(accentPos === 'full') borderStyle = 'border:2px solid '+color+';background:'+color+'15';
-    h += '<div style="background:rgba(30,30,36,0.7);border-radius:10px;padding:14px 16px;display:flex;align-items:flex-start;gap:14px;'+borderStyle+'">';
+    var revealAnim = (isPres && S.pres && it.reveal === S.revealStep) ? ' ep-revealing' : '';
+    h += '<div class="ep-list-item'+revealAnim+'" style="background:rgba(30,30,36,0.7);border-radius:10px;padding:14px 16px;display:flex;align-items:flex-start;gap:14px;'+borderStyle+';position:relative">';
+    // Editor-only: show reveal badge if item has a reveal step
+    if(!isPres && it.reveal){
+      h += '<div class="ep-item-reveal-badge" title="Reveal step '+it.reveal+'">'+it.reveal+'</div>';
+    }
     if(el.showNumbers){
       h += '<div style="width:36px;height:36px;border-radius:50%;background:'+color+';color:#000;font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">'+(i+1)+'</div>';
     }
@@ -4363,13 +5270,23 @@ function renderTableList(el, isPres){
   h += '<tbody>';
   for(var ri=0; ri<items.length; ri++){
     var it = items[ri];
+    // Per-row reveal: hide in pres if reveal > current step
+    var hidden = isPres && S.pres && it.reveal && it.reveal > S.revealStep;
+    if(hidden) continue;
     var rowBg = ri % 2 === 0 ? 'transparent' : el.altRowBg;
-    h += '<tr>';
+    var revealAnim = (isPres && S.pres && it.reveal === S.revealStep) ? ' ep-revealing' : '';
+    h += '<tr class="ep-list-item'+revealAnim+'" style="position:relative">';
     for(var cj=0; cj<it.cells.length; cj++){
+      // Editor-only: show reveal step badge in first cell of any row that has a reveal step
+      var isFirstCell = cj === 0;
+      var badgeHTML = '';
+      if(!isPres && isFirstCell && it.reveal){
+        badgeHTML = '<div class="ep-item-reveal-badge" style="top:-6px;left:-6px;right:auto" title="Reveal step '+it.reveal+'">'+it.reveal+'</div>';
+      }
       if(isPres){
-        h += '<td style="background:'+rowBg+';color:'+el.rowColor+';padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.06);vertical-align:top;white-space:pre-wrap;word-wrap:break-word">'+esc(it.cells[cj])+'</td>';
+        h += '<td style="background:'+rowBg+';color:'+el.rowColor+';padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.06);vertical-align:top;white-space:pre-wrap;word-wrap:break-word;position:relative">'+esc(it.cells[cj])+'</td>';
       } else {
-        h += '<td style="background:'+rowBg+';padding:6px;border-bottom:1px solid rgba(255,255,255,0.06);vertical-align:top"><textarea rows="1" oninput="autoGrow(this);updateListTableCell(\''+el.id+'\',\''+it.id+'\','+cj+',this.value)" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" style="width:100%;background:transparent;border:none;outline:none;color:'+el.rowColor+';padding:4px 8px;font-size:'+el.fs+'px;font-family:Outfit;resize:none;overflow:hidden;line-height:1.4">'+esc(it.cells[cj])+'</textarea></td>';
+        h += '<td style="background:'+rowBg+';padding:6px;border-bottom:1px solid rgba(255,255,255,0.06);vertical-align:top;position:relative">'+badgeHTML+'<textarea rows="1" oninput="autoGrow(this);updateListTableCell(\''+el.id+'\',\''+it.id+'\','+cj+',this.value)" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" style="width:100%;background:transparent;border:none;outline:none;color:'+el.rowColor+';padding:4px 8px;font-size:'+el.fs+'px;font-family:Outfit;resize:none;overflow:hidden;line-height:1.4">'+esc(it.cells[cj])+'</textarea></td>';
       }
     }
     h += '</tr>';
@@ -4384,6 +5301,9 @@ function renderChecklistList(el, isPres){
   var h = '<div style="width:'+el.w+'px;min-height:'+el.h+'px;background:'+el.bg+';border-radius:'+el.br+'px;padding:'+pad+'px;overflow:visible;display:flex;flex-direction:column;gap:10px;box-sizing:border-box">';
   for(var i=0; i<items.length; i++){
     var it = items[i];
+    // Per-item reveal: hide in pres if reveal > current step
+    var hidden = isPres && S.pres && it.reveal && it.reveal > S.revealStep;
+    if(hidden) continue;
     var checked = !!it.checked;
     var boxStyle = checked
       ? 'background:'+el.checkColor+';border:2px solid '+el.checkColor
@@ -4391,7 +5311,11 @@ function renderChecklistList(el, isPres){
     var textStyle = checked
       ? 'color:'+el.textColor+';opacity:0.5;text-decoration:line-through'
       : 'color:'+el.textColor;
-    h += '<div style="display:flex;align-items:flex-start;gap:12px;padding:10px;background:rgba(0,0,0,0.2);border-radius:8px">';
+    var revealAnim = (isPres && S.pres && it.reveal === S.revealStep) ? ' ep-revealing' : '';
+    h += '<div class="ep-list-item'+revealAnim+'" style="display:flex;align-items:flex-start;gap:12px;padding:10px;background:rgba(0,0,0,0.2);border-radius:8px;position:relative">';
+    if(!isPres && it.reveal){
+      h += '<div class="ep-item-reveal-badge" title="Reveal step '+it.reveal+'">'+it.reveal+'</div>';
+    }
     if(isPres){
       h += '<div style="width:22px;height:22px;border-radius:5px;'+boxStyle+';flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="event.stopPropagation();toggleChecklistItem(\''+el.id+'\',\''+it.id+'\')">';
       if(checked) h += '<svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3" style="width:14px;height:14px"><polyline points="20 6 9 17 4 12"/></svg>';
@@ -4421,8 +5345,15 @@ function renderTimelineList(el, isPres){
   h += '<div style="display:flex;flex-direction:column;gap:14px;position:relative">';
   for(var i=0; i<items.length; i++){
     var it = items[i];
+    // Per-item reveal: hide in pres if reveal > current step
+    var hidden = isPres && S.pres && it.reveal && it.reveal > S.revealStep;
+    if(hidden) continue;
     var color = it.color || '#7ed957';
-    h += '<div style="display:flex;gap:16px;align-items:flex-start">';
+    var revealAnim = (isPres && S.pres && it.reveal === S.revealStep) ? ' ep-revealing' : '';
+    h += '<div class="ep-list-item'+revealAnim+'" style="display:flex;gap:16px;align-items:flex-start;position:relative">';
+    if(!isPres && it.reveal){
+      h += '<div class="ep-item-reveal-badge" title="Reveal step '+it.reveal+'">'+it.reveal+'</div>';
+    }
     h += '<div style="width:'+dotSize+'px;height:'+dotSize+'px;border-radius:50%;background:'+color+';flex-shrink:0;margin-top:4px;box-shadow:0 0 0 3px '+el.bg+';position:relative;z-index:1"></div>';
     h += '<div style="flex:1;min-width:0;background:rgba(30,30,36,0.5);border-radius:8px;padding:10px 14px;border-left:3px solid '+color+'">';
     if(isPres){
@@ -4491,7 +5422,13 @@ function renderElsHtml(slide, isPres){
       h += '</div>';
       continue;
     }
-    h += '<div class="el'+(sel?' sel':'')+(el.lk?' locked':'')+'" style="left:'+el.x+'px;top:'+el.y+'px;z-index:'+(i+2)+';pointer-events:'+pe+'"';
+    var isRevealing = isPres && el.reveal && el.reveal === S.revealStep;
+    var elAnimClass = '';
+    if(isRevealing && el.revealAnim){
+      // Per-element override — wrap in own animation class so it doesn't inherit the slide-level one
+      elAnimClass = ' ep-anim-' + el.revealAnim;
+    }
+    h += '<div class="el'+(sel?' sel':'')+(el.lk?' locked':'')+(isRevealing ? ' ep-revealing' : '')+elAnimClass+'" style="left:'+el.x+'px;top:'+el.y+'px;z-index:'+(i+2)+';pointer-events:'+pe+'"';
     if(!isPres){
       h += ' onmousedown="startElDrag(event,\''+el.id+'\')" oncontextmenu="showContext(event,\''+el.id+'\')"';
     }
@@ -4517,6 +5454,21 @@ function renderElsHtml(slide, isPres){
       }
     }
     h += '</div>';
+  }
+  // Group bounding boxes — drawn for any group whose member is in the current selection.
+  // Only in editor mode (not presentation).
+  if(!isPres && S.selIds.length > 0){
+    var gidsInSel = {};
+    S.selIds.forEach(function(id){
+      var el = gEl(id);
+      if(el && el.gid) gidsInSel[el.gid] = true;
+    });
+    Object.keys(gidsInSel).forEach(function(gid){
+      var b = getGroupBounds(gid);
+      if(!b) return;
+      var pad = 6;
+      h += '<div class="ep-group-box" style="left:'+(b.x - pad)+'px;top:'+(b.y - pad)+'px;width:'+(b.w + pad*2)+'px;height:'+(b.h + pad*2)+'px"></div>';
+    });
   }
   return h;
 }
@@ -4682,23 +5634,6 @@ function render(){
   h += '<button class="tb-b" onclick="doRedo()" data-tip="Redo (Ctrl+Y)">'+I.redo+'</button>';
   h += '</div>';
 
-  // Alignment bar (only when 2+ selected)
-  if(S.selIds.length >= 2){
-    h += '<div class="tb-sep"></div>';
-    h += '<div class="tb-g">';
-    h += '<button class="tb-b" onclick="alignSelection(\'left\')" data-tip="Align Left">'+I.alignLeft+'</button>';
-    h += '<button class="tb-b" onclick="alignSelection(\'hcenter\')" data-tip="Align H-Center">'+I.alignCenter+'</button>';
-    h += '<button class="tb-b" onclick="alignSelection(\'right\')" data-tip="Align Right">'+I.alignRight+'</button>';
-    h += '<button class="tb-b" onclick="alignSelection(\'top\')" data-tip="Align Top">'+I.alignTop+'</button>';
-    h += '<button class="tb-b" onclick="alignSelection(\'vcenter\')" data-tip="Align V-Center">'+I.alignMiddle+'</button>';
-    h += '<button class="tb-b" onclick="alignSelection(\'bottom\')" data-tip="Align Bottom">'+I.alignBottom+'</button>';
-    if(S.selIds.length >= 3){
-      h += '<button class="tb-b" onclick="alignSelection(\'dist-h\')" data-tip="Distribute Horizontally">'+I.distH+'</button>';
-      h += '<button class="tb-b" onclick="alignSelection(\'dist-v\')" data-tip="Distribute Vertically">'+I.distV+'</button>';
-    }
-    h += '</div>';
-  }
-
   // Snap toggle (always visible)
   h += '<div class="tb-sep"></div>';
   h += '<button class="tb-b'+(S.snapEnabled?' a':'')+'" onclick="toggleSnap()" data-tip="'+(S.snapEnabled?'Snap ON':'Snap OFF')+'">'+I.magnet+'</button>';
@@ -4709,7 +5644,6 @@ function render(){
   var asLabel = S.autoSaveEnabled ? 'Auto-save on' : 'Auto-save OFF';
   var asTip = S.autoSaveEnabled ? 'Click to disable auto-save' : 'Click to enable auto-save';
   h += '<span id="autosaveInd" onclick="toggleAutoSave()" title="'+asTip+'" style="font-size:10px;color:'+asColor+';letter-spacing:1px;font-weight:600;text-transform:uppercase;margin-right:10px;cursor:pointer;padding:5px 9px;border-radius:6px;border:1px solid '+(S.autoSaveEnabled?'rgba(126,217,87,0.25)':'var(--brd)')+';transition:all 0.12s" onmouseover="this.style.background=\'rgba(255,255,255,0.04)\'" onmouseout="this.style.background=\'transparent\'">'+asLabel+'</span>';
-  h += '<span style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:1px;font-weight:600">BG <input type="color" value="'+s.bg+'" style="width:30px;height:28px;border:1px solid var(--brd);border-radius:6px;background:none;cursor:pointer;padding:0" onchange="setBg(this.value)"></span>';
   h += '<div class="tb-sep"></div>';
   h += '<button class="tb-b'+(S.showNotes?' a':'')+'" onclick="toggleNotes()" data-tip="Toggle speaker notes (per slide)">'+I.notesIcon+'</button>';
   h += '<button class="tb-b" onclick="openPresenterView()" data-tip="Presenter View (opens 2nd window with notes, next slide, timer)">'+I.presenter+'</button>';
@@ -4765,6 +5699,9 @@ function render(){
       if(el) h += renderPropsPanel(el);
     } else if(S.selIds.length >= 2){
       h += renderMultiSelectPanel();
+    } else {
+      // Nothing selected → show slide-level properties (transition, etc.)
+      h += renderSlidePropsPanel();
     }
   }
 
@@ -4878,7 +5815,7 @@ function renderPropsPanel(el){
     h += propRow('Width', el.bw, "updateEl('"+el.id+"',{bw:+this.value})", 'number');
     h += propRow('Radius', el.br, "updateEl('"+el.id+"',{br:+this.value})", 'number');
     h += '</div>';
-    h += propSection('Fill', [propRow('BG', el.bg, "updateEl('"+el.id+"',{bg:this.value})", 'text')]);
+    h += propSection('Fill', [propFillRow('BG', el.id, 'bg', el.bg)]);
   }
 
   if(el.type === 'shape'){
@@ -4936,16 +5873,37 @@ function renderPropsPanel(el){
     }
     h += '<div class="pr"><span class="pr-l">Label</span><input type="text" class="pr-i" value="'+esc(el.label||'')+'" placeholder="Screen Share" oninput="updateScreenShareLabel(\''+el.id+'\',this.value)"></div>';
     h += '</div>';
-    h += '<div class="ps"><div class="ps-t">Border</div><div class="bcs">';
+    h += '<div class="ps"><div class="ps-t">Border</div>';
+    // Border style picker: solid / gradient / animated
+    var curBStyleSS = el.borderStyle || 'solid';
+    h += '<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Style</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-bottom:10px">';
+    [{v:'solid',l:'Solid'},{v:'gradient',l:'Gradient'},{v:'animated',l:'Animated'}].forEach(function(bs){
+      var active = curBStyleSS === bs.v;
+      h += '<button class="sp-btn" style="padding:6px 2px;font-size:10px'+(active?';border-color:var(--g);color:var(--g)':'')+'" onclick="updateEl(\''+el.id+'\',{borderStyle:\''+bs.v+'\'})">'+bs.l+'</button>';
+    });
+    h += '</div>';
+    // Primary color
+    h += '<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">'+(curBStyleSS === 'solid' ? 'Color' : 'Color 1')+'</div>';
+    h += '<div class="bcs" style="margin-bottom:'+(curBStyleSS === 'solid' ? '0' : '8px')+'">';
     for(var si=0; si<BORDER_COLORS.length; si++){
       var cc = BORDER_COLORS[si];
       h += '<div class="bcs-d'+(el.bc===cc?' a':'')+'" style="background:'+cc+'" onclick="updateEl(\''+el.id+'\',{bc:\''+cc+'\'})"></div>';
     }
     h += '</div>';
+    // Secondary color (only for gradient/animated)
+    if(curBStyleSS !== 'solid'){
+      h += '<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Color 2</div>';
+      h += '<div class="bcs">';
+      for(var si2=0; si2<BORDER_COLORS.length; si2++){
+        var cc2 = BORDER_COLORS[si2];
+        h += '<div class="bcs-d'+(el.bc2===cc2?' a':'')+'" style="background:'+cc2+'" onclick="updateEl(\''+el.id+'\',{bc2:\''+cc2+'\'})"></div>';
+      }
+      h += '</div>';
+    }
     h += propRow('Width', el.bw, "updateEl('"+el.id+"',{bw:+this.value})", 'number');
     h += propRow('Radius', el.br, "updateEl('"+el.id+"',{br:+this.value})", 'number');
     h += '</div>';
-    // Live Badge section — style + position
     var curBadgeStyle = el.badgeStyle || 'full';
     var curBadgePos = el.badgePos || 'tl';
     h += '<div class="ps"><div class="ps-t">Live Badge</div>';
@@ -5002,12 +5960,31 @@ function renderPropsPanel(el){
     h += '<div class="pr"><span class="pr-l">Mirror</span><input type="checkbox" '+(curMirror?'checked':'')+' onchange="updateEl(\''+el.id+'\',{mirror:this.checked})"></div>';
     h += '</div>';
     // Border
-    h += '<div class="ps"><div class="ps-t">Border</div><div class="bcs">';
+    h += '<div class="ps"><div class="ps-t">Border</div>';
+    var curBStyleWC = el.borderStyle || 'solid';
+    h += '<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Style</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-bottom:10px">';
+    [{v:'solid',l:'Solid'},{v:'gradient',l:'Gradient'},{v:'animated',l:'Animated'}].forEach(function(bs){
+      var active = curBStyleWC === bs.v;
+      h += '<button class="sp-btn" style="padding:6px 2px;font-size:10px'+(active?';border-color:var(--g);color:var(--g)':'')+'" onclick="updateEl(\''+el.id+'\',{borderStyle:\''+bs.v+'\'})">'+bs.l+'</button>';
+    });
+    h += '</div>';
+    h += '<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">'+(curBStyleWC === 'solid' ? 'Color' : 'Color 1')+'</div>';
+    h += '<div class="bcs" style="margin-bottom:'+(curBStyleWC === 'solid' ? '0' : '8px')+'">';
     for(var wci=0; wci<BORDER_COLORS.length; wci++){
       var wcc = BORDER_COLORS[wci];
       h += '<div class="bcs-d'+(el.bc===wcc?' a':'')+'" style="background:'+wcc+'" onclick="updateEl(\''+el.id+'\',{bc:\''+wcc+'\'})"></div>';
     }
     h += '</div>';
+    if(curBStyleWC !== 'solid'){
+      h += '<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Color 2</div>';
+      h += '<div class="bcs">';
+      for(var wci2=0; wci2<BORDER_COLORS.length; wci2++){
+        var wcc2 = BORDER_COLORS[wci2];
+        h += '<div class="bcs-d'+(el.bc2===wcc2?' a':'')+'" style="background:'+wcc2+'" onclick="updateEl(\''+el.id+'\',{bc2:\''+wcc2+'\'})"></div>';
+      }
+      h += '</div>';
+    }
     h += propRow('Width', el.bw, "updateEl('"+el.id+"',{bw:+this.value})", 'number');
     h += '</div>';
     // Live Badge (same as screen share but default to off for camera)
@@ -5138,18 +6115,57 @@ function renderPropsPanel(el){
 
     // Background
     h += '<div class="ps"><div class="ps-t">Background</div>';
-    h += propRow('BG', el.bg, "updateEl('"+el.id+"',{bg:this.value})", 'text');
+    h += propFillRow('BG', el.id, 'bg', el.bg);
     h += '</div>';
 
     // Items manager
     h += '<div class="ps"><div class="ps-t">Items ('+(el.items?el.items.length:0)+')</div>';
+    h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:8px">Set a Step number on any item to reveal it on click during presentation. Step 0 = always visible.</div>';
     if(el.items && (el.style === 'stacked-card' || el.style === 'timeline')){
+      // Column header so the small number column is understood
+      h += '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;padding:0 2px">';
+      h += '<div style="width:24px"></div>';
+      h += '<div style="flex:1;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Item</div>';
+      h += '<div style="width:38px;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;text-align:center">Step</div>';
+      h += '<div style="width:30px"></div>';
+      h += '</div>';
       for(var ii=0; ii<el.items.length; ii++){
         var it = el.items[ii];
         h += '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">';
         h += '<input type="color" value="'+(it.color||'#7ed957')+'" onchange="updateListItem(\''+el.id+'\',\''+it.id+'\',{color:this.value})" style="width:24px;height:24px;border:1px solid var(--brd);background:none;cursor:pointer;padding:0;border-radius:4px">';
         h += '<span style="flex:1;font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc((it.title||'').slice(0,20))+'</span>';
+        h += '<input type="number" min="0" max="20" value="'+(it.reveal||0)+'" title="Reveal step (0 = always visible)" onchange="updateListItem(\''+el.id+'\',\''+it.id+'\',{reveal:+this.value})" style="width:38px;background:var(--d3);border:1px solid var(--brd);color:var(--w);padding:2px 4px;border-radius:4px;font-size:11px;font-family:Outfit;text-align:center">';
         h += '<button class="sp-btn del" style="padding:3px 8px;font-size:10px" onclick="removeListItem(\''+el.id+'\',\''+it.id+'\')">×</button>';
+        h += '</div>';
+      }
+    } else if(el.items && el.style === 'checklist'){
+      h += '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;padding:0 2px">';
+      h += '<div style="flex:1;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Item</div>';
+      h += '<div style="width:38px;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;text-align:center">Step</div>';
+      h += '<div style="width:30px"></div>';
+      h += '</div>';
+      for(var ck=0; ck<el.items.length; ck++){
+        var ckIt = el.items[ck];
+        h += '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">';
+        h += '<span style="flex:1;font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc((ckIt.text||'').slice(0,24))+'</span>';
+        h += '<input type="number" min="0" max="20" value="'+(ckIt.reveal||0)+'" title="Reveal step (0 = always visible)" onchange="updateListItem(\''+el.id+'\',\''+ckIt.id+'\',{reveal:+this.value})" style="width:38px;background:var(--d3);border:1px solid var(--brd);color:var(--w);padding:2px 4px;border-radius:4px;font-size:11px;font-family:Outfit;text-align:center">';
+        h += '<button class="sp-btn del" style="padding:3px 8px;font-size:10px" onclick="removeListItem(\''+el.id+'\',\''+ckIt.id+'\')">×</button>';
+        h += '</div>';
+      }
+    } else if(el.items && el.style === 'table'){
+      // Table rows now also support per-row reveal step
+      h += '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;padding:0 2px">';
+      h += '<div style="flex:1;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Row</div>';
+      h += '<div style="width:38px;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;text-align:center">Step</div>';
+      h += '<div style="width:30px"></div>';
+      h += '</div>';
+      for(var ti=0; ti<el.items.length; ti++){
+        var row = el.items[ti];
+        var rowLabel = (row.cells && row.cells[0]) ? row.cells[0] : (row.label || ('Row ' + (ti+1)));
+        h += '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">';
+        h += '<span style="flex:1;font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(rowLabel).slice(0,24))+'</span>';
+        h += '<input type="number" min="0" max="20" value="'+(row.reveal||0)+'" title="Reveal step (0 = always visible)" onchange="updateListItem(\''+el.id+'\',\''+row.id+'\',{reveal:+this.value})" style="width:38px;background:var(--d3);border:1px solid var(--brd);color:var(--w);padding:2px 4px;border-radius:4px;font-size:11px;font-family:Outfit;text-align:center">';
+        h += '<button class="sp-btn del" style="padding:3px 8px;font-size:10px" onclick="removeListItem(\''+el.id+'\',\''+row.id+'\')">×</button>';
         h += '</div>';
       }
     }
@@ -5159,12 +6175,25 @@ function renderPropsPanel(el){
 
   // Reveal animation (always shown)
   var revealVal = el.reveal || 0;
+  var elRevealAnim = el.revealAnim || '__inherit';
   h += '<div class="ps"><div class="ps-t">Reveal on Click</div>';
   h += '<div style="display:flex;gap:5px;align-items:center;margin-bottom:6px">';
   h += '<span class="pr-l" style="width:auto">Step</span>';
   h += '<input type="number" min="0" max="20" value="'+revealVal+'" class="pr-i" style="flex:1" onchange="updateEl(\''+el.id+'\',{reveal:+this.value})">';
   h += '</div>';
-  h += '<div style="font-size:10px;color:var(--muted);line-height:1.4">0 = always visible. 1+ = reveal on Nth click during presentation.</div>';
+  // Reveal animation override (only meaningful if reveal > 0)
+  if(revealVal > 0){
+    h += '<div style="margin-top:8px">';
+    h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Animation</div>';
+    h += '<select class="pr-i" style="width:100%" onchange="updateEl(\''+el.id+'\',{revealAnim:this.value === \'__inherit\' ? null : this.value})">';
+    h += '<option value="__inherit"' + (elRevealAnim === '__inherit' ? ' selected' : '') + '>Use global default ('+(REVEAL_ANIM_OPTIONS.find(function(x){return x.v===(S.globalRevealAnim||'fade')})||{l:'Fade'}).l+')</option>';
+    REVEAL_ANIM_OPTIONS.forEach(function(t){
+      h += '<option value="'+t.v+'"' + (elRevealAnim === t.v ? ' selected' : '') + '>'+t.l+'</option>';
+    });
+    h += '</select>';
+    h += '</div>';
+  }
+  h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-top:6px">0 = always visible. 1+ = reveal on Nth click during presentation.</div>';
   h += '</div>';
 
   // Common actions
@@ -5182,25 +6211,219 @@ function propSection(title, rows){
   return '<div class="ps"><div class="ps-t">'+title+'</div>'+rows.join('')+'</div>';
 }
 
+function renderSlidePropsPanel(){
+  var slide = cs();
+  if(!slide) return '';
+  var slideTrans = slide.transition || '__inherit';
+  var globalTrans = S.globalTransition || 'fade';
+  var globalReveal = S.globalRevealAnim || 'fade';
+  var h = '<div class="pp"><div class="pp-t">SLIDE Properties</div>';
+
+  // Slide background
+  h += '<div class="ps"><div class="ps-t">Background</div>';
+  h += '<div style="display:flex;align-items:center;gap:10px">';
+  h += '<input type="color" value="'+slide.bg+'" style="width:42px;height:36px;border:1px solid var(--brd);border-radius:6px;background:none;cursor:pointer;padding:0" onchange="setBg(this.value)">';
+  h += '<input type="text" class="pr-i" style="flex:1" value="'+slide.bg+'" onchange="setBg(this.value)">';
+  h += '</div>';
+  h += '</div>';
+
+  // Slide transition (per-slide override)
+  h += '<div class="ps"><div class="ps-t">Slide Transition</div>';
+  h += '<div style="font-size:10px;color:var(--muted);margin-bottom:6px;line-height:1.4">Animation when this slide appears</div>';
+  h += '<select class="pr-i" style="width:100%" onchange="setSlideTransition(this.value)">';
+  h += '<option value="__inherit"' + (slideTrans === '__inherit' ? ' selected' : '') + '>Use global default (' + (TRANSITION_OPTIONS.find(function(x){return x.v===globalTrans})||{l:globalTrans}).l + ')</option>';
+  TRANSITION_OPTIONS.forEach(function(t){
+    h += '<option value="'+t.v+'"' + (slideTrans === t.v ? ' selected' : '') + '>'+t.l+'</option>';
+  });
+  h += '</select>';
+  h += '</div>';
+
+  // Slide audio (voiceover)
+  h += '<div class="ps"><div class="ps-t">Audio Voiceover</div>';
+  if(slide.audio && slide.audio.data){
+    var audioName = slide.audio.name || 'Audio attached';
+    var displayName = audioName.length > 28 ? audioName.substr(0, 25) + '...' : audioName;
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(126,217,87,0.08);border:1px solid rgba(126,217,87,0.25);border-radius:6px;margin-bottom:8px">';
+    h += '<span style="color:var(--g);font-size:14px">●</span>';
+    h += '<div style="flex:1;min-width:0">';
+    h += '<div style="font-size:11px;color:var(--w);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(audioName)+'">'+esc(displayName)+'</div>';
+    h += '<audio controls style="width:100%;margin-top:6px;height:30px" src="'+slide.audio.data+'"></audio>';
+    h += '</div>';
+    h += '</div>';
+    // Three togglable settings as switches
+    var sw = function(label, key, hint){
+      var on = !!slide.audio[key];
+      var s = '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;cursor:pointer" onclick="toggleSlideAudioSetting(\''+key+'\')">';
+      s += '<div style="flex:1"><div style="font-size:11px;color:var(--w);font-weight:600">'+label+'</div>';
+      s += '<div style="font-size:10px;color:var(--muted);line-height:1.3">'+hint+'</div></div>';
+      s += '<div style="width:32px;height:18px;background:'+(on?'var(--g)':'#3a3a44')+';border-radius:9px;position:relative;flex-shrink:0;transition:background 0.15s">';
+      s += '<div style="position:absolute;top:2px;left:'+(on?'16':'2')+'px;width:14px;height:14px;background:#fff;border-radius:50%;transition:left 0.15s"></div>';
+      s += '</div></div>';
+      return s;
+    };
+    h += sw('Autoplay', 'autoplay', 'Start audio when slide opens');
+    h += sw('Auto-advance', 'autoadvance', 'Move to next slide when audio ends');
+    h += sw('Show controls', 'showControls', 'Show play/pause button in presentation toolbar');
+    h += '<button class="sp-btn" style="width:100%;margin-top:8px" onclick="uploadSlideAudio()">Replace Audio</button>';
+    h += '<button class="sp-btn del" style="width:100%;margin-top:5px" onclick="removeSlideAudio()">Remove Audio</button>';
+  } else {
+    h += '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.4">Attach an audio file (mp3, wav) for this slide. Useful for ElevenLabs voiceovers.</div>';
+    h += '<button class="sp-btn" style="width:100%;border-color:var(--g);color:var(--g)" onclick="uploadSlideAudio()">+ Upload Audio</button>';
+  }
+  h += '</div>';
+
+  // Slide actions
+  h += '<div class="ps"><div class="ps-t">Slide Actions</div>';
+  h += '<button class="sp-btn" style="width:100%;margin-bottom:5px" onclick="duplicateSlide()">Duplicate Slide</button>';
+  h += '<button class="sp-btn del" style="width:100%;margin-bottom:8px" onclick="deleteSlide()">Delete Slide</button>';
+  h += '<button class="sp-btn" style="width:100%;border-color:var(--g);color:var(--g)" onclick="openGlobalPreferences()">⚙ Global Preferences…</button>';
+  h += '</div>';
+
+  h += '</div>';
+  return h;
+}
+
+// Global preferences popover — opens from "Global Preferences..." button.
+window.openGlobalPreferences = function(){
+  var globalTrans = S.globalTransition || 'fade';
+  var globalReveal = S.globalRevealAnim || 'fade';
+  var globalSpeed = S.globalSpeed || 'normal';
+  var existing = document.getElementById('ep-global-prefs');
+  if(existing){ existing.remove(); return; }
+  var overlay = document.createElement('div');
+  overlay.id = 'ep-global-prefs';
+  var html = '<div class="ep-gp-card">';
+  html += '<div class="ep-gp-header"><h2>Global Preferences</h2><button class="ep-gp-close" onclick="closeGlobalPreferences()">&times;</button></div>';
+  html += '<div class="ep-gp-body">';
+
+  // Animation Speed (placed first because it affects everything else)
+  html += '<div class="ep-gp-section">';
+  html += '<div class="ep-gp-label">Animation Speed</div>';
+  html += '<div class="ep-gp-hint">Applies to all transitions and reveals</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">';
+  ['fast','normal','slow'].forEach(function(s){
+    var active = globalSpeed === s;
+    html += '<button class="sp-btn" style="padding:9px 4px;font-weight:600'+(active?';border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)':'')+'" onclick="setGlobalSpeed(\''+s+'\');closeGlobalPreferences();openGlobalPreferences()">'+s.charAt(0).toUpperCase()+s.slice(1)+'</button>';
+  });
+  html += '</div>';
+  html += '</div>';
+
+  html += '<div class="ep-gp-section">';
+  html += '<div class="ep-gp-label">Default Slide Transition</div>';
+  html += '<div class="ep-gp-hint">Used for slides without their own override</div>';
+  html += '<select class="pr-i" style="width:100%" onchange="setGlobalTransition(this.value)">';
+  TRANSITION_OPTIONS.forEach(function(t){
+    html += '<option value="'+t.v+'"' + (globalTrans === t.v ? ' selected' : '') + '>'+t.l+'</option>';
+  });
+  html += '</select>';
+  html += '</div>';
+  html += '<div class="ep-gp-section">';
+  html += '<div class="ep-gp-label">Default Reveal Animation</div>';
+  html += '<div class="ep-gp-hint">Applied to elements + list items as they reveal</div>';
+  html += '<select class="pr-i" style="width:100%" onchange="setGlobalRevealAnim(this.value)">';
+  REVEAL_ANIM_OPTIONS.forEach(function(t){
+    html += '<option value="'+t.v+'"' + (globalReveal === t.v ? ' selected' : '') + '>'+t.l+'</option>';
+  });
+  html += '</select>';
+  html += '</div>';
+
+  // Tip block
+  html += '<div style="background:rgba(255,165,0,0.08);border:1px solid rgba(255,165,0,0.25);border-radius:8px;padding:12px;font-size:11px;color:#ffd596;line-height:1.5">';
+  html += '<strong style="color:#ffa500">Tip:</strong> Slide transitions only fire when you CHANGE slides during presentation. They won\'t replay on the same slide.';
+  html += '</div>';
+
+  html += '</div>';
+  html += '</div>';
+  overlay.innerHTML = html;
+  document.body.appendChild(overlay);
+  // Close on Esc / outside click
+  overlay.addEventListener('click', function(e){
+    if(e.target === overlay) closeGlobalPreferences();
+  });
+  var keyHandler = function(e){
+    if(e.key === 'Escape'){ closeGlobalPreferences(); document.removeEventListener('keydown', keyHandler); }
+  };
+  document.addEventListener('keydown', keyHandler);
+};
+window.closeGlobalPreferences = function(){
+  var el = document.getElementById('ep-global-prefs');
+  if(el) el.remove();
+};
+
 function renderMultiSelectPanel(){
   var count = S.selIds.length;
   var h = '<div class="pp">';
   h += '<div class="pp-t">'+count+' items selected</div>';
+
+  // Detect group state of selection
+  var slide = cs();
+  var gids = {};
+  var firstReveal = null;
+  var allSameReveal = true;
+  if(slide){
+    S.selIds.forEach(function(id){
+      var el = gEl(id);
+      if(el && el.gid) gids[el.gid] = true;
+      if(el){
+        var rev = el.reveal || 0;
+        if(firstReveal === null) firstReveal = rev;
+        else if(firstReveal !== rev) allSameReveal = false;
+      }
+    });
+  }
+  var groupCount = Object.keys(gids).length;
+  var allInOneGroup = (groupCount === 1) && S.selIds.every(function(id){
+    var el = gEl(id);
+    return el && el.gid && gids[el.gid];
+  });
+
+  // Group section — top of panel because it's the most semantically important
+  h += '<div class="ps"><div class="ps-t">Group</div>';
+  if(allInOneGroup){
+    h += '<div style="background:rgba(255,165,0,0.08);border:1px solid rgba(255,165,0,0.25);border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:11px;color:#ffd596;display:flex;align-items:center;gap:6px"><span style="color:#ffa500">●</span> Grouped (' + count + ' members)</div>';
+    h += '<button class="sp-btn" style="width:100%" onclick="ungroupSelection()">Ungroup (Ctrl+Shift+G)</button>';
+  } else if(groupCount > 0){
+    h += '<div style="background:rgba(126,217,87,0.08);border:1px solid rgba(126,217,87,0.25);border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:11px;color:#bff0a3;line-height:1.4">Selection spans ' + groupCount + ' group(s) and/or ungrouped items</div>';
+    h += '<button class="sp-btn" style="width:100%;margin-bottom:5px" onclick="groupSelection()">Group All (Ctrl+G)</button>';
+    h += '<button class="sp-btn" style="width:100%" onclick="ungroupSelection()">Ungroup All</button>';
+  } else {
+    h += '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.4">Treat these elements as one — drag, reveal, and lock together.</div>';
+    h += '<button class="sp-btn" style="width:100%;border-color:var(--g);color:var(--g)" onclick="groupSelection()">+ Group (Ctrl+G)</button>';
+  }
+  h += '</div>';
+
+  // Reveal-on-click for the whole group
+  h += '<div class="ps"><div class="ps-t">Reveal on Click</div>';
+  h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:6px">Same step on every selected element \u2014 they reveal together</div>';
+  var revVal = (allSameReveal && firstReveal !== null) ? firstReveal : 0;
+  h += '<div style="display:flex;gap:5px;align-items:center">';
+  h += '<span class="pr-l" style="width:auto">Step</span>';
+  h += '<input type="number" min="0" max="20" value="'+revVal+'" class="pr-i" style="flex:1" onchange="setSelectionReveal(+this.value)" placeholder="'+(allSameReveal?'':'mixed')+'">';
+  h += '</div>';
+  h += '</div>';
+
+  // Align section — different behaviour for whole-group vs ungrouped multi-select
   h += '<div class="ps"><div class="ps-t">Align</div>';
+  if(allInOneGroup){
+    h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:6px">Moves the whole group to that edge of the slide. Children keep their relative positions.</div>';
+  } else {
+    h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:6px">Aligns the edges/centers of selected items to each other. Tip: group first if you want them to move as one.</div>';
+  }
   h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:8px">';
-  h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'left\')" title="Align Left">'+I.alignLeft+'</button>';
-  h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'hcenter\')" title="Center H">'+I.alignCenter+'</button>';
-  h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'right\')" title="Align Right">'+I.alignRight+'</button>';
-  h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'top\')" title="Align Top">'+I.alignTop+'</button>';
-  h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'vcenter\')" title="Center V">'+I.alignMiddle+'</button>';
-  h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'bottom\')" title="Align Bottom">'+I.alignBottom+'</button>';
+  h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'left\')" title="Align Left edges">'+I.alignLeft+'</button>';
+  h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'hcenter\')" title="Center horizontally">'+I.alignCenter+'</button>';
+  h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'right\')" title="Align Right edges">'+I.alignRight+'</button>';
+  h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'top\')" title="Align Top edges">'+I.alignTop+'</button>';
+  h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'vcenter\')" title="Center vertically">'+I.alignMiddle+'</button>';
+  h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'bottom\')" title="Align Bottom edges">'+I.alignBottom+'</button>';
   h += '</div></div>';
 
-  if(count >= 3){
+  if(count >= 3 && !allInOneGroup){
     h += '<div class="ps"><div class="ps-t">Distribute</div>';
+    h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:6px">Equal spacing between selected items.</div>';
     h += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px">';
-    h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'dist-h\')">'+I.distH+'</button>';
-    h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'dist-v\')">'+I.distV+'</button>';
+    h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'dist-h\')" title="Equal horizontal spacing">'+I.distH+'</button>';
+    h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'dist-v\')" title="Equal vertical spacing">'+I.distV+'</button>';
     h += '</div></div>';
   }
 
@@ -5211,12 +6434,27 @@ function renderMultiSelectPanel(){
   h += '</div>';
 
   h += '<div class="ps"><div class="ps-t" style="color:var(--muted)">Tip</div>';
-  h += '<div style="font-size:11px;color:var(--gray);line-height:1.5">Shift+click to add to selection. Arrow keys nudge by 1px, Shift+arrows by 10px.</div>';
+  h += '<div style="font-size:11px;color:var(--gray);line-height:1.5">Shift+click to add to selection. Arrow keys nudge by 1px, Shift+arrows by 10px. Ctrl+G groups selection.</div>';
   h += '</div>';
 
   h += '</div>';
   return h;
 }
+
+// Apply the same reveal step to every element in the current selection.
+window.setSelectionReveal = function(step){
+  if(!S.selIds.length) return;
+  var ids = S.selIds.slice();
+  updateSlide(function(s){
+    s.els.forEach(function(e){
+      if(ids.indexOf(e.id) >= 0){
+        if(step > 0) e.reveal = step;
+        else delete e.reveal;
+      }
+    });
+    return s;
+  });
+};
 
 window.deleteSelection = function(){
   if(!S.selIds.length) return;
@@ -5243,6 +6481,83 @@ function propRow(label, value, handler, type, opts){
   }
   return '<div class="pr"><span class="pr-l">'+label+'</span>'+inp+'</div>';
 }
+
+// Parse a color string ("#hex", "rgb(...)", "rgba(...)") into {hex, alpha}.
+// Used by propFillRow so the color picker can show a swatch even for rgba values.
+function parseColorWithAlpha(value){
+  var s = String(value || '').trim();
+  if(!s) return { hex: '#000000', alpha: 1 };
+  // rgba(r,g,b,a)
+  var m = s.match(/^rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)$/i);
+  if(m){
+    var r = parseInt(m[1],10), g = parseInt(m[2],10), b = parseInt(m[3],10);
+    var a = m[4] !== undefined ? parseFloat(m[4]) : 1;
+    var toHex = function(n){ var h = n.toString(16); return h.length === 1 ? '0'+h : h; };
+    return { hex: '#' + toHex(r) + toHex(g) + toHex(b), alpha: a };
+  }
+  // #rrggbb
+  if(/^#[0-9a-f]{6}$/i.test(s)) return { hex: s, alpha: 1 };
+  // #rgb shorthand
+  if(/^#[0-9a-f]{3}$/i.test(s)){
+    return { hex: '#' + s[1]+s[1]+s[2]+s[2]+s[3]+s[3], alpha: 1 };
+  }
+  // 'transparent' or unknown — fall back
+  if(s === 'transparent') return { hex: '#000000', alpha: 0 };
+  return { hex: '#000000', alpha: 1 };
+}
+
+// Combine a hex color and alpha (0-1) back into "rgba(r,g,b,a)" or "#hex" (if alpha=1)
+function formatColorWithAlpha(hex, alpha){
+  alpha = Math.max(0, Math.min(1, alpha));
+  if(alpha >= 0.999) return hex;
+  var h = String(hex || '#000000').replace('#','');
+  if(h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  var r = parseInt(h.substr(0,2),16), g = parseInt(h.substr(2,2),16), b = parseInt(h.substr(4,2),16);
+  return 'rgba('+r+','+g+','+b+','+(Math.round(alpha*100)/100)+')';
+}
+
+// Render a "fill" property row: color swatch + opacity slider + preset palette,
+// all feeding back into the same property as either #hex (alpha=1) or rgba() (alpha<1).
+// elId: the element id; prop: property name (e.g. 'bg', 'fill').
+function propFillRow(label, elId, prop, value){
+  var parsed = parseColorWithAlpha(value);
+  var hex = parsed.hex;
+  var alpha = parsed.alpha;
+  var pct = Math.round(alpha * 100);
+  // Use a unique input id so onchange handlers can read both inputs together
+  var hexId = 'fill_'+elId+'_'+prop+'_hex';
+  var alphaId = 'fill_'+elId+'_'+prop+'_alpha';
+  var combineCode = "(function(){var h=document.getElementById('"+hexId+"').value;var a=parseInt(document.getElementById('"+alphaId+"').value,10)/100;updateEl('"+elId+"',{"+prop+":formatColorWithAlpha(h,a)});})()";
+  var h = '<div class="pr"><span class="pr-l">'+label+'</span>';
+  h += '<div style="flex:1;display:flex;gap:6px;align-items:center">';
+  h += '<input id="'+hexId+'" type="color" value="'+hex+'" style="width:34px;height:26px;border:1px solid var(--brd);border-radius:4px;background:none;cursor:pointer;padding:0;flex-shrink:0" onchange="'+combineCode+'">';
+  h += '<input id="'+alphaId+'" type="range" min="0" max="100" step="5" value="'+pct+'" title="Opacity" style="flex:1;min-width:40px" onchange="'+combineCode+'">';
+  h += '<span style="font-size:10px;color:var(--muted);min-width:28px;text-align:right">'+pct+'%</span>';
+  h += '</div></div>';
+  // Preset palette — common backgrounds for slides/elements
+  var presets = [
+    { l:'Off', v:'transparent' },
+    { l:'Black 45%', v:'rgba(0,0,0,0.45)' },
+    { l:'Black 30%', v:'rgba(0,0,0,0.3)' },
+    { l:'Black 70%', v:'rgba(0,0,0,0.7)' },
+    { l:'White 10%', v:'rgba(255,255,255,0.1)' },
+    { l:'Brand', v:'#7ed957' },
+    { l:'Orange', v:'#ffa500' },
+    { l:'Solid Black', v:'#000000' },
+    { l:'Solid White', v:'#ffffff' }
+  ];
+  h += '<div style="display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-top:6px;padding:0 6px">';
+  presets.forEach(function(p){
+    var isActive = String(value).toLowerCase().replace(/\s/g,'') === String(p.v).toLowerCase().replace(/\s/g,'');
+    var checker = p.v === 'transparent'
+      ? 'background:repeating-conic-gradient(#444 0% 25%,#222 0% 50%) 50%/8px 8px'
+      : 'background:'+p.v;
+    h += '<div class="ep-fill-preset'+(isActive?' active':'')+'" style="'+checker+'" title="'+p.l+'" onclick="updateEl(\''+elId+'\',{'+prop+':\''+p.v+'\'})"></div>';
+  });
+  h += '</div>';
+  return h;
+}
+window.formatColorWithAlpha = formatColorWithAlpha;
 
 // =========================================================
 // ADD LIST / TEMPLATES POPOVERS
@@ -5366,8 +6681,19 @@ function renderPres(){
   var isDrawTool = S.tool === 'pen' || S.tool === 'highlighter' || S.tool === 'eraser';
   var cursor = isDrawTool ? 'none' : 'default';
 
-  var h = '<div class="pres-root">';
-  h += '<div class="pres-stage" style="width:'+stageDispW+'px;height:'+stageDispH+'px;background:'+slide.bg+';cursor:'+cursor+'" id="presStage" onmousedown="onCanvasDown(event)">';
+  // Determine effective transition + reveal animation classes for this slide.
+  // We add a key prop to the stage so animation re-runs on every slide change.
+  var effTrans = getEffectiveTransition(slide);
+  var effReveal = S.globalRevealAnim || 'fade';
+  var transClass = ' ep-trans-' + effTrans;
+  var revealClass = ' ep-anim-' + effReveal;
+  // Animation triggers — bump these every slide change / reveal step for re-render
+  var animKey = S.presSlide + '-' + S.revealStep;
+
+  var h = '<div class="pres-root'+revealClass+'">';
+  // Don't include the transition class in the initial HTML — we add it post-render
+  // after a forced reflow so the browser sees a fresh animation each render.
+  h += '<div class="pres-stage" data-trans="'+effTrans+'" data-anim-key="'+animKey+'" style="width:'+stageDispW+'px;height:'+stageDispH+'px;background:'+slide.bg+';cursor:'+cursor+'" id="presStage" onmousedown="onCanvasDown(event)">';
   h += '<div id="elsLayer" style="position:absolute;inset:0;transform:scale('+scale+');transform-origin:0 0;width:'+STAGE_W+'px;height:'+STAGE_H+'px">';
   h += renderElsHtml(slide, true);
   h += '</div>';
@@ -5386,6 +6712,23 @@ function renderPres(){
   h += '<div class="pres-counter"><span>'+(S.presSlide+1)+'</span> / '+S.slides.length+revealLabel+'</div>';
   h += '<button class="tb-b" onclick="presNext()" data-tip="Next (→)">'+I.next+'</button>';
   h += '<div class="tb-sep"></div>';
+
+  // Audio play/pause — only shown when current slide has audio attached AND
+  // the per-slide "Show controls" toggle is on. Uses the toolbar (which is NOT
+  // captured by the in-app recorder) so it stays out of any recording.
+  var presSlideObj = S.slides[S.presSlide];
+  var hasAudio = presSlideObj && presSlideObj.audio && presSlideObj.audio.data;
+  var showAudioBtn = hasAudio && presSlideObj.audio.showControls !== false;
+  if(showAudioBtn){
+    var isPlaying = _slideAudio.audio && !_slideAudio.audio.paused && _slideAudio.slideId === presSlideObj.id;
+    var audioIcon = isPlaying
+      ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>'
+      : '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+    var audioTip = isPlaying ? 'Pause voiceover' : 'Play voiceover';
+    h += '<button class="tb-b'+(isPlaying?' a':'')+'" onclick="toggleSlideAudio()" data-tip="'+audioTip+'" style="'+(isPlaying?'color:var(--g)':'')+'">'+audioIcon+'</button>';
+    h += '<div class="tb-sep"></div>';
+  }
+
   // Annotation tools
   h += '<button class="tb-b'+(S.tool==='cursor'?' a':'')+'" onclick="setPresTool(\'cursor\')" data-tip="Pointer (C)">'+I.cursor+'</button>';
   h += '<button class="tb-b'+(S.tool==='pen'?' a':'')+'" onclick="setPresTool(\'pen\')" data-tip="Pen (P)">'+I.pen+'</button>';
@@ -5451,8 +6794,35 @@ function renderPres(){
   // Mount TradingView widgets on current pres slide
   mountAllTradingViewOnSlide(S.slides[S.presSlide]);
 
+  // Slide transitions: only fire when the slide ACTUALLY CHANGES (not on reveal clicks).
+  // _lastTransSlideIdx tracks the last slide that triggered a transition.
+  var stage = document.getElementById('presStage');
+  var presRoot = stage ? stage.parentElement : null;
+  var slideChanged = (window._lastTransSlideIdx !== S.presSlide);
+  if(stage && presRoot && slideChanged){
+    presRoot.classList.remove('ep-trans-fade','ep-trans-slide-left','ep-trans-slide-right','ep-trans-slide-up','ep-trans-slide-down','ep-trans-zoom','ep-trans-zoom-out','ep-trans-none');
+    stage.classList.remove('ep-slide-transition');
+    void stage.offsetHeight; // force reflow
+    presRoot.classList.add('ep-trans-' + effTrans);
+    stage.classList.add('ep-slide-transition');
+    window._lastTransSlideIdx = S.presSlide;
+
+    // Slide audio: stop any previous, autoplay if configured on this slide
+    var curSlide = S.slides[S.presSlide];
+    if(curSlide && curSlide.audio && curSlide.audio.data && curSlide.audio.autoplay){
+      playSlideAudio(curSlide);
+    } else {
+      stopSlideAudio();
+    }
+  }
+
   initDrawCanvas();
 }
+
+// Reset slide transition tracker when entering / exiting presentation mode
+window._resetSlideTransitionTracker = function(){
+  window._lastTransSlideIdx = -1;
+};
 
 function reattachScreenShareStreams(){
   // For every element with an active stream, find its <video> and reattach srcObject

@@ -40,5 +40,19 @@ contextBridge.exposeInMainWorld('epElectron', {
   getVersion: () => ipcRenderer.invoke('ep:get-version'),
   openExternal: (url) => ipcRenderer.invoke('ep:open-external', url),
   listDesktopSources: () => ipcRenderer.invoke('ep:list-desktop-sources'),
+
+  // Video conversion: takes an ArrayBuffer of WebM bytes + format and returns
+  // { ok, outputPath } or { ok: false, error / canceled }.
+  // The renderer should subscribe to onConvertProgress for live percentage.
+  convertVideo: (sourceData, format, suggestedFilename, opts) =>
+    ipcRenderer.invoke('ep:convert-video', { sourceData, format, suggestedFilename, opts }),
+  probeEncoders: () => ipcRenderer.invoke('ep:probe-encoders'),
+  onConvertProgress: (cb) => {
+    const handler = (_event, data) => { try { cb(data); } catch (e) {} };
+    ipcRenderer.on('ep:convert-progress', handler);
+    return () => ipcRenderer.removeListener('ep:convert-progress', handler);
+  },
+  showInFolder: (filePath) => ipcRenderer.invoke('ep:show-in-folder', filePath),
+
   platform: process.platform
 });
