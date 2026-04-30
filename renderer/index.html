@@ -296,6 +296,13 @@ body.ep-speed-slow{--ep-trans-dur:1.1s;--ep-reveal-dur:0.85s}
 
 /* Element group dashed bounding box (shown in editor when any group member is selected) */
 .ep-group-box{position:absolute;border:1.5px dashed #ffa500;border-radius:4px;pointer-events:none;z-index:1;box-shadow:0 0 0 1px rgba(255,165,0,0.15);animation:ep-group-pulse 2.4s ease-in-out infinite}
+/* Phase 4f: animated sticker tiles in the picker popover. Each tile shows a
+   live preview at 80x80 with the label below. */
+.sticker-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px 6px;border:1px solid var(--brd);border-radius:8px;background:rgba(255,255,255,0.02);cursor:pointer;transition:all 0.12s;font-family:'Outfit'}
+.sticker-tile:hover{background:rgba(126,217,87,0.08);border-color:rgba(126,217,87,0.4);transform:translateY(-1px)}
+.sticker-tile-label{font-size:10.5px;color:#bbb;font-weight:500;text-align:center}
+.sticker-tile:hover .sticker-tile-label{color:#fff}
+.ep-sticker{display:block}
 /* Phase 4: group resize frame — wraps the selection bbox and hosts 8 resize handles. */
 .ep-group-resize-frame{position:absolute;border:1.5px solid rgba(126,217,87,0.55);border-radius:6px;pointer-events:none;z-index:25;box-shadow:0 0 0 1px rgba(0,0,0,0.4)}
 .ep-group-handle{position:absolute;width:12px;height:12px;background:#7ed957;border:2px solid #fff;border-radius:3px;z-index:32;pointer-events:auto;box-shadow:0 1px 4px rgba(0,0,0,0.5);transition:transform 0.1s, background 0.1s}
@@ -937,8 +944,992 @@ function syncAllConnectors(slide){
   });
 }
 
+// =========================================================
+// PHASE 3 LEVEL 2: ELBOW CONNECTOR ROUTING
+// =========================================================
+// Computes a right-angle (manhattan) path between two endpoints. The route
+// exits each anchored endpoint along the anchor's outward normal direction so
+// the connector visually leaves the shape cleanly, then bends to reach the
+// other endpoint.
+//
+// Returns an array of stage-coordinate {x,y} points for a polyline, including
+// both endpoints. For a typical L-shape: 3 points. For Z-shape: 4 points.
+//
+// Strategy:
+//  1. Determine each endpoint's "facing direction" — the unit vector the path
+//     should INITIALLY travel to leave that endpoint cleanly. For anchored
+//     endpoints, that's the anchor's outward normal. For free endpoints, we
+//     infer from the relative position of the other endpoint.
+//  2. Move each endpoint outward by a small offset along its facing direction
+//     to get "exit" points. This gives a small visual stub where the path
+//     leaves the shape, before bending.
+//  3. Connect the two exit points with right-angle segments. The geometry
+//     depends on whether the facing directions are aligned, opposite, or
+//     perpendicular.
+//
+// Exit offset: ~24 stage units. Tuned to feel like "the path leaves the shape
+// before turning" without being so long that small adjacent shapes get a long
+// stub between them.
+
+var ELBOW_EXIT_OFFSET = 24;
+
+// Returns the outward normal {dx, dy} for an anchor at normalized (ax, ay).
+// Convention: outward = away from shape center, snapped to the closest cardinal
+// direction. We snap because elbow routing is purely axis-aligned; diagonal
+// anchor exits would create slanted segments.
+function anchorFacingDirection(ax, ay){
+  var dxn = ax - 0.5, dyn = ay - 0.5;
+  // Snap to whichever axis has the larger component
+  if(Math.abs(dxn) > Math.abs(dyn)){
+    return { dx: dxn > 0 ? 1 : -1, dy: 0 };
+  } else if(Math.abs(dyn) > 0.001){
+    return { dx: 0, dy: dyn > 0 ? 1 : -1 };
+  }
+  // Center anchor (rare) → default to right
+  return { dx: 1, dy: 0 };
+}
+
+// Get an endpoint's facing direction. If the endpoint is anchored to a shape,
+// use the anchor's outward normal. If free, infer from the OTHER endpoint —
+// face whichever cardinal direction points away from the other end.
+function getEndpointFacing(line, which, slide){
+  var isFrom = (which === 1);
+  var shapeId = isFrom ? line.fromId : line.toId;
+  var anchorIdx = isFrom ? line.fromAnchor : line.toAnchor;
+  if(shapeId !== undefined && shapeId !== null){
+    var el = slide.els.find(function(e){ return e.id === shapeId; });
+    if(el && el.type === 'shape'){
+      var def = SHAPE_BY_ID[el.shape];
+      if(def && def.anchors && def.anchors[anchorIdx]){
+        var a = def.anchors[anchorIdx];
+        return anchorFacingDirection(a.x, a.y);
+      }
+    }
+  }
+  // Free endpoint — face away from the other endpoint
+  var thisX = isFrom ? line.x1 : line.x2;
+  var thisY = isFrom ? line.y1 : line.y2;
+  var otherX = isFrom ? line.x2 : line.x1;
+  var otherY = isFrom ? line.y2 : line.y1;
+  var dx = thisX - otherX, dy = thisY - otherY;
+  if(Math.abs(dx) > Math.abs(dy)){
+    return { dx: dx > 0 ? 1 : -1, dy: 0 };
+  }
+  return { dx: 0, dy: dy > 0 ? 1 : -1 };
+}
+
+// Compute the elbow path for a connector. Returns array of {x,y} points.
+function computeElbowPath(line, slide){
+  if(!slide) return [{x: line.x1, y: line.y1}, {x: line.x2, y: line.y2}];
+
+  var p1 = { x: line.x1, y: line.y1 };
+  var p2 = { x: line.x2, y: line.y2 };
+  var f1 = getEndpointFacing(line, 1, slide);
+  var f2 = getEndpointFacing(line, 2, slide);
+
+  // Exit points — moved outward from each endpoint along its facing direction.
+  // Distance is min(default offset, half the gap) so very close shapes don't
+  // get a stub larger than the gap itself.
+  var dx = p2.x - p1.x, dy = p2.y - p1.y;
+  var maxOffset = ELBOW_EXIT_OFFSET;
+  // For very close anchored points facing each other, shorten the exit so we
+  // don't overshoot the midpoint.
+  var distAlongF1 = Math.abs(dx * f1.dx + dy * f1.dy);
+  var distAlongF2 = Math.abs(dx * f2.dx + dy * f2.dy);
+  var exit1 = Math.min(maxOffset, Math.max(8, distAlongF1 / 2));
+  var exit2 = Math.min(maxOffset, Math.max(8, distAlongF2 / 2));
+
+  var e1 = { x: p1.x + f1.dx * exit1, y: p1.y + f1.dy * exit1 };
+  var e2 = { x: p2.x + f2.dx * exit2, y: p2.y + f2.dy * exit2 };
+
+  // Now route from e1 to e2 with axis-aligned segments. Three cases based on
+  // facing-direction relationship:
+  //
+  // Case A — Both face along the SAME axis (both horizontal or both vertical).
+  //   We need a Z-shape: exit, traverse perpendicular axis, traverse parallel,
+  //   enter.
+  //
+  // Case B — Faces are OPPOSITE on the same axis (e.g. f1 right, f2 left):
+  //   If both points are on roughly the same line (perpendicular delta small),
+  //   one bend is enough. Otherwise Z-shape: exit, midpoint along facing axis,
+  //   cross perpendicular, enter.
+  //
+  // Case C — Faces are PERPENDICULAR (one horizontal, one vertical):
+  //   L-shape: exit horizontally (or vertically), turn at the corner where
+  //   the two axes meet, enter the other.
+
+  var path = [p1];
+  var f1Horizontal = (f1.dy === 0);
+  var f2Horizontal = (f2.dy === 0);
+  var sameAxis = f1Horizontal === f2Horizontal;
+  var sameDirection = (f1.dx === f2.dx && f1.dy === f2.dy);
+
+  if(!sameAxis){
+    // Case C: L-shape. Corner is at (e2.x, e1.y) if f1 is horizontal, else
+    // (e1.x, e2.y).
+    if(f1Horizontal){
+      path.push(e1);
+      path.push({ x: e2.x, y: e1.y });
+      path.push(e2);
+    } else {
+      path.push(e1);
+      path.push({ x: e1.x, y: e2.y });
+      path.push(e2);
+    }
+  } else if(!sameDirection){
+    // Case B: faces oppose each other on the same axis.
+    if(f1Horizontal){
+      // Both face left/right. Bend in the middle.
+      var midX = (e1.x + e2.x) / 2;
+      // If they're perfectly aligned vertically (e1.y === e2.y), one straight
+      // segment suffices; otherwise Z-shape.
+      if(Math.abs(e1.y - e2.y) < 1){
+        path.push(e1);
+        path.push(e2);
+      } else {
+        path.push(e1);
+        path.push({ x: midX, y: e1.y });
+        path.push({ x: midX, y: e2.y });
+        path.push(e2);
+      }
+    } else {
+      var midY = (e1.y + e2.y) / 2;
+      if(Math.abs(e1.x - e2.x) < 1){
+        path.push(e1);
+        path.push(e2);
+      } else {
+        path.push(e1);
+        path.push({ x: e1.x, y: midY });
+        path.push({ x: e2.x, y: midY });
+        path.push(e2);
+      }
+    }
+  } else {
+    // Case A: both face the same direction. Loop around — the path needs to
+    // travel out, turn 90°, traverse the perpendicular gap, turn 90° back,
+    // loop AROUND, then enter the other endpoint.
+    if(f1Horizontal){
+      // Both face right (or both left). Project beyond the farther endpoint.
+      var outX = f1.dx > 0 ? Math.max(e1.x, e2.x) + maxOffset : Math.min(e1.x, e2.x) - maxOffset;
+      path.push(e1);
+      path.push({ x: outX, y: e1.y });
+      path.push({ x: outX, y: e2.y });
+      path.push(e2);
+    } else {
+      var outY = f1.dy > 0 ? Math.max(e1.y, e2.y) + maxOffset : Math.min(e1.y, e2.y) - maxOffset;
+      path.push(e1);
+      path.push({ x: e1.x, y: outY });
+      path.push({ x: e2.x, y: outY });
+      path.push(e2);
+    }
+  }
+
+  path.push(p2);
+  return path;
+}
+
+
+// =========================================================
+// PHASE 3 LEVEL 3: OBSTACLE-AVOIDING CONNECTOR ROUTING
+// =========================================================
+// When a connector's style is 'avoid', it routes around any non-endpoint
+// shapes/images/notes/text on the slide using a coarse-grid A* search with
+// axis-aligned moves. Falls back to the straight elbow path if no clear route
+// exists or if the grid build fails.
+//
+// Strategy:
+//   1. Build a coarse grid covering the slide. Cells inside any obstacle
+//      (with padding) are marked blocked. The connector's anchored shapes are
+//      excluded from obstacles so the route can enter/exit them naturally.
+//   2. Find the grid cells nearest to the connector's exit points (e1, e2 from
+//      the same anchor-direction logic as elbow routing).
+//   3. Run A* with 4-directional moves and a bend-penalty heuristic so paths
+//      prefer fewer corners.
+//   4. Convert cell sequence back to stage coordinates and compress collinear
+//      runs into single segments.
+//   5. Stitch endpoint stubs (anchored point → exit point → routed path → exit
+//      point → anchored point).
+//
+// Tuning constants — picked to balance quality vs runtime on the typical
+// 1920x1080 stage. Cell size of 20 gives a 96x54 grid (~5184 cells). A*
+// completes in <1ms in practice.
+
+var AVOID_CELL_SIZE = 20;       // Stage units per grid cell
+var AVOID_OBSTACLE_PAD = 10;    // How far paths stay clear of obstacle bboxes
+var AVOID_BEND_PENALTY = 1.5;   // Extra cost per direction change
+
+// Returns the list of obstacle bboxes for a given line on a given slide.
+// Excludes the line's two anchored endpoints, lines themselves, ink, and
+// invisible/zero-size elements. Each obstacle is {x, y, w, h}.
+function collectAvoidanceObstacles(line, slide){
+  if(!slide || !slide.els) return [];
+  var excludeIds = {};
+  if(line.fromId) excludeIds[line.fromId] = true;
+  if(line.toId) excludeIds[line.toId] = true;
+  var obstacles = [];
+  slide.els.forEach(function(e){
+    if(excludeIds[e.id]) return;
+    if(e.type === 'line') return;
+    if(e.type === 'screenshare' || e.type === 'webcam') return; // Live media; skip for now
+    // For most types, x/y/w/h define the bbox
+    var x = e.x, y = e.y, w = e.w || 0, h = e.h || 0;
+    if(w < 4 || h < 4) return; // skip tiny / placeholder
+    obstacles.push({ x: x, y: y, w: w, h: h });
+  });
+  return obstacles;
+}
+
+// Build the blocked-cell grid for a slide. Returns {cells, cols, rows, cellW, cellH}.
+// `cells` is a flat Uint8Array; cells[r * cols + c] === 1 means blocked.
+function buildAvoidanceGrid(obstacles, stageW, stageH){
+  var cellSize = AVOID_CELL_SIZE;
+  var cols = Math.ceil(stageW / cellSize);
+  var rows = Math.ceil(stageH / cellSize);
+  var cells = new Uint8Array(cols * rows);
+  obstacles.forEach(function(b){
+    var x0 = Math.max(0, Math.floor((b.x - AVOID_OBSTACLE_PAD) / cellSize));
+    var y0 = Math.max(0, Math.floor((b.y - AVOID_OBSTACLE_PAD) / cellSize));
+    var x1 = Math.min(cols - 1, Math.floor((b.x + b.w + AVOID_OBSTACLE_PAD) / cellSize));
+    var y1 = Math.min(rows - 1, Math.floor((b.y + b.h + AVOID_OBSTACLE_PAD) / cellSize));
+    for(var ry=y0; ry<=y1; ry++){
+      for(var cx=x0; cx<=x1; cx++){
+        cells[ry * cols + cx] = 1;
+      }
+    }
+  });
+  return { cells: cells, cols: cols, rows: rows, cellW: cellSize, cellH: cellSize };
+}
+
+// Find the closest unblocked cell to (x, y). If the input cell is unblocked,
+// returns it. Otherwise spirals outward looking for a free cell. Returns
+// {cx, cy} or null if none found within reasonable range.
+function nearestFreeCell(grid, x, y){
+  var cx = Math.max(0, Math.min(grid.cols - 1, Math.floor(x / grid.cellW)));
+  var cy = Math.max(0, Math.min(grid.rows - 1, Math.floor(y / grid.cellH)));
+  if(!grid.cells[cy * grid.cols + cx]) return { cx: cx, cy: cy };
+  // Spiral search up to radius 8 cells (~160px)
+  for(var r=1; r<=8; r++){
+    for(var dy=-r; dy<=r; dy++){
+      for(var dx=-r; dx<=r; dx++){
+        if(Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+        var nx = cx + dx, ny = cy + dy;
+        if(nx < 0 || ny < 0 || nx >= grid.cols || ny >= grid.rows) continue;
+        if(!grid.cells[ny * grid.cols + nx]) return { cx: nx, cy: ny };
+      }
+    }
+  }
+  return null;
+}
+
+// Manhattan-distance A* with bend penalty. Returns array of {cx, cy} grid cells
+// from start to end, or null if no path. Tracks last-move direction in node
+// state so we can charge a bend penalty when direction changes.
+//
+// Performance: bounds the search to a rectangle around the start/end + a
+// margin, so we don't explore far-away regions of the grid. For typical
+// connector spans this keeps A* under a few milliseconds.
+function astarRoute(grid, start, end){
+  if(!start || !end) return null;
+  var cols = grid.cols, rows = grid.rows;
+  var blocked = grid.cells;
+
+  // Search region — rectangle around start+end with a fixed margin so paths
+  // can swing a bit wide for detours but we don't explore the whole stage
+  // for long connectors. 12 cells (~240px) is enough room for one obstacle.
+  var rMargin = 12;
+  var minCx = Math.max(0, Math.min(start.cx, end.cx) - rMargin);
+  var maxCx = Math.min(cols - 1, Math.max(start.cx, end.cx) + rMargin);
+  var minCy = Math.max(0, Math.min(start.cy, end.cy) - rMargin);
+  var maxCy = Math.min(rows - 1, Math.max(start.cy, end.cy) + rMargin);
+
+  var open = [];
+  var bestG = {};
+  function key(cx, cy, dir){ return cy * cols + cx + '|' + dir; }
+  // Directions: 0=none/start, 1=right, 2=left, 3=down, 4=up
+  var startNode = { cx: start.cx, cy: start.cy, dir: 0, g: 0, f: 0, path: null };
+  startNode.f = Math.abs(start.cx - end.cx) + Math.abs(start.cy - end.cy);
+  open.push(startNode);
+  bestG[key(start.cx, start.cy, 0)] = 0;
+  var iter = 0;
+  var maxIter = (maxCx - minCx + 1) * (maxCy - minCy + 1) * 4; // generous safety cap
+  while(open.length > 0 && iter < maxIter){
+    iter++;
+    // Pop lowest-f node — linear scan; for the bounded region this stays small
+    var bestIdx = 0;
+    for(var i=1; i<open.length; i++){ if(open[i].f < open[bestIdx].f) bestIdx = i; }
+    var node = open.splice(bestIdx, 1)[0];
+    if(node.cx === end.cx && node.cy === end.cy){
+      var pts = [];
+      var cur = node;
+      while(cur){ pts.unshift({ cx: cur.cx, cy: cur.cy }); cur = cur.path; }
+      return pts;
+    }
+    var neighbors = [
+      { dx: 1, dy: 0, dir: 1 },
+      { dx: -1, dy: 0, dir: 2 },
+      { dx: 0, dy: 1, dir: 3 },
+      { dx: 0, dy: -1, dir: 4 }
+    ];
+    for(var n=0; n<neighbors.length; n++){
+      var nb = neighbors[n];
+      var ncx = node.cx + nb.dx, ncy = node.cy + nb.dy;
+      // Clip to search region (not just full grid)
+      if(ncx < minCx || ncy < minCy || ncx > maxCx || ncy > maxCy) continue;
+      if(blocked[ncy * cols + ncx]) continue;
+      var bend = (node.dir !== 0 && node.dir !== nb.dir) ? AVOID_BEND_PENALTY : 0;
+      var ng = node.g + 1 + bend;
+      var nk = key(ncx, ncy, nb.dir);
+      if(bestG[nk] !== undefined && bestG[nk] <= ng) continue;
+      bestG[nk] = ng;
+      var heuristic = Math.abs(ncx - end.cx) + Math.abs(ncy - end.cy);
+      open.push({ cx: ncx, cy: ncy, dir: nb.dir, g: ng, f: ng + heuristic, path: node });
+    }
+  }
+  return null;
+}
+
+// Compress a sequence of grid cells into a list of stage-coordinate points,
+// keeping only the corner points (where direction changes) plus the endpoints.
+function compressGridPath(cells, grid){
+  if(!cells || cells.length === 0) return [];
+  var halfW = grid.cellW / 2, halfH = grid.cellH / 2;
+  function toStage(c){ return { x: c.cx * grid.cellW + halfW, y: c.cy * grid.cellH + halfH }; }
+  if(cells.length === 1) return [toStage(cells[0])];
+  var pts = [toStage(cells[0])];
+  for(var i=1; i<cells.length-1; i++){
+    var prev = cells[i-1], cur = cells[i], next = cells[i+1];
+    var dx1 = cur.cx - prev.cx, dy1 = cur.cy - prev.cy;
+    var dx2 = next.cx - cur.cx, dy2 = next.cy - cur.cy;
+    if(dx1 !== dx2 || dy1 !== dy2){
+      pts.push(toStage(cur));
+    }
+  }
+  pts.push(toStage(cells[cells.length-1]));
+  return pts;
+}
+
+// Main entry point — returns array of {x,y} stage points for an avoid-style
+// connector. Falls back to elbow path if any step fails (no obstacles, no
+// path found, etc.) so the connector is never blank.
+function computeAvoidPath(line, slide){
+  if(!slide) return computeElbowPath(line, slide);
+  var p1 = { x: line.x1, y: line.y1 };
+  var p2 = { x: line.x2, y: line.y2 };
+  var f1 = getEndpointFacing(line, 1, slide);
+  var f2 = getEndpointFacing(line, 2, slide);
+  var e1 = { x: p1.x + f1.dx * ELBOW_EXIT_OFFSET, y: p1.y + f1.dy * ELBOW_EXIT_OFFSET };
+  var e2 = { x: p2.x + f2.dx * ELBOW_EXIT_OFFSET, y: p2.y + f2.dy * ELBOW_EXIT_OFFSET };
+
+  var obstacles = collectAvoidanceObstacles(line, slide);
+  if(obstacles.length === 0){
+    return computeElbowPath(line, slide);
+  }
+  var grid = buildAvoidanceGrid(obstacles, STAGE_W, STAGE_H);
+  var startCell = nearestFreeCell(grid, e1.x, e1.y);
+  var endCell = nearestFreeCell(grid, e2.x, e2.y);
+  if(!startCell || !endCell){
+    return computeElbowPath(line, slide);
+  }
+  var cellPath = astarRoute(grid, startCell, endCell);
+  if(!cellPath){
+    return computeElbowPath(line, slide);
+  }
+  var midPath = compressGridPath(cellPath, grid);
+  if(midPath.length === 0){
+    return computeElbowPath(line, slide);
+  }
+
+  // Stitching — the source of the bug. The grid path's first/last points are
+  // at cell centers near e1/e2 but NOT aligned to e1/e2 exactly. Naively
+  // overwriting them with e1/e2 creates diagonal segments. Instead we build
+  // proper L-shaped transitions that keep every segment axis-aligned.
+  //
+  // For each end: insert an explicit bend point so the path goes
+  //   anchor exit → align-segment along facing direction → bend → grid path
+  // ensuring the segment leaving the shape stays along the anchor's direction
+  // (clean exit) and only bends ONCE before joining the grid route.
+  var firstGrid = midPath[0];
+  var lastGrid = midPath[midPath.length - 1];
+
+  // Stitch from e1 → firstGrid with one bend, oriented by f1's facing axis.
+  // If f1 is horizontal, leave horizontally to e1, then move vertically to
+  // align with firstGrid's y, then horizontally into firstGrid.
+  // (firstGrid.x might equal e1.x already; we collapse collinear later.)
+  var startBridge;
+  if(f1.dy === 0){
+    // Horizontal facing — keep horizontal segment first
+    startBridge = { x: firstGrid.x, y: e1.y };
+  } else {
+    // Vertical facing — keep vertical segment first
+    startBridge = { x: e1.x, y: firstGrid.y };
+  }
+  var endBridge;
+  if(f2.dy === 0){
+    endBridge = { x: lastGrid.x, y: e2.y };
+  } else {
+    endBridge = { x: e2.x, y: lastGrid.y };
+  }
+
+  // Full path: p1 → e1 → startBridge → firstGrid → ... midPath ... → lastGrid → endBridge → e2 → p2
+  // We use the inner midPath (without first/last duplicates) and collapse
+  // collinear runs at the end.
+  var full = [p1, e1, startBridge];
+  for(var i=0; i<midPath.length; i++){
+    full.push(midPath[i]);
+  }
+  full.push(endBridge);
+  full.push(e2);
+  full.push(p2);
+
+  // Collapse collinear / duplicate-point runs in one pass.
+  var cleaned = [full[0]];
+  for(var i=1; i<full.length; i++){
+    var prev = cleaned[cleaned.length - 1];
+    var cur = full[i];
+    // Drop near-duplicate points (within 0.5 stage units)
+    if(Math.abs(cur.x - prev.x) < 0.5 && Math.abs(cur.y - prev.y) < 0.5) continue;
+    // If cur is collinear with prev and the one before, replace prev with cur
+    if(cleaned.length >= 2){
+      var pprev = cleaned[cleaned.length - 2];
+      var sameX = (Math.abs(prev.x - pprev.x) < 0.5 && Math.abs(cur.x - prev.x) < 0.5);
+      var sameY = (Math.abs(prev.y - pprev.y) < 0.5 && Math.abs(cur.y - prev.y) < 0.5);
+      if(sameX || sameY){
+        cleaned[cleaned.length - 1] = cur;
+        continue;
+      }
+    }
+    cleaned.push(cur);
+  }
+  return cleaned;
+}
+
 
 // Slide templates - applied via button in toolbar
+// =========================================================
+// PHASE 4f: ANIMATED STICKER LIBRARY
+// =========================================================
+// Curated set of looping animations for the canvas. Each sticker is defined
+// as a render function (w, h, tMs) → inner SVG markup, where tMs is the
+// current animation time in milliseconds. The function computes all transform
+// and opacity values from tMs so the SVG markup at any instant captures the
+// current visual state — this lets us rasterize stickers to canvas during
+// MP4 recording (which serializes the SVG and draws it as an image, picking
+// up whatever attribute values were computed for that frame).
+//
+// Animations loop on their own internal period (each sticker picks one),
+// and the global animation tick (tickStickers) updates a shared `now()` used
+// by every sticker's render function.
+//
+// Style: simple, bright, recognizable. Single color or a small palette per
+// sticker. Designed to read at small sizes (~80px) and scale up to ~300px.
+
+function easeInOut(t){ return t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2; }
+function loopT(now, period){ return ((now % period) + period) % period / period; } // 0..1
+
+var STICKER_LIBRARY = [
+  // ---- FIRE ----
+  // A flickering flame. Two layered flames with offset phases pulse and shift.
+  { id:'fire', cat:'reactions', label:'Fire', desc:'Flickering flame', emoji:'\uD83D\uDD25',
+    render: function(w, h, tMs){
+      var u = loopT(tMs, 600);            // 600ms flicker cycle
+      var flick = 0.92 + 0.08 * Math.sin(u * Math.PI * 2);
+      var dx = Math.sin(u * Math.PI * 2) * (w * 0.04);
+      var u2 = loopT(tMs + 150, 700);
+      var flick2 = 0.88 + 0.12 * Math.sin(u2 * Math.PI * 2);
+      var sX = 0.5 * w, sY = 0.62 * h;
+      // Outer orange flame
+      var outer = 'M' + (sX - w*0.30*flick) + ' ' + (sY + h*0.15) +
+                  ' Q' + (sX - w*0.35*flick + dx) + ' ' + (sY - h*0.15) + ' ' + sX + ' ' + (h*0.10) +
+                  ' Q' + (sX + w*0.35*flick + dx) + ' ' + (sY - h*0.15) + ' ' + (sX + w*0.30*flick) + ' ' + (sY + h*0.15) +
+                  ' Q' + sX + ' ' + (sY + h*0.30) + ' ' + (sX - w*0.30*flick) + ' ' + (sY + h*0.15) + ' Z';
+      // Inner yellow flame
+      var inner = 'M' + (sX - w*0.16*flick2) + ' ' + (sY + h*0.12) +
+                  ' Q' + (sX - w*0.18*flick2 - dx*0.5) + ' ' + (sY - h*0.05) + ' ' + sX + ' ' + (h*0.25) +
+                  ' Q' + (sX + w*0.18*flick2 - dx*0.5) + ' ' + (sY - h*0.05) + ' ' + (sX + w*0.16*flick2) + ' ' + (sY + h*0.12) +
+                  ' Q' + sX + ' ' + (sY + h*0.20) + ' ' + (sX - w*0.16*flick2) + ' ' + (sY + h*0.12) + ' Z';
+      return '<path d="'+outer+'" fill="#ff7a18"/>'
+           + '<path d="'+inner+'" fill="#ffd400"/>';
+    }
+  },
+
+  // ---- HEART ----
+  // Steady pulsing heart. Scales up and down from center.
+  { id:'heart', cat:'reactions', label:'Heart', desc:'Pulsing heart', emoji:'\u2764\uFE0F',
+    render: function(w, h, tMs){
+      var u = loopT(tMs, 900);           // 900ms heartbeat
+      var pulse = 0.9 + 0.1 * (Math.sin(u * Math.PI * 4) * 0.5 + 0.5);
+      var cx = w * 0.5, cy = h * 0.5;
+      var s = pulse;
+      // Heart path centered at origin, scaled by s
+      var d = 'M0 ' + (15) + ' C' + (-25) + ' ' + (-10) + ', ' + (-50) + ' ' + (10) + ', 0 ' + (45) + ' C' + (50) + ' ' + (10) + ', ' + (25) + ' ' + (-10) + ', 0 ' + (15) + ' Z';
+      var glowOpacity = 0.3 + 0.2 * Math.sin(u * Math.PI * 2);
+      return '<g transform="translate('+cx+','+cy+') scale('+(w/100*s)+')">'
+           + '<path d="'+d+'" fill="#ff3860" opacity="'+glowOpacity+'" transform="scale(1.15)"/>'
+           + '<path d="'+d+'" fill="#ff3860"/>'
+           + '</g>';
+    }
+  },
+
+  // ---- SPARKLE ----
+  // Twinkling 4-point star with rays.
+  { id:'sparkle', cat:'celebration', label:'Sparkle', desc:'Twinkling sparkle', emoji:'\u2728',
+    render: function(w, h, tMs){
+      var u = loopT(tMs, 1400);
+      var twinkle = 0.5 + 0.5 * Math.sin(u * Math.PI * 2);
+      var rot = u * 360 * 0.3;
+      var cx = w*0.5, cy = h*0.5;
+      var size = w * 0.35;
+      // Big star + small offset stars
+      var bigOpacity = 0.5 + 0.5 * twinkle;
+      var smallOpacity = 0.5 + 0.5 * (1 - twinkle);
+      function fourPoint(s){
+        return 'M0,'+(-s)+' L'+(s*0.25)+',-'+(s*0.25)+' L'+s+',0 L'+(s*0.25)+','+(s*0.25)+' L0,'+s+' L-'+(s*0.25)+','+(s*0.25)+' L-'+s+',0 L-'+(s*0.25)+',-'+(s*0.25)+' Z';
+      }
+      return '<g transform="translate('+cx+','+cy+') rotate('+rot+')">'
+           + '<path d="'+fourPoint(size)+'" fill="#ffd400" opacity="'+bigOpacity+'"/>'
+           + '<g transform="translate('+(-w*0.25)+','+(-h*0.18)+')"><path d="'+fourPoint(size*0.45)+'" fill="#fff7a8" opacity="'+smallOpacity+'"/></g>'
+           + '<g transform="translate('+(w*0.25)+','+(h*0.20)+')"><path d="'+fourPoint(size*0.4)+'" fill="#fff7a8" opacity="'+smallOpacity+'"/></g>'
+           + '</g>';
+    }
+  },
+
+  // ---- PARTY (confetti burst) ----
+  // 12 colorful confetti pieces falling and rotating.
+  { id:'party', cat:'celebration', label:'Party', desc:'Confetti burst', emoji:'\uD83C\uDF89',
+    render: function(w, h, tMs){
+      var pieces = [];
+      var colors = ['#ff3860','#ffd400','#7ed957','#3273dc','#9b59ff','#ff7a18'];
+      for(var i=0; i<12; i++){
+        var seedX = (Math.sin(i * 12.9898) * 43758.5453) % 1;
+        var seedY = (Math.sin(i * 78.233) * 12345.6789) % 1;
+        var period = 1500 + (Math.abs(seedX) * 800);
+        var u = loopT(tMs + i * 80, period);
+        var startX = w * (0.1 + Math.abs(seedX) * 0.8);
+        var endY = h + 20;
+        var startY = -20;
+        var y = startY + (endY - startY) * u;
+        var x = startX + Math.sin((u + Math.abs(seedY)) * Math.PI * 2) * (w * 0.05);
+        var rot = u * 360 * (1 + Math.abs(seedX) * 2);
+        var col = colors[i % colors.length];
+        pieces.push('<g transform="translate('+x+','+y+') rotate('+rot+')"><rect x="-3" y="-1.5" width="6" height="3" fill="'+col+'"/></g>');
+      }
+      return pieces.join('');
+    }
+  },
+
+  // ---- CLAP ----
+  // Two hand silhouettes that meet and pull apart.
+  { id:'clap', cat:'reactions', label:'Clap', desc:'Clapping hands', emoji:'\uD83D\uDC4F',
+    render: function(w, h, tMs){
+      var u = loopT(tMs, 700);
+      var sep = (Math.cos(u * Math.PI * 2) * 0.5 + 0.5) * w * 0.18 + w*0.05;
+      var cx = w*0.5, cy = h*0.55;
+      var hs = w * 0.30;
+      // Simplified hand: rounded rectangle with finger lines
+      function hand(side, x, y){
+        var flip = side === 'r' ? -1 : 1;
+        return '<g transform="translate('+x+','+y+') scale('+flip+',1)">'
+             + '<rect x="-'+(hs*0.55)+'" y="-'+(hs*0.5)+'" width="'+(hs*0.55)+'" height="'+hs+'" rx="'+(hs*0.18)+'" fill="#fdc28a"/>'
+             + '<rect x="-'+(hs*0.55)+'" y="-'+(hs*0.55)+'" width="'+(hs*0.18)+'" height="'+(hs*0.65)+'" rx="'+(hs*0.08)+'" fill="#fdc28a"/>'
+             + '<rect x="-'+(hs*0.36)+'" y="-'+(hs*0.6)+'" width="'+(hs*0.18)+'" height="'+(hs*0.7)+'" rx="'+(hs*0.08)+'" fill="#fdc28a"/>'
+             + '<rect x="-'+(hs*0.18)+'" y="-'+(hs*0.55)+'" width="'+(hs*0.18)+'" height="'+(hs*0.65)+'" rx="'+(hs*0.08)+'" fill="#fdc28a"/>'
+             + '</g>';
+      }
+      // Motion lines that briefly appear when hands meet
+      var meeting = u > 0.45 && u < 0.55;
+      var lines = '';
+      if(meeting){
+        var op = (1 - Math.abs(u - 0.5) * 20);
+        lines = '<g opacity="'+op+'" stroke="#ffd400" stroke-width="2">'
+              + '<line x1="'+(cx - w*0.1)+'" y1="'+(cy - h*0.15)+'" x2="'+(cx - w*0.18)+'" y2="'+(cy - h*0.22)+'"/>'
+              + '<line x1="'+(cx + w*0.1)+'" y1="'+(cy - h*0.15)+'" x2="'+(cx + w*0.18)+'" y2="'+(cy - h*0.22)+'"/>'
+              + '<line x1="'+cx+'" y1="'+(cy - h*0.25)+'" x2="'+cx+'" y2="'+(cy - h*0.35)+'"/>'
+              + '</g>';
+      }
+      return hand('l', cx - sep, cy) + hand('r', cx + sep, cy) + lines;
+    }
+  },
+
+  // ---- THUMBS UP ----
+  // Static thumb shape with a subtle bobbing motion.
+  { id:'thumbs', cat:'reactions', label:'Thumbs Up', desc:'Approval thumbs-up', emoji:'\uD83D\uDC4D',
+    render: function(w, h, tMs){
+      var u = loopT(tMs, 1100);
+      var bob = Math.sin(u * Math.PI * 2) * h * 0.025;
+      var rot = Math.sin(u * Math.PI * 2) * 5;
+      return '<g transform="translate('+(w*0.5)+','+(h*0.5+bob)+') rotate('+rot+') scale('+(w/100)+')">'
+           + '<path d="M-15 35 L-15 -10 L-5 -10 L0 -25 Q5 -35 15 -30 Q22 -25 18 -10 L30 -10 Q40 -10 38 0 L35 30 Q33 38 25 38 L-10 38 Q-15 38 -15 35 Z" fill="#ffd400" stroke="#e0a900" stroke-width="2"/>'
+           + '<rect x="-25" y="-10" width="14" height="48" rx="3" fill="#ffd400" stroke="#e0a900" stroke-width="2"/>'
+           + '</g>';
+    }
+  },
+
+  // ---- MONEY ----
+  // Floating $ bills falling and rotating.
+  { id:'money', cat:'celebration', label:'Money', desc:'Falling money', emoji:'\uD83D\uDCB0',
+    render: function(w, h, tMs){
+      var bills = [];
+      for(var i=0; i<5; i++){
+        var seed = (Math.sin(i * 47.123) * 9999) % 1;
+        var period = 2200 + Math.abs(seed) * 600;
+        var u = loopT(tMs + i * 350, period);
+        var x = w * (0.15 + Math.abs(Math.sin(i*i)) * 0.7);
+        var y = -20 + (h + 40) * u;
+        var rot = u * 360 + i * 60;
+        var sway = Math.sin(u * Math.PI * 2) * w * 0.06;
+        bills.push('<g transform="translate('+(x+sway)+','+y+') rotate('+rot+')">'
+                + '<rect x="-22" y="-12" width="44" height="24" rx="2" fill="#7ed957" stroke="#5aa83a" stroke-width="1.5"/>'
+                + '<text x="0" y="5" text-anchor="middle" font-family="Outfit,sans-serif" font-size="14" font-weight="800" fill="#1a4014">$</text>'
+                + '</g>');
+      }
+      return bills.join('');
+    }
+  },
+
+  // ---- LIGHTNING ----
+  // Quick zap that flashes.
+  { id:'lightning', cat:'effects', label:'Lightning', desc:'Zap of lightning', emoji:'\u26A1',
+    render: function(w, h, tMs){
+      var u = loopT(tMs, 1200);
+      var visible = u < 0.15 || (u > 0.5 && u < 0.6);
+      var op = visible ? (1 - Math.abs(u % 0.15 - 0.075) * 10) : 0.85;
+      if(visible) op = 1;
+      var glow = visible ? 0.7 : 0;
+      var d = 'M' + (w*0.55) + ' ' + (h*0.05) +
+              ' L' + (w*0.30) + ' ' + (h*0.50) +
+              ' L' + (w*0.50) + ' ' + (h*0.50) +
+              ' L' + (w*0.40) + ' ' + (h*0.95) +
+              ' L' + (w*0.75) + ' ' + (h*0.40) +
+              ' L' + (w*0.55) + ' ' + (h*0.40) + ' Z';
+      return '<path d="'+d+'" fill="#ffd400" opacity="'+glow+'" transform="translate('+(-w*0.02)+','+(-h*0.02)+') scale(1.08)" filter="blur(3px)"/>'
+           + '<path d="'+d+'" fill="#ffd400" stroke="#e0a900" stroke-width="2" opacity="'+op+'"/>';
+    }
+  },
+
+  // ---- STAR ----
+  // Five-pointed star spinning slowly with a glow pulse.
+  { id:'star-anim', cat:'celebration', label:'Star', desc:'Spinning star', emoji:'\u2B50',
+    render: function(w, h, tMs){
+      var u = loopT(tMs, 3000);
+      var rot = u * 360;
+      var pulseU = loopT(tMs, 1500);
+      var pulse = 0.95 + 0.05 * Math.sin(pulseU * Math.PI * 2);
+      var cx = w*0.5, cy = h*0.5;
+      var size = w * 0.4 * pulse;
+      // 5-point star path
+      var d = '';
+      for(var i=0; i<10; i++){
+        var r = (i % 2 === 0) ? size : size * 0.45;
+        var ang = (i / 10) * Math.PI * 2 - Math.PI / 2;
+        var px = Math.cos(ang) * r;
+        var py = Math.sin(ang) * r;
+        d += (i === 0 ? 'M' : 'L') + px + ' ' + py + ' ';
+      }
+      d += 'Z';
+      return '<g transform="translate('+cx+','+cy+') rotate('+rot+')">'
+           + '<path d="'+d+'" fill="#ffd400" opacity="0.4" transform="scale(1.2)"/>'
+           + '<path d="'+d+'" fill="#ffd400" stroke="#e0a900" stroke-width="2"/>'
+           + '</g>';
+    }
+  },
+
+  // ---- CHECK BOUNCE ----
+  // Green checkmark that bounces in.
+  { id:'check', cat:'status', label:'Checkmark', desc:'Bouncing check', emoji:'\u2705',
+    render: function(w, h, tMs){
+      var u = loopT(tMs, 1800);
+      var s;
+      if(u < 0.3) s = u / 0.3;
+      else if(u < 0.45) s = 1 + 0.15 * Math.sin((u - 0.3) / 0.15 * Math.PI);
+      else s = 1;
+      // Fade out at end
+      var op = u < 0.85 ? 1 : (1 - (u - 0.85) / 0.15);
+      var cx = w*0.5, cy = h*0.5;
+      return '<g transform="translate('+cx+','+cy+') scale('+s+')" opacity="'+op+'">'
+           + '<circle r="'+(w*0.4)+'" fill="#7ed957"/>'
+           + '<path d="M'+(-w*0.18)+' 0 L'+(-w*0.05)+' '+(h*0.13)+' L'+(w*0.20)+' '+(-h*0.13)+'" stroke="#1a4014" stroke-width="'+(w*0.06)+'" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+           + '</g>';
+    }
+  },
+
+  // ---- EXCLAIM ----
+  // Pulsing exclamation mark with attention-grabbing wiggle.
+  { id:'exclaim', cat:'status', label:'Exclaim', desc:'Pulsing alert', emoji:'\u2757',
+    render: function(w, h, tMs){
+      var u = loopT(tMs, 600);
+      var pulse = 0.95 + 0.05 * Math.sin(u * Math.PI * 2);
+      var rot = Math.sin(u * Math.PI * 4) * 8;
+      var cx = w*0.5, cy = h*0.5;
+      return '<g transform="translate('+cx+','+cy+') rotate('+rot+') scale('+pulse+')">'
+           + '<rect x="'+(-w*0.06)+'" y="'+(-h*0.32)+'" width="'+(w*0.12)+'" height="'+(h*0.42)+'" rx="'+(w*0.05)+'" fill="#ff3860"/>'
+           + '<circle cx="0" cy="'+(h*0.22)+'" r="'+(w*0.08)+'" fill="#ff3860"/>'
+           + '</g>';
+    }
+  },
+
+  // ---- LIKES (rising hearts) ----
+  // Small hearts rising up like Instagram likes.
+  { id:'rising-hearts', cat:'reactions', label:'Rising Hearts', desc:'Floating hearts', emoji:'\uD83D\uDC95',
+    render: function(w, h, tMs){
+      var hearts = [];
+      for(var i=0; i<6; i++){
+        var seed = (Math.sin(i * 91.7) * 9999) % 1;
+        var period = 1800 + Math.abs(seed) * 700;
+        var u = loopT(tMs + i * 280, period);
+        var startX = w * (0.2 + Math.abs(seed) * 0.6);
+        var x = startX + Math.sin(u * Math.PI * 2) * w * 0.08;
+        var y = h - 10 - (h + 20) * u;
+        var size = (0.2 + 0.15 * (1 - u)) * w;
+        var op = u < 0.1 ? u / 0.1 : (u > 0.85 ? (1-u)/0.15 : 1);
+        hearts.push('<g transform="translate('+x+','+y+') scale('+(size/40)+')" opacity="'+op+'">'
+                  + '<path d="M0 6 C-12 -6, -22 6, 0 18 C22 6, 12 -6, 0 6 Z" fill="#ff3860"/>'
+                  + '</g>');
+      }
+      return hearts.join('');
+    }
+  },
+
+  // ---- WOW (open-mouth surprise) ----
+  // Yellow round face with wide oval mouth, eyes that grow.
+  { id:'wow', cat:'reactions', label:'Wow', desc:'Open-mouth surprise', emoji:'\uD83D\uDE2E',
+    render: function(w, h, tMs){
+      var u = loopT(tMs, 1500);
+      var grow = 0.85 + 0.15 * Math.sin(u * Math.PI * 2);
+      var cx = w*0.5, cy = h*0.5;
+      var r = w*0.42;
+      return '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="#ffd400" stroke="#e0a900" stroke-width="2"/>'
+           + '<ellipse cx="'+(cx-w*0.13)+'" cy="'+(cy-h*0.08)+'" rx="'+(w*0.04*grow)+'" ry="'+(h*0.06*grow)+'" fill="#1a1a1a"/>'
+           + '<ellipse cx="'+(cx+w*0.13)+'" cy="'+(cy-h*0.08)+'" rx="'+(w*0.04*grow)+'" ry="'+(h*0.06*grow)+'" fill="#1a1a1a"/>'
+           + '<ellipse cx="'+cx+'" cy="'+(cy+h*0.14)+'" rx="'+(w*0.07*grow)+'" ry="'+(h*0.10*grow)+'" fill="#1a1a1a"/>';
+    }
+  },
+
+  // ---- LAUGH TEARS ----
+  // Round face crying tears of laughter — bouncing tears.
+  { id:'laugh-tears', cat:'reactions', label:'Laugh', desc:'Crying with laughter', emoji:'\uD83D\uDE02',
+    render: function(w, h, tMs){
+      var u = loopT(tMs, 800);
+      var bounce = Math.sin(u * Math.PI * 2) * h * 0.04;
+      var cx = w*0.5, cy = h*0.5 + bounce;
+      var r = w*0.42;
+      // Tears falling: drop from below eyes, fade as they fall
+      var tearU = loopT(tMs, 700);
+      var tearY = tearU * h * 0.35;
+      var tearOp = 1 - tearU;
+      return '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="#ffd400" stroke="#e0a900" stroke-width="2"/>'
+           // Squinting eyes (curves)
+           + '<path d="M'+(cx-w*0.20)+' '+(cy-h*0.05)+' Q'+(cx-w*0.13)+' '+(cy-h*0.13)+' '+(cx-w*0.06)+' '+(cy-h*0.05)+'" stroke="#1a1a1a" stroke-width="3" fill="none" stroke-linecap="round"/>'
+           + '<path d="M'+(cx+w*0.06)+' '+(cy-h*0.05)+' Q'+(cx+w*0.13)+' '+(cy-h*0.13)+' '+(cx+w*0.20)+' '+(cy-h*0.05)+'" stroke="#1a1a1a" stroke-width="3" fill="none" stroke-linecap="round"/>'
+           // Open laughing mouth
+           + '<path d="M'+(cx-w*0.15)+' '+(cy+h*0.10)+' Q'+cx+' '+(cy+h*0.25)+' '+(cx+w*0.15)+' '+(cy+h*0.10)+' Z" fill="#1a1a1a"/>'
+           // Tears
+           + '<ellipse cx="'+(cx-w*0.25)+'" cy="'+(cy-h*0.02 + tearY)+'" rx="'+(w*0.025)+'" ry="'+(h*0.05)+'" fill="#3273dc" opacity="'+tearOp+'"/>'
+           + '<ellipse cx="'+(cx+w*0.25)+'" cy="'+(cy-h*0.02 + tearY)+'" rx="'+(w*0.025)+'" ry="'+(h*0.05)+'" fill="#3273dc" opacity="'+tearOp+'"/>';
+    }
+  },
+
+  // ---- MIND BLOWN ----
+  // Head with a popping top — explosive starburst.
+  { id:'mind-blown', cat:'reactions', label:'Mind Blown', desc:'Explosive realization', emoji:'\uD83E\uDD2F',
+    render: function(w, h, tMs){
+      var u = loopT(tMs, 1200);
+      var burst = Math.min(1, u * 2);
+      var fade = u < 0.5 ? 1 : (1 - (u - 0.5) * 1.5);
+      if(fade < 0) fade = 0;
+      var cx = w*0.5, cy = h*0.62;
+      var r = w*0.32;
+      // Burst rays
+      var rays = '';
+      for(var i=0; i<8; i++){
+        var ang = i / 8 * Math.PI * 2 - Math.PI/2;
+        var len = w * 0.35 * burst;
+        var x1 = cx + Math.cos(ang) * (r + 5);
+        var y1 = cy + Math.sin(ang) * (r + 5);
+        var x2 = cx + Math.cos(ang) * (r + len);
+        var y2 = cy + Math.sin(ang) * (r + len);
+        rays += '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="#ffa500" stroke-width="3" stroke-linecap="round" opacity="'+fade+'"/>';
+      }
+      return rays
+           + '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="#ffd400" stroke="#e0a900" stroke-width="2"/>'
+           + '<circle cx="'+(cx-w*0.10)+'" cy="'+(cy-h*0.05)+'" r="'+(w*0.025)+'" fill="#1a1a1a"/>'
+           + '<circle cx="'+(cx+w*0.10)+'" cy="'+(cy-h*0.05)+'" r="'+(w*0.025)+'" fill="#1a1a1a"/>'
+           + '<ellipse cx="'+cx+'" cy="'+(cy+h*0.10)+'" rx="'+(w*0.06)+'" ry="'+(h*0.04)+'" fill="#1a1a1a"/>';
+    }
+  },
+
+  // ---- TROPHY ----
+  // Gold trophy with sparkles around it.
+  { id:'trophy', cat:'celebration', label:'Trophy', desc:'Victory trophy', emoji:'\uD83C\uDFC6',
+    render: function(w, h, tMs){
+      var u = loopT(tMs, 1800);
+      var shine = (u < 0.3) ? 1 : 0;
+      var cx = w*0.5, cy = h*0.5;
+      // Trophy cup
+      var cupW = w*0.35, cupH = h*0.35;
+      var path = 'M'+(cx-cupW/2)+' '+(cy-cupH/2)+' L'+(cx+cupW/2)+' '+(cy-cupH/2)+' L'+(cx+cupW*0.4)+' '+(cy+cupH/2)+' L'+(cx-cupW*0.4)+' '+(cy+cupH/2)+' Z';
+      // Handles
+      var handle1 = 'M'+(cx-cupW/2)+' '+(cy-cupH*0.3)+' Q'+(cx-cupW)+' '+(cy-cupH*0.3)+' '+(cx-cupW*0.7)+' '+(cy+cupH*0.1);
+      var handle2 = 'M'+(cx+cupW/2)+' '+(cy-cupH*0.3)+' Q'+(cx+cupW)+' '+(cy-cupH*0.3)+' '+(cx+cupW*0.7)+' '+(cy+cupH*0.1);
+      // Base
+      var base = '<rect x="'+(cx-cupW*0.5)+'" y="'+(cy+cupH/2)+'" width="'+cupW+'" height="'+(h*0.05)+'" fill="#d49100"/>'
+               + '<rect x="'+(cx-cupW*0.6)+'" y="'+(cy+cupH/2 + h*0.05)+'" width="'+(cupW*1.2)+'" height="'+(h*0.06)+'" rx="2" fill="#d49100"/>';
+      // Sparkles around the rim
+      var sx = '';
+      var sparkleU = loopT(tMs, 1500);
+      var sparkleOp = 0.5 + 0.5 * Math.sin(sparkleU * Math.PI * 2);
+      sx += '<circle cx="'+(cx-cupW*0.7)+'" cy="'+(cy-cupH*0.6)+'" r="2.5" fill="#fff7a8" opacity="'+sparkleOp+'"/>';
+      sx += '<circle cx="'+(cx+cupW*0.7)+'" cy="'+(cy-cupH*0.5)+'" r="2.5" fill="#fff7a8" opacity="'+(1-sparkleOp)+'"/>';
+      return base
+           + '<path d="'+path+'" fill="#ffd400" stroke="#d49100" stroke-width="2"/>'
+           + '<path d="'+handle1+'" fill="none" stroke="#d49100" stroke-width="3"/>'
+           + '<path d="'+handle2+'" fill="none" stroke="#d49100" stroke-width="3"/>'
+           + sx;
+    }
+  },
+
+  // ---- GIFT ----
+  // Gift box with bouncing ribbon.
+  { id:'gift', cat:'celebration', label:'Gift', desc:'Wrapped present', emoji:'\uD83C\uDF81',
+    render: function(w, h, tMs){
+      var u = loopT(tMs, 1400);
+      var bow = 0.95 + 0.05 * Math.sin(u * Math.PI * 4);
+      var cx = w*0.5, cy = h*0.55;
+      var bw = w*0.55, bh = h*0.4;
+      return '<rect x="'+(cx-bw/2)+'" y="'+(cy-bh/2)+'" width="'+bw+'" height="'+bh+'" rx="4" fill="#ff3860" stroke="#bf2949" stroke-width="2"/>'
+           // Vertical ribbon
+           + '<rect x="'+(cx-w*0.05)+'" y="'+(cy-bh/2)+'" width="'+(w*0.10)+'" height="'+bh+'" fill="#ffd400"/>'
+           // Horizontal ribbon
+           + '<rect x="'+(cx-bw/2)+'" y="'+(cy-h*0.02)+'" width="'+bw+'" height="'+(h*0.05)+'" fill="#ffd400"/>'
+           // Bow
+           + '<g transform="translate('+cx+','+(cy-bh/2)+') scale('+bow+')">'
+           + '<ellipse cx="-12" cy="-8" rx="10" ry="7" fill="#ffd400" stroke="#d49100" stroke-width="1.5"/>'
+           + '<ellipse cx="12" cy="-8" rx="10" ry="7" fill="#ffd400" stroke="#d49100" stroke-width="1.5"/>'
+           + '<circle cx="0" cy="-8" r="4" fill="#ffa500"/>'
+           + '</g>';
+    }
+  },
+
+  // ---- LOADING DOTS ----
+  // Three dots that pulse in sequence.
+  { id:'loading', cat:'status', label:'Loading', desc:'Three pulsing dots', emoji:'\u2026',
+    render: function(w, h, tMs){
+      var cy = h*0.5;
+      var dots = '';
+      for(var i=0; i<3; i++){
+        var u = loopT(tMs - i * 200, 1200);
+        var scale = 0.6 + 0.4 * Math.sin(u * Math.PI * 2);
+        if(scale < 0.6) scale = 0.6;
+        var op = 0.4 + 0.6 * Math.sin(u * Math.PI * 2);
+        var x = w * (0.25 + i * 0.25);
+        dots += '<circle cx="'+x+'" cy="'+cy+'" r="'+(w*0.08*scale)+'" fill="#7ed957" opacity="'+op+'"/>';
+      }
+      return dots;
+    }
+  },
+
+  // ---- WARNING (animated triangle) ----
+  // Yellow warning triangle with pulsing ! interior.
+  { id:'warning', cat:'status', label:'Warning', desc:'Caution alert', emoji:'\u26A0',
+    render: function(w, h, tMs){
+      var u = loopT(tMs, 800);
+      var pulse = 0.85 + 0.15 * Math.sin(u * Math.PI * 2);
+      var cx = w*0.5, cy = h*0.55;
+      var size = w*0.45;
+      var d = 'M'+cx+' '+(cy-size)+' L'+(cx-size*0.95)+' '+(cy+size*0.65)+' L'+(cx+size*0.95)+' '+(cy+size*0.65)+' Z';
+      return '<path d="'+d+'" fill="#ffd400" stroke="#d49100" stroke-width="3" stroke-linejoin="round"/>'
+           + '<g transform="translate('+cx+','+(cy+h*0.05)+') scale('+pulse+')">'
+           + '<rect x="-5" y="-25" width="10" height="32" rx="3" fill="#1a1a1a"/>'
+           + '<circle cx="0" cy="15" r="5" fill="#1a1a1a"/>'
+           + '</g>';
+    }
+  }
+];
+
+var STICKER_BY_ID = (function(){ var m = {}; STICKER_LIBRARY.forEach(function(s){ m[s.id] = s; }); return m; })();
+
+// Animation tick: a single requestAnimationFrame loop that updates every visible
+// sticker's SVG inner markup based on the current time. Stickers are tagged
+// with `data-sticker-id` and `data-sticker-kind` so the tick can find them
+// without a full app re-render (which would be too expensive at 60fps).
+var STICKER_TICK_RUNNING = false;
+function startStickerTick(){
+  if(STICKER_TICK_RUNNING) return;
+  STICKER_TICK_RUNNING = true;
+  function tick(){
+    if(!STICKER_TICK_RUNNING) return;
+    var nowMs = performance.now();
+    var nodes = document.querySelectorAll('[data-sticker-id]');
+    for(var i=0; i<nodes.length; i++){
+      var node = nodes[i];
+      var kind = node.getAttribute('data-sticker-kind');
+      var w = +node.getAttribute('data-w');
+      var h = +node.getAttribute('data-h');
+      var t0 = +node.getAttribute('data-t');
+      var def = STICKER_BY_ID[kind];
+      if(!def) continue;
+      // Each sticker's `t` field offsets its phase so duplicates desync
+      var inner = def.render(w, h, nowMs + t0);
+      // Only update if changed to avoid layout thrash. Cheap string compare.
+      if(node._lastInner !== inner){
+        node.innerHTML = inner;
+        node._lastInner = inner;
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+function stopStickerTick(){ STICKER_TICK_RUNNING = false; }
+
+// =========================================================
+// PHASE 4f: STICKER RECORDING CACHE
+// =========================================================
+// The recording canvas runs synchronously each frame (setInterval 33ms) but
+// rasterizing SVG to a bitmap requires async Image loading. We solve this by
+// maintaining a per-sticker cached Image that's REFRESHED async on every
+// frame, but DRAWN synchronously using whatever was last loaded. The result
+// is recording frames that are 1-2 ticks stale at most — invisible at 30fps.
+
+var STICKER_RENDER_CACHE = {};   // id → {img, imgLoaded, lastSerialized}
+
+function getStickerRenderCache(id){
+  if(!STICKER_RENDER_CACHE[id]){
+    STICKER_RENDER_CACHE[id] = { img: new Image(), imgLoaded: false, lastSerialized: '' };
+  }
+  return STICKER_RENDER_CACHE[id];
+}
+
+// Kick an async refresh: serialize the sticker's current SVG state to a Blob
+// URL, set img.src to it. When the image loads, mark it ready. Future
+// drawImage calls will pick up the new frame. We dedupe identical serialized
+// strings to avoid redundant Blob/URL churn.
+function refreshStickerCache(el, def){
+  var cache = getStickerRenderCache(el.id);
+  var t0 = el.t || 0;
+  var inner = def.render(el.w, el.h, performance.now() + t0);
+  // Wrap inner in a full SVG document for the Blob
+  var serialized = '<svg xmlns="http://www.w3.org/2000/svg" width="' + el.w + '" height="' + el.h + '" viewBox="0 0 ' + el.w + ' ' + el.h + '">' + inner + '</svg>';
+  if(serialized === cache.lastSerialized) return;
+  cache.lastSerialized = serialized;
+  var blob = new Blob([serialized], { type: 'image/svg+xml' });
+  var url = URL.createObjectURL(blob);
+  // Build a fresh image (re-using the same Image element across src changes
+  // can produce a brief moment of zero-pixel state during the swap).
+  var img = new Image();
+  img.onload = function(){
+    cache.img = img;
+    cache.imgLoaded = true;
+    URL.revokeObjectURL(url);
+  };
+  img.onerror = function(){ URL.revokeObjectURL(url); };
+  img.src = url;
+}
+
+// =========================================================
+// END STICKER LIBRARY
+// =========================================================
+
+
 var SLIDE_TEMPLATES = [
   {
     key:'title',
@@ -1058,6 +2049,8 @@ var I = {
   cursor:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 2l14 11-5.5 1.5L16 22l-3.5 1L9 15.5 4 20z"/></svg>',
   text:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>',
   textTemplates:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 5h14v3H5z" fill="currentColor" stroke="none"/><path d="M5 12h10v2H5z" fill="currentColor" stroke="none" opacity="0.7"/><path d="M5 17h7v1.5H5z" fill="currentColor" stroke="none" opacity="0.4"/><circle cx="20" cy="5.5" r="1.5" fill="#7ed957" stroke="none"/></svg>',
+  // Phase 4f: animated sticker icon — sparkle/star shape signaling movement
+  sticker:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 L13.5 9.5 L20 11 L13.5 12.5 L12 19 L10.5 12.5 L4 11 L10.5 9.5 Z" fill="currentColor" stroke="none" opacity="0.9"/><circle cx="18" cy="5" r="1.2" fill="#7ed957" stroke="none"/><circle cx="5" cy="17" r="1" fill="#ffa500" stroke="none"/></svg>',
   emoji:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 14c1.5 1.5 6.5 1.5 8 0" stroke-linecap="round"/><circle cx="9" cy="10" r="1" fill="currentColor"/><circle cx="15" cy="10" r="1" fill="currentColor"/></svg>',
   image:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>',
   rect:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>',
@@ -1234,6 +2227,10 @@ var S = {
   stageScale:1,
   clipboard:null,
   snapEnabled:true,
+  // Phase 4g: visual grid overlay + snap-to-grid. Independent from object-to-object snap.
+  gridVisible:false,
+  gridSnapEnabled:false,
+  gridSize:20,         // stage units between grid lines
   snapGuides:[],
   marquee:null,
   presBarPos:'bottom', // 'top' | 'bottom' | 'left' | 'right'
@@ -1266,10 +2263,15 @@ S.slides = [newSlide()];
 // FACTORIES
 // =========================================================
 function mkText(x,y){return{id:uid(),type:'text',x:x,y:y,w:420,h:70,text:'Double-click to edit',fs:28,fw:'700',color:'#f0f0f5',bc:'#7ed957',bw:3,br:8,bg:'rgba(0,0,0,0.45)',align:'center',vAlign:'center',italic:false,transform:'none',letterSpacing:0,lk:false}}
-function mkLine(x1,y1,x2,y2,arrow){return{id:uid(),type:'line',x1:x1,y1:y1,x2:x2,y2:y2,stroke:'#7ed957',sw:3,arrow:!!arrow,lk:false}}
+function mkLine(x1,y1,x2,y2,arrow){return{id:uid(),type:'line',x1:x1,y1:y1,x2:x2,y2:y2,stroke:'#7ed957',sw:3,arrow:!!arrow,style:'straight',lk:false}}
 function mkShape(sh,x,y){return{id:uid(),type:'shape',shape:sh,x:x,y:y,w:140,h:140,fill:'transparent',fillOp:1,stroke:'#7ed957',sw:3,lk:false}}
 function mkImage(src,x,y,w,h){return{id:uid(),type:'image',x:x,y:y,w:w,h:h,src:src,bc:'transparent',bw:0,br:0,op:1,lk:false}}
 function mkNote(x,y){return{id:uid(),type:'note',x:x,y:y,w:200,h:160,text:'Note...',bg:NOTE_COLORS[0],lk:false}}
+// Phase 4f: animated sticker. `kind` selects which animation; `t` is a phase
+// offset so identical stickers can animate out of sync. Stickers render via
+// the STICKER_LIBRARY render functions (live SVG with browser-driven CSS
+// animations) AND via canvas rasterization during recording.
+function mkSticker(kind, x, y){return{id:uid(),type:'sticker',kind:kind,x:x,y:y,w:120,h:120,t:Math.floor(Math.random()*1000),lk:false}}
 function mkScreenShare(x,y){return{id:uid(),type:'screenshare',x:x,y:y,w:640,h:360,label:'Screen Share',bc:'#7ed957',bc2:'#9b59ff',bw:2,br:10,borderStyle:'solid',badgeStyle:'full',badgePos:'tl',lk:false}}
 // Webcam element: a placeholder on the slide that fills with live camera feed.
 // Unlike the floating webcam overlay (toggled via W key), this is per-slide,
@@ -1744,12 +2746,12 @@ function buildPresenterSlidePreview(slide, maxW, maxH, respectReveal){
     if(respectReveal && el.reveal && el.reveal > S.revealStep) continue;
     if(el.type === 'line'){
       inner += '<div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none">';
-      inner += renderElInner(el, true);
+      inner += renderElInner(el, true, slide);
       inner += '</div>';
       continue;
     }
     inner += '<div style="position:absolute;left:'+el.x+'px;top:'+el.y+'px;pointer-events:none">';
-    inner += renderElInner(el, true);
+    inner += renderElInner(el, true, slide);
     inner += '</div>';
   }
   // Pen annotations
@@ -3508,6 +4510,10 @@ window.startElDrag = function(evt, id){
     primaryAnchorY: primaryAnchorY,
     origPositions: origPositions
   };
+  // Phase 4g: reset hysteresis state at the start of each drag so a sticky
+  // snap from a previous drag doesn't carry over.
+  window._snapStateX = null;
+  window._snapStateY = null;
   render();
 };
 
@@ -4026,6 +5032,7 @@ window.addText = function(){
 var TEXT_TEMPLATES = [
   {
     id: 'hero',
+    cat: 'titles',
     label: 'Hero Title',
     desc: 'Big title + subtitle',
     // Preview: simulates the rendered look at small scale
@@ -4046,6 +5053,7 @@ var TEXT_TEMPLATES = [
   },
   {
     id: 'section',
+    cat: 'titles',
     label: 'Section Header',
     desc: 'Title + accent rule',
     spawn: function(x, y){
@@ -4062,6 +5070,7 @@ var TEXT_TEMPLATES = [
   },
   {
     id: 'quote',
+    cat: 'quotes',
     label: 'Quote',
     desc: 'Italic with side bar',
     spawn: function(x, y){
@@ -4084,6 +5093,7 @@ var TEXT_TEMPLATES = [
   },
   {
     id: 'stat',
+    cat: 'stats',
     label: 'Stat / Metric',
     desc: 'Big number + label',
     spawn: function(x, y){
@@ -4101,6 +5111,7 @@ var TEXT_TEMPLATES = [
   },
   {
     id: 'big-number',
+    cat: 'stats',
     label: 'Big Number',
     desc: 'Single huge number',
     spawn: function(x, y){
@@ -4114,6 +5125,7 @@ var TEXT_TEMPLATES = [
   },
   {
     id: 'numbered-step',
+    cat: 'steps',
     label: 'Numbered Step',
     desc: 'Step number + heading',
     spawn: function(x, y){
@@ -4138,6 +5150,7 @@ var TEXT_TEMPLATES = [
   },
   {
     id: 'title-body',
+    cat: 'callouts',
     label: 'Title + Body',
     desc: 'Headline + paragraph',
     spawn: function(x, y){
@@ -4155,6 +5168,7 @@ var TEXT_TEMPLATES = [
   },
   {
     id: 'callout',
+    cat: 'callouts',
     label: 'Callout Box',
     desc: 'Highlighted text block',
     spawn: function(x, y){
@@ -4175,6 +5189,7 @@ var TEXT_TEMPLATES = [
   },
   {
     id: 'two-line-title',
+    cat: 'titles',
     label: 'Two-Line Title',
     desc: 'Bold + light contrast',
     spawn: function(x, y){
@@ -4192,6 +5207,7 @@ var TEXT_TEMPLATES = [
   },
   {
     id: 'underlined-title',
+    cat: 'titles',
     label: 'Underlined Title',
     desc: 'Title with thick underline',
     spawn: function(x, y){
@@ -4208,6 +5224,7 @@ var TEXT_TEMPLATES = [
   },
   {
     id: 'centered-quote',
+    cat: 'quotes',
     label: 'Centered Quote',
     desc: 'Big quote marks + centered',
     spawn: function(x, y){
@@ -4230,6 +5247,7 @@ var TEXT_TEMPLATES = [
   },
   {
     id: 'eyebrow-title',
+    cat: 'titles',
     label: 'Eyebrow Title',
     desc: 'Small label + main title',
     spawn: function(x, y){
@@ -4249,6 +5267,7 @@ var TEXT_TEMPLATES = [
   },
   {
     id: 'three-stats',
+    cat: 'stats',
     label: 'Three Stats',
     desc: 'Side-by-side metrics',
     spawn: function(x, y){
@@ -4287,6 +5306,7 @@ var TEXT_TEMPLATES = [
   },
   {
     id: 'two-tone-heading',
+    cat: 'callouts',
     label: 'Two-Tone Heading',
     desc: 'Bicolor split title',
     spawn: function(x, y){
@@ -4305,6 +5325,7 @@ var TEXT_TEMPLATES = [
   },
   {
     id: 'tagline',
+    cat: 'callouts',
     label: 'Tagline',
     desc: 'Light italic centered line',
     spawn: function(x, y){
@@ -4313,6 +5334,302 @@ var TEXT_TEMPLATES = [
           fs:22, fw:'300', color:'#a0a0a8', align:'center', vAlign:'center',
           bc:'transparent', bw:0, br:0, bg:'transparent',
           italic:true, transform:'none', letterSpacing:1, lk:false }
+      ];
+    }
+  },
+  // ---------- New templates added in v1.0.4 ----------
+  {
+    id: 'blockquote',
+    cat: 'quotes',
+    label: 'Blockquote',
+    desc: 'Large quote with bottom rule',
+    spawn: function(x, y){
+      return [
+        { type:'text', x:x, y:y, w:780, h:120, text:'A statement that demands the reader\u2019s full attention before it lets them go.',
+          fs:36, fw:'500', color:'#f0f0f5', align:'left', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false },
+        // Bottom accent rule
+        { type:'shape', shape:'rect', x:x, y:y+130, w:80, h:4,
+          fill:'#7ed957', fillOp:1, stroke:'#7ed957', sw:0, lk:false },
+        { type:'text', x:x, y:y+145, w:780, h:30, text:'AUTHOR  \u2022  CONTEXT',
+          fs:11, fw:'600', color:'#a0a0a8', align:'left', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'uppercase', letterSpacing:2.5, lk:false }
+      ];
+    }
+  },
+  {
+    id: 'pull-quote',
+    cat: 'quotes',
+    label: 'Pull Quote',
+    desc: 'Highlighted standout quote',
+    spawn: function(x, y){
+      return [
+        // Big quotation mark
+        { type:'text', x:x, y:y, w:60, h:60, text:'\u201C',
+          fs:80, fw:'800', color:'#7ed957', align:'left', vAlign:'top',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false },
+        { type:'text', x:x+70, y:y+10, w:660, h:90, text:'A specific, memorable line lifted from a longer piece of writing.',
+          fs:26, fw:'600', color:'#ffffff', align:'left', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false }
+      ];
+    }
+  },
+  {
+    id: 'attribution-card',
+    cat: 'quotes',
+    label: 'Attribution Card',
+    desc: 'Photo + name + role layout',
+    spawn: function(x, y){
+      return [
+        // Avatar circle (placeholder — user can replace with image element)
+        { type:'shape', shape:'circle', x:x, y:y+10, w:80, h:80,
+          fill:'#3a3a42', fillOp:1, stroke:'#7ed957', sw:2, lk:false },
+        { type:'text', x:x, y:y+30, w:80, h:40, text:'AB',
+          fs:24, fw:'700', color:'#7ed957', align:'center', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'uppercase', letterSpacing:1, lk:false },
+        // Name
+        { type:'text', x:x+100, y:y+15, w:500, h:32, text:'Alex Brennan',
+          fs:22, fw:'700', color:'#ffffff', align:'left', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false },
+        // Role
+        { type:'text', x:x+100, y:y+48, w:500, h:24, text:'HEAD OF PRODUCT, ACME',
+          fs:11, fw:'600', color:'#7ed957', align:'left', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'uppercase', letterSpacing:2, lk:false },
+        // Quote
+        { type:'text', x:x+100, y:y+72, w:500, h:32, text:'\u201CShipping faster meant we could iterate sooner.\u201D',
+          fs:14, fw:'500', color:'#a0a0a8', align:'left', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:true, transform:'none', letterSpacing:0, lk:false }
+      ];
+    }
+  },
+  {
+    id: 'pricing',
+    cat: 'stats',
+    label: 'Pricing',
+    desc: 'Price + period + caption',
+    spawn: function(x, y){
+      return [
+        // Currency symbol (small, top-aligned)
+        { type:'text', x:x, y:y, w:40, h:50, text:'$',
+          fs:32, fw:'600', color:'#7ed957', align:'left', vAlign:'top',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false },
+        // Price (huge)
+        { type:'text', x:x+35, y:y, w:280, h:100, text:'49',
+          fs:96, fw:'800', color:'#7ed957', align:'left', vAlign:'top',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:-2, lk:false },
+        // Period
+        { type:'text', x:x+170, y:y+50, w:120, h:30, text:'/ month',
+          fs:18, fw:'400', color:'#a0a0a8', align:'left', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false },
+        // Caption
+        { type:'text', x:x, y:y+108, w:300, h:24, text:'BILLED ANNUALLY',
+          fs:11, fw:'600', color:'#a0a0a8', align:'left', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'uppercase', letterSpacing:2.5, lk:false }
+      ];
+    }
+  },
+  {
+    id: 'percent-stat',
+    cat: 'stats',
+    label: 'Percent Stat',
+    desc: 'Big % with comparison',
+    spawn: function(x, y){
+      return [
+        { type:'text', x:x, y:y, w:300, h:120, text:'87%',
+          fs:96, fw:'800', color:'#7ed957', align:'center', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:-1, lk:false },
+        { type:'text', x:x, y:y+125, w:300, h:30, text:'OF CUSTOMERS RETURN',
+          fs:12, fw:'700', color:'#ffffff', align:'center', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'uppercase', letterSpacing:2.5, lk:false },
+        { type:'text', x:x, y:y+155, w:300, h:24, text:'\u2191 12% from last year',
+          fs:13, fw:'500', color:'#a0a0a8', align:'center', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false }
+      ];
+    }
+  },
+  {
+    id: 'three-steps',
+    cat: 'steps',
+    label: 'Three Steps',
+    desc: 'Numbered side-by-side steps',
+    spawn: function(x, y){
+      var colW = 240, gap = 30;
+      var els = [];
+      var nums = ['1', '2', '3'];
+      var titles = ['Plan', 'Build', 'Ship'];
+      var descs = ['Define the scope and pick the path forward together.',
+                   'Iterate quickly with small, testable changes.',
+                   'Release with a clear story for what changed.'];
+      for(var i=0; i<3; i++){
+        var cx = x + i * (colW + gap);
+        // Number circle
+        els.push({ type:'shape', shape:'circle', x:cx, y:y, w:50, h:50,
+          fill:'rgba(126,217,87,0.15)', fillOp:1, stroke:'#7ed957', sw:2, lk:false });
+        els.push({ type:'text', x:cx, y:y+8, w:50, h:34, text:nums[i],
+          fs:22, fw:'800', color:'#7ed957', align:'center', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false });
+        // Title
+        els.push({ type:'text', x:cx, y:y+60, w:colW, h:32, text:titles[i],
+          fs:22, fw:'700', color:'#ffffff', align:'left', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false });
+        // Description
+        els.push({ type:'text', x:cx, y:y+92, w:colW, h:60, text:descs[i],
+          fs:13, fw:'400', color:'#a0a0a8', align:'left', vAlign:'top',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false });
+      }
+      return els;
+    }
+  },
+  {
+    id: 'checklist',
+    cat: 'steps',
+    label: 'Checklist',
+    desc: 'Vertical task list',
+    spawn: function(x, y){
+      var els = [];
+      var rowH = 38;
+      var items = ['Define goals and metrics',
+                   'Sketch flow and key screens',
+                   'Build the smallest shippable version',
+                   'Get it in front of three users'];
+      for(var i=0; i<items.length; i++){
+        var ry = y + i * rowH;
+        // Checkbox: rounded square with green check (using small rect for box, then a check shape)
+        els.push({ type:'shape', shape:'rrect', x:x, y:ry+4, w:24, h:24,
+          fill:'rgba(126,217,87,0.18)', fillOp:1, stroke:'#7ed957', sw:2, lk:false });
+        // Check mark text (✓)
+        els.push({ type:'text', x:x, y:ry+4, w:24, h:24, text:'\u2713',
+          fs:16, fw:'800', color:'#7ed957', align:'center', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false });
+        // Item text
+        els.push({ type:'text', x:x+38, y:ry, w:600, h:32, text:items[i],
+          fs:18, fw:'500', color:'#f0f0f5', align:'left', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false });
+      }
+      return els;
+    }
+  },
+  {
+    id: 'timeline',
+    cat: 'steps',
+    label: 'Timeline',
+    desc: 'Horizontal milestone path',
+    spawn: function(x, y){
+      var els = [];
+      // Horizontal connecting line
+      els.push({ type:'shape', shape:'rect', x:x+40, y:y+38, w:660, h:3,
+        fill:'rgba(126,217,87,0.4)', fillOp:1, stroke:'rgba(126,217,87,0.4)', sw:0, lk:false });
+      var labels = ['Q1', 'Q2', 'Q3', 'Q4'];
+      var milestones = ['Research', 'Design', 'Build', 'Launch'];
+      var stepX = 140;
+      for(var i=0; i<4; i++){
+        var cx = x + 40 + i * stepX;
+        // Milestone dot
+        els.push({ type:'shape', shape:'circle', x:cx-10, y:y+30, w:20, h:20,
+          fill:'#7ed957', fillOp:1, stroke:'#1a1a1a', sw:3, lk:false });
+        // Quarter label above
+        els.push({ type:'text', x:cx-40, y:y, w:80, h:24, text:labels[i],
+          fs:11, fw:'700', color:'#7ed957', align:'center', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'uppercase', letterSpacing:2, lk:false });
+        // Milestone name below
+        els.push({ type:'text', x:cx-60, y:y+58, w:120, h:30, text:milestones[i],
+          fs:16, fw:'600', color:'#ffffff', align:'center', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false });
+      }
+      return els;
+    }
+  },
+  {
+    id: 'roadmap',
+    cat: 'steps',
+    label: 'Roadmap',
+    desc: 'Phased plan with arrows',
+    spawn: function(x, y){
+      var els = [];
+      var phases = [
+        { num:'PHASE 1', title:'Discovery',     desc:'Research, interviews, prioritization' },
+        { num:'PHASE 2', title:'Design & Build', desc:'Prototype, iterate, build' },
+        { num:'PHASE 3', title:'Launch & Learn', desc:'Ship, measure, iterate' }
+      ];
+      var blockW = 230, blockH = 100, gap = 18;
+      for(var i=0; i<phases.length; i++){
+        var bx = x + i * (blockW + gap + 22); // +22 for arrow
+        // Card background
+        els.push({ type:'shape', shape:'rrect', x:bx, y:y, w:blockW, h:blockH,
+          fill:'rgba(126,217,87,0.08)', fillOp:1, stroke:'#7ed957', sw:1.5, lk:false });
+        // Phase label
+        els.push({ type:'text', x:bx+15, y:y+10, w:blockW-30, h:20, text:phases[i].num,
+          fs:10, fw:'700', color:'#7ed957', align:'left', vAlign:'top',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'uppercase', letterSpacing:2, lk:false });
+        // Title
+        els.push({ type:'text', x:bx+15, y:y+30, w:blockW-30, h:28, text:phases[i].title,
+          fs:18, fw:'700', color:'#ffffff', align:'left', vAlign:'top',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false });
+        // Description
+        els.push({ type:'text', x:bx+15, y:y+58, w:blockW-30, h:36, text:phases[i].desc,
+          fs:11, fw:'400', color:'#a0a0a8', align:'left', vAlign:'top',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false });
+        // Arrow connector to next phase (skip after last)
+        if(i < phases.length - 1){
+          els.push({ type:'line',
+            x1:bx+blockW+2, y1:y+blockH/2,
+            x2:bx+blockW+gap+18, y2:y+blockH/2,
+            stroke:'#7ed957', sw:2.5, arrow:true, style:'straight', lk:false });
+        }
+      }
+      return els;
+    }
+  },
+  {
+    id: 'warning-box',
+    cat: 'callouts',
+    label: 'Warning Box',
+    desc: 'Highlighted alert / caution',
+    spawn: function(x, y){
+      return [
+        // Background pill — orange-tinted
+        { type:'shape', shape:'rrect', x:x, y:y, w:520, h:90,
+          fill:'rgba(255,165,0,0.12)', fillOp:1, stroke:'#ffa500', sw:2, lk:false },
+        // Warning icon (triangle-ish via text)
+        { type:'text', x:x+15, y:y+22, w:50, h:46, text:'\u26A0',
+          fs:36, fw:'700', color:'#ffa500', align:'center', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false },
+        // Title
+        { type:'text', x:x+70, y:y+12, w:430, h:25, text:'IMPORTANT',
+          fs:12, fw:'700', color:'#ffa500', align:'left', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'uppercase', letterSpacing:2, lk:false },
+        // Body
+        { type:'text', x:x+70, y:y+38, w:430, h:42, text:'Something the reader should pay attention to before they keep going.',
+          fs:14, fw:'500', color:'#f0f0f5', align:'left', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false }
       ];
     }
   }
@@ -4403,6 +5720,17 @@ window.addNote = function(){
 };
 
 window.setNoteColor = function(id, c){ window.updateEl(id, {bg:c}); };
+
+// Phase 4f: animated sticker. Drops a sticker onto the current slide.
+window.addSticker = function(kind){
+  if(!STICKER_BY_ID[kind]){ showToast('Unknown sticker: ' + kind); return; }
+  var p = getNextSpawnPos(120, 120);
+  var el = mkSticker(kind, p.x, p.y);
+  updateSlide(function(s){s.els.push(el); return s;});
+  S.sel = el.id;
+  S.tool = 'select';
+  closePopover();
+};
 
 // =========================================================
 // LIST ELEMENT ACTIONS
@@ -4945,20 +6273,122 @@ window.alignSelection = function(mode){
 // =========================================================
 // SNAP-TO-GRID & ALIGNMENT GUIDES
 // =========================================================
-var SNAP_THRESHOLD = 10; // pixels at stage scale (was 6, too tight)
+// Phase 4g v2: hysteresis. When NOT currently snapped, only engage snap when
+// cursor is within SNAP_ENGAGE_THRESHOLD of a target. Once snapped, STAY
+// snapped until cursor moves more than SNAP_RELEASE_THRESHOLD beyond the
+// target. This eliminates the "flicker" where cursor wobble of 1-2 pixels
+// makes the element oscillate between snapped and unsnapped positions.
+var SNAP_ENGAGE_THRESHOLD = 8;     // pixels at stage scale — initial bite
+var SNAP_RELEASE_THRESHOLD = 18;   // pixels — must drag this far to break snap
+var SNAP_THRESHOLD = SNAP_ENGAGE_THRESHOLD;  // back-compat alias
 var GRID_SIZE = 20;
+
+// Track whether each axis is currently snapped (and to which target value).
+// Reset at the start of each drag in onCanvasDown / startElDrag.
+window._snapStateX = null;  // {target: number} or null
+window._snapStateY = null;
 
 window.toggleSnap = function(){
   S.snapEnabled = !S.snapEnabled;
-  render();
+  refreshAlignMenuInPlace();
 };
 
+// Phase 4g: visual grid + grid-snap toggles. Persisted to localStorage so the
+// user's preference survives reloads.
+window.toggleGridVisible = function(){
+  S.gridVisible = !S.gridVisible;
+  try{ localStorage.setItem('ep-grid-visible', S.gridVisible ? '1' : '0'); }catch(e){}
+  refreshAlignMenuInPlace();
+  refreshGridOverlayInPlace();
+};
+window.toggleGridSnap = function(){
+  S.gridSnapEnabled = !S.gridSnapEnabled;
+  try{ localStorage.setItem('ep-grid-snap', S.gridSnapEnabled ? '1' : '0'); }catch(e){}
+  refreshAlignMenuInPlace();
+};
+window.setGridSize = function(n){
+  var v = parseInt(n, 10);
+  if(isNaN(v) || v < 4 || v > 200) return;
+  S.gridSize = v;
+  try{ localStorage.setItem('ep-grid-size', String(v)); }catch(e){}
+  refreshAlignMenuInPlace();
+  refreshGridOverlayInPlace();
+};
+
+// Phase 4g v2: in-place updates to avoid the popover flickering on every
+// toggle. Instead of a full app render() that wipes app.innerHTML, we just
+// update the popover's existing DOM with the fresh menu HTML.
+function refreshAlignMenuInPlace(){
+  if(S.pop !== 'alignMenu') return;
+  // Find the popover element. Our popovers render with class "menu-popover".
+  // The alignMenu is the one that's currently in the DOM.
+  var existing = document.querySelector('.popover.menu-popover');
+  if(!existing) return;
+  // Build fresh HTML for just the popover (without backdrop)
+  var html = renderAlignMenu();
+  // Strip the backdrop div from html — it's the first <div class="popover-backdrop">
+  var temp = document.createElement('div');
+  temp.innerHTML = html;
+  // Find the .popover element in temp and copy its innerHTML to existing
+  var fresh = temp.querySelector('.popover.menu-popover');
+  if(!fresh) return;
+  existing.innerHTML = fresh.innerHTML;
+  // Also update the toolbar magnet button's "active" appearance — find its
+  // node and recompute the class. Simpler: just toggle the 'a' class based
+  // on alignActive.
+  var alignActive = S.snapEnabled || S.gridVisible || S.gridSnapEnabled;
+  var btns = document.querySelectorAll('.tb-b');
+  for(var i=0; i<btns.length; i++){
+    var btn = btns[i];
+    if(btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf("'alignMenu'") !== -1){
+      if(alignActive || S.pop === 'alignMenu'){ btn.classList.add('a'); }
+      else { btn.classList.remove('a'); }
+      break;
+    }
+  }
+}
+
+// Refresh just the grid overlay layer (and only that) without a full render.
+// Cheaper than re-rendering the whole canvas.
+function refreshGridOverlayInPlace(){
+  // Remove existing grid layers (we render two: minor + major)
+  var stage = document.getElementById('canvasStage');
+  if(!stage) return;
+  // Tag both grid layers with a class so we can find and replace cleanly.
+  var existing = stage.querySelectorAll('.ep-grid-layer');
+  for(var i=0; i<existing.length; i++) existing[i].remove();
+  if(!S.gridVisible) return;
+  var gs = S.gridSize;
+  var maj = gs * 5;
+  var minorLayer = document.createElement('div');
+  minorLayer.className = 'ep-grid-layer';
+  minorLayer.style.cssText = 'position:absolute;inset:0;transform:scale('+S.stageScale+');transform-origin:0 0;width:'+STAGE_W+'px;height:'+STAGE_H+'px;pointer-events:none;'
+    + 'background-image:linear-gradient(to right, rgba(126,217,87,0.12) 1px, transparent 1px),'
+    + 'linear-gradient(to bottom, rgba(126,217,87,0.12) 1px, transparent 1px);'
+    + 'background-size:'+gs+'px '+gs+'px;';
+  var majorLayer = document.createElement('div');
+  majorLayer.className = 'ep-grid-layer';
+  majorLayer.style.cssText = 'position:absolute;inset:0;transform:scale('+S.stageScale+');transform-origin:0 0;width:'+STAGE_W+'px;height:'+STAGE_H+'px;pointer-events:none;'
+    + 'background-image:linear-gradient(to right, rgba(126,217,87,0.22) 1px, transparent 1px),'
+    + 'linear-gradient(to bottom, rgba(126,217,87,0.22) 1px, transparent 1px);'
+    + 'background-size:'+maj+'px '+maj+'px;';
+  // Insert before the elsLayer so the grid sits BENEATH elements but above background
+  var elsLayer = document.getElementById('elsLayer');
+  if(elsLayer){
+    stage.insertBefore(minorLayer, elsLayer);
+    stage.insertBefore(majorLayer, elsLayer);
+  } else {
+    stage.appendChild(minorLayer);
+    stage.appendChild(majorLayer);
+  }
+}
+
 function computeSnap(movingIds, proposedDx, proposedDy){
-  if(!S.snapEnabled) return {dx:proposedDx, dy:proposedDy, guides:[]};
+  if(!S.snapEnabled && !S.gridSnapEnabled) return {dx:Math.round(proposedDx), dy:Math.round(proposedDy), guides:[]};
   var slide = cs();
   var moving = slide.els.filter(function(e){return movingIds.indexOf(e.id) >= 0});
   var others = slide.els.filter(function(e){return movingIds.indexOf(e.id) < 0});
-  if(!moving.length) return {dx:proposedDx, dy:proposedDy, guides:[]};
+  if(!moving.length) return {dx:Math.round(proposedDx), dy:Math.round(proposedDy), guides:[]};
 
   // Bounding box of moving elements (already moved by proposed delta)
   var bounds = moving.map(function(el){
@@ -4971,46 +6401,108 @@ function computeSnap(movingIds, proposedDx, proposedDy){
   var my2 = Math.max.apply(null, bounds.map(function(b){return b.y+b.h}));
   var mcx = (mx1+mx2)/2, mcy = (my1+my2)/2;
 
-  // Candidate snap points: other element edges/centers + stage edges/center
-  var xTargets = [0, STAGE_W/2, STAGE_W];
-  var yTargets = [0, STAGE_H/2, STAGE_H];
-  others.forEach(function(el){
-    var b = getElBounds(el);
-    xTargets.push(b.x, b.x+b.w/2, b.x+b.w);
-    yTargets.push(b.y, b.y+b.h/2, b.y+b.h);
-  });
-
-  var threshold = SNAP_THRESHOLD / S.stageScale;
+  // Hysteresis: once an axis is snapped, the threshold to BREAK the snap is
+  // larger than the threshold to ENGAGE it. This prevents the element from
+  // oscillating around the snap target when cursor wobble is in the gray zone.
+  var engageThreshold = SNAP_ENGAGE_THRESHOLD / S.stageScale;
+  var releaseThreshold = SNAP_RELEASE_THRESHOLD / S.stageScale;
+  // Effective threshold per axis, depending on current snap state
+  var thresholdX = window._snapStateX ? releaseThreshold : engageThreshold;
+  var thresholdY = window._snapStateY ? releaseThreshold : engageThreshold;
   var bestX = null, bestY = null;
   var guides = [];
 
-  // Try snap: left edge, center, right edge of moving -> each xTarget
-  xTargets.forEach(function(tx){
-    [[mx1,'l'], [mcx,'c'], [mx2,'r']].forEach(function(pair){
-      var d = tx - pair[0];
-      if(Math.abs(d) < threshold){
-        if(!bestX || Math.abs(d) < Math.abs(bestX.d)){
-          bestX = {d:d, tx:tx};
-        }
-      }
+  // Object-to-object snap targets (existing behavior)
+  if(S.snapEnabled){
+    var xTargets = [0, STAGE_W/2, STAGE_W];
+    var yTargets = [0, STAGE_H/2, STAGE_H];
+    others.forEach(function(el){
+      var b = getElBounds(el);
+      xTargets.push(b.x, b.x+b.w/2, b.x+b.w);
+      yTargets.push(b.y, b.y+b.h/2, b.y+b.h);
     });
-  });
-  yTargets.forEach(function(ty){
-    [[my1,'t'], [mcy,'c'], [my2,'b']].forEach(function(pair){
-      var d = ty - pair[0];
-      if(Math.abs(d) < threshold){
-        if(!bestY || Math.abs(d) < Math.abs(bestY.d)){
-          bestY = {d:d, ty:ty};
+    // If we're currently snapped to a specific target, prefer staying on it
+    // (use release threshold). If we drift further than release, drop the
+    // snap and consider engaging on a different target with engage threshold.
+    if(window._snapStateX){
+      var stickyX = window._snapStateX.target;
+      // Distance from each candidate point to the sticky target
+      [mx1, mcx, mx2].forEach(function(p){
+        var d = stickyX - p;
+        if(Math.abs(d) < releaseThreshold){
+          if(!bestX || Math.abs(d) < Math.abs(bestX.d)){
+            bestX = {d:d, tx:stickyX, kind:'object'};
+          }
         }
-      }
-    });
-  });
+      });
+    }
+    if(!bestX){
+      // No sticky engagement — try fresh engagement at the smaller threshold
+      xTargets.forEach(function(tx){
+        [mx1, mcx, mx2].forEach(function(p){
+          var d = tx - p;
+          if(Math.abs(d) < engageThreshold){
+            if(!bestX || Math.abs(d) < Math.abs(bestX.d)){
+              bestX = {d:d, tx:tx, kind:'object'};
+            }
+          }
+        });
+      });
+    }
+    if(window._snapStateY){
+      var stickyY = window._snapStateY.target;
+      [my1, mcy, my2].forEach(function(p){
+        var d = stickyY - p;
+        if(Math.abs(d) < releaseThreshold){
+          if(!bestY || Math.abs(d) < Math.abs(bestY.d)){
+            bestY = {d:d, ty:stickyY, kind:'object'};
+          }
+        }
+      });
+    }
+    if(!bestY){
+      yTargets.forEach(function(ty){
+        [my1, mcy, my2].forEach(function(p){
+          var d = ty - p;
+          if(Math.abs(d) < engageThreshold){
+            if(!bestY || Math.abs(d) < Math.abs(bestY.d)){
+              bestY = {d:d, ty:ty, kind:'object'};
+            }
+          }
+        });
+      });
+    }
+  }
+
+  // Phase 4g: snap-to-grid. Snaps the moving bbox's TOP-LEFT corner to the
+  // nearest grid intersection. Object-to-object snaps win when they're closer
+  // (they're more visually meaningful), but if no object snap fires we fall
+  // back to grid alignment.
+  if(S.gridSnapEnabled && S.gridSize > 0){
+    var g = S.gridSize;
+    var snapToGridX = Math.round(mx1 / g) * g - mx1;
+    var snapToGridY = Math.round(my1 / g) * g - my1;
+    if(!bestX || Math.abs(snapToGridX) < Math.abs(bestX.d)){
+      bestX = {d:snapToGridX, tx:mx1 + snapToGridX, kind:'grid'};
+    }
+    if(!bestY || Math.abs(snapToGridY) < Math.abs(bestY.d)){
+      bestY = {d:snapToGridY, ty:my1 + snapToGridY, kind:'grid'};
+    }
+  }
+
+  // Update sticky-snap state for the next frame
+  window._snapStateX = bestX ? {target: bestX.tx} : null;
+  window._snapStateY = bestY ? {target: bestY.ty} : null;
 
   var finalDx = proposedDx + (bestX ? bestX.d : 0);
   var finalDy = proposedDy + (bestY ? bestY.d : 0);
 
-  if(bestX) guides.push({type:'v', x:bestX.tx});
-  if(bestY) guides.push({type:'h', y:bestY.ty});
+  // Phase 4g: round to integers to eliminate float-precision drift.
+  finalDx = Math.round(finalDx);
+  finalDy = Math.round(finalDy);
+
+  if(bestX && bestX.kind === 'object') guides.push({type:'v', x:bestX.tx});
+  if(bestY && bestY.kind === 'object') guides.push({type:'h', y:bestY.ty});
 
   return {dx:finalDx, dy:finalDy, guides:guides};
 }
@@ -5743,17 +7235,36 @@ async function renderSlideToCanvas(s, scale){
       x.strokeStyle = el.stroke;
       x.lineWidth = el.sw;
       x.lineCap = 'round';
+      x.lineJoin = 'round';
+      // Phase 3 Level 2/3: draw the multi-segment elbow/avoid path if this
+      // is a styled connector. Otherwise straight x1/y1 → x2/y2.
+      var canvasPathPts;
+      if(el.style === 'avoid'){
+        canvasPathPts = computeAvoidPath(el, slide);
+      } else if(el.style === 'elbow'){
+        canvasPathPts = computeElbowPath(el, slide);
+      } else {
+        canvasPathPts = [{x:el.x1, y:el.y1}, {x:el.x2, y:el.y2}];
+      }
       x.beginPath();
-      x.moveTo(el.x1, el.y1);
-      x.lineTo(el.x2, el.y2);
+      x.moveTo(canvasPathPts[0].x, canvasPathPts[0].y);
+      for(var cp=1; cp<canvasPathPts.length; cp++){
+        x.lineTo(canvasPathPts[cp].x, canvasPathPts[cp].y);
+      }
       x.stroke();
       if(el.arrow){
-        var ang = Math.atan2(el.y2-el.y1, el.x2-el.x1);
+        // Arrow direction: use the LAST segment of the path so elbow connectors
+        // get the arrowhead pointing along the final approach, not along the
+        // overall endpoint-to-endpoint line.
+        var lastIdx = canvasPathPts.length - 1;
+        var prevPt = canvasPathPts[lastIdx - 1] || canvasPathPts[0];
+        var endPt = canvasPathPts[lastIdx];
+        var ang = Math.atan2(endPt.y - prevPt.y, endPt.x - prevPt.x);
         x.fillStyle = el.stroke;
         x.beginPath();
-        x.moveTo(el.x2, el.y2);
-        x.lineTo(el.x2 - 16*Math.cos(ang-0.4), el.y2 - 16*Math.sin(ang-0.4));
-        x.lineTo(el.x2 - 16*Math.cos(ang+0.4), el.y2 - 16*Math.sin(ang+0.4));
+        x.moveTo(endPt.x, endPt.y);
+        x.lineTo(endPt.x - 16*Math.cos(ang-0.4), endPt.y - 16*Math.sin(ang-0.4));
+        x.lineTo(endPt.x - 16*Math.cos(ang+0.4), endPt.y - 16*Math.sin(ang+0.4));
         x.closePath();
         x.fill();
       }
@@ -5766,6 +7277,27 @@ async function renderSlideToCanvas(s, scale){
       x.textAlign = 'left';
       var noteLines = (el.text || '').split('\n');
       for(var nli=0; nli<noteLines.length; nli++) x.fillText(noteLines[nli], el.x + 12, el.y + 24 + nli*20, el.w - 20);
+    }
+    // Phase 4f: animated sticker. We maintain a per-sticker cached <img>
+    // (keyed by sticker id) that gets refreshed asynchronously each frame
+    // with the current SVG state, and we drawImage the latest cached frame
+    // synchronously. The frame may be 1-2 ticks stale but that's invisible
+    // at 30fps. The refresh kick is non-blocking; we never wait for load.
+    if(el.type === 'sticker'){
+      var stickerDef = STICKER_BY_ID[el.kind];
+      if(stickerDef){
+        // Draw cached frame if we have one
+        var cached = getStickerRenderCache(el.id);
+        if(cached.img && cached.imgLoaded){
+          x.drawImage(cached.img, el.x, el.y, el.w, el.h);
+        } else {
+          // No cached image yet — placeholder fill so the area isn't blank
+          x.fillStyle = 'rgba(255,255,255,0.05)';
+          x.fillRect(el.x, el.y, el.w, el.h);
+        }
+        // Kick async refresh (non-blocking) for the NEXT frame
+        refreshStickerCache(el, stickerDef);
+      }
     }
     if(el.type === 'shape'){
       x.strokeStyle = el.stroke;
@@ -6343,8 +7875,11 @@ window.addEventListener('resize', function(){
 // =========================================================
 // ELEMENT INNER RENDERER
 // =========================================================
-function renderElInner(el, isPres){
+function renderElInner(el, isPres, slideCtx){
   var h = '';
+  // slideCtx defaults to current edit slide if not provided (back-compat).
+  // It's used by the elbow connector router to find anchored shapes.
+  if(!slideCtx) slideCtx = cs();
   if(el.type === 'text'){
     var hAlign = el.align || 'center';
     var vAlign = el.vAlign || 'center';
@@ -6366,19 +7901,48 @@ function renderElInner(el, isPres){
     h += '</div>';
   }
   if(el.type === 'line'){
-    var mnx = Math.min(el.x1, el.x2) - 10, mny = Math.min(el.y1, el.y2) - 10;
-    var mxx = Math.max(el.x1, el.x2) + 10, mxy = Math.max(el.y1, el.y2) + 10;
+    // Phase 3 Level 2 + 3: connectors compute a multi-segment polyline path
+    // based on the chosen style.
+    //   - 'straight' (default): direct x1/y1 → x2/y2 line
+    //   - 'elbow': right-angle path that exits each anchor cleanly
+    //   - 'avoid': elbow path plus A* obstacle avoidance around other shapes
+    var pathPts;
+    if(el.style === 'avoid'){
+      pathPts = computeAvoidPath(el, slideCtx);
+    } else if(el.style === 'elbow'){
+      pathPts = computeElbowPath(el, slideCtx);
+    } else {
+      pathPts = [{x:el.x1, y:el.y1}, {x:el.x2, y:el.y2}];
+    }
+
+    // Compute bounding box for the SVG container — must encompass every path
+    // point with a small padding so the SVG isn't clipped at the corners.
+    var pad_l = 10;
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    pathPts.forEach(function(p){
+      if(p.x < minX) minX = p.x;
+      if(p.y < minY) minY = p.y;
+      if(p.x > maxX) maxX = p.x;
+      if(p.y > maxY) maxY = p.y;
+    });
+    var mnx = minX - pad_l, mny = minY - pad_l;
+    var mxx = maxX + pad_l, mxy = maxY + pad_l;
     var w = mxx - mnx, ht = mxy - mny;
-    var lx1 = el.x1 - mnx, ly1 = el.y1 - mny, lx2 = el.x2 - mnx, ly2 = el.y2 - mny;
+
+    // Convert path points to SVG-local coordinates
+    var localPts = pathPts.map(function(p){ return (p.x - mnx) + ',' + (p.y - mny); });
+    var pointsAttr = localPts.join(' ');
+
     h += '<svg width="'+w+'" height="'+ht+'" style="position:absolute;left:'+mnx+'px;top:'+mny+'px;overflow:visible">';
     if(el.arrow){
       h += '<defs><marker id="ah'+el.id+'" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="'+el.stroke+'"/></marker></defs>';
-      h += '<line x1="'+lx1+'" y1="'+ly1+'" x2="'+lx2+'" y2="'+ly2+'" stroke="'+el.stroke+'" stroke-width="'+el.sw+'" stroke-linecap="round" marker-end="url(#ah'+el.id+')"/>';
+      h += '<polyline points="'+pointsAttr+'" stroke="'+el.stroke+'" stroke-width="'+el.sw+'" stroke-linecap="round" stroke-linejoin="round" fill="none" marker-end="url(#ah'+el.id+')"/>';
     } else {
-      h += '<line x1="'+lx1+'" y1="'+ly1+'" x2="'+lx2+'" y2="'+ly2+'" stroke="'+el.stroke+'" stroke-width="'+el.sw+'" stroke-linecap="round"/>';
+      h += '<polyline points="'+pointsAttr+'" stroke="'+el.stroke+'" stroke-width="'+el.sw+'" stroke-linecap="round" stroke-linejoin="round" fill="none"/>';
     }
     if(!isPres){
-      h += '<line x1="'+lx1+'" y1="'+ly1+'" x2="'+lx2+'" y2="'+ly2+'" class="line-hit" onmousedown="startElDrag(event,\''+el.id+'\')"/>';
+      // Hit polyline: fatter invisible stroke for easier clicking
+      h += '<polyline points="'+pointsAttr+'" class="line-hit" fill="none" onmousedown="startElDrag(event,\''+el.id+'\')"/>';
     }
     h += '</svg>';
     if(!isPres && S.selIds && S.selIds.length === 1 && S.selIds[0] === el.id){
@@ -6400,6 +7964,22 @@ function renderElInner(el, isPres){
   }
   if(el.type === 'image'){
     h += '<img src="'+el.src+'" style="width:'+el.w+'px;height:'+el.h+'px;object-fit:cover;border-radius:'+el.br+'px;border:'+el.bw+'px solid '+el.bc+';opacity:'+el.op+';pointer-events:none;display:block" draggable="false">';
+  }
+  // Phase 4f: animated sticker. The wrapper SVG gets data-attributes so the
+  // tick loop (startStickerTick) can find it and update its inner markup
+  // each frame without a full app re-render. Initial inner is rendered once
+  // here so the sticker shows even before the tick runs.
+  if(el.type === 'sticker'){
+    var stickerDef = STICKER_BY_ID[el.kind];
+    var stickerT0 = el.t || 0;
+    var initialInner = '';
+    if(stickerDef){
+      initialInner = stickerDef.render(el.w, el.h, performance.now() + stickerT0);
+    } else {
+      // Unknown sticker kind — show a placeholder box
+      initialInner = '<rect width="'+el.w+'" height="'+el.h+'" fill="#444" stroke="#888" stroke-width="2"/><text x="'+(el.w/2)+'" y="'+(el.h/2)+'" text-anchor="middle" fill="#888" font-family="Outfit">?</text>';
+    }
+    h += '<svg class="ep-sticker" data-sticker-id="'+el.id+'" data-sticker-kind="'+el.kind+'" data-w="'+el.w+'" data-h="'+el.h+'" data-t="'+stickerT0+'" width="'+el.w+'" height="'+el.h+'" viewBox="0 0 '+el.w+' '+el.h+'" style="overflow:visible;display:block;pointer-events:'+(isPres?'none':'auto')+'">'+initialInner+'</svg>';
   }
   if(el.type === 'shape'){
     h += renderShape(el);
@@ -6891,7 +8471,7 @@ function renderElsHtml(slide, isPres){
       h += '<div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:'+(i+2)+'"';
       if(!isPres) h += ' oncontextmenu="showContext(event,\''+el.id+'\')"';
       h += '>';
-      h += renderElInner(el, isPres);
+      h += renderElInner(el, isPres, slide);
       h += '</div>';
       continue;
     }
@@ -6913,7 +8493,7 @@ function renderElsHtml(slide, isPres){
       h += ' onmousedown="startElDrag(event,\''+el.id+'\')" oncontextmenu="showContext(event,\''+el.id+'\')"';
     }
     h += '>';
-    h += renderElInner(el, isPres);
+    h += renderElInner(el, isPres, slide);
     // Reveal step badge (editor mode only)
     if(!isPres && el.reveal && el.reveal > 0){
       h += '<div style="position:absolute;top:-10px;left:-10px;width:22px;height:22px;border-radius:50%;background:#ffa500;color:#000;font-weight:800;font-size:11px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.5);z-index:20;pointer-events:none" title="Reveals on click '+el.reveal+'">'+el.reveal+'</div>';
@@ -7193,9 +8773,13 @@ function render(){
   h += '<button class="tb-b" onclick="doUndo()" data-tip="Undo (Ctrl+Z)">'+I.undo+'</button>';
   h += '<button class="tb-b" onclick="doRedo()" data-tip="Redo (Ctrl+Y)">'+I.redo+'</button>';
   h += '</div>';
-  // SNAP toggle
+  // SNAP & GRID dropdown — toggles object-snap, grid visibility, grid-snap,
+  // and grid size, all in one place.
   h += '<div class="tb-sep"></div>';
-  h += '<button class="tb-b'+(S.snapEnabled?' a':'')+'" onclick="toggleSnap()" data-tip="'+(S.snapEnabled?'Snap ON':'Snap OFF')+'">'+I.magnet+'</button>';
+  // The button shows "active" when ANY of the three features is on, so the
+  // user has a quick visual cue that some alignment helper is engaged.
+  var alignActive = S.snapEnabled || S.gridVisible || S.gridSnapEnabled;
+  h += '<button class="tb-b'+(S.pop==='alignMenu'?' a':(alignActive?' a':''))+'" onclick="togglePop(\'alignMenu\',event)" data-tip="Alignment: snap, grid">'+I.magnet+'</button>';
 
   h += '<div class="tb-spacer"></div>';
   // RIGHT SIDE: notes / presenter / present / file menu
@@ -7219,6 +8803,25 @@ function render(){
   syncAllConnectors(s);
   h += renderElsHtml(s, false);
   h += '</div>';
+  // Phase 4g: visual grid overlay. Renders BELOW the snap guides so guide
+  // lines remain visible. Uses CSS background-image with a single tile pattern
+  // so 1000s of cells don't create DOM bloat. Only renders when toggled on.
+  if(S.gridVisible){
+    var gs = S.gridSize;
+    var gridStyle = 'position:absolute;inset:0;transform:scale('+S.stageScale+');transform-origin:0 0;width:'+STAGE_W+'px;height:'+STAGE_H+'px;pointer-events:none;'
+      + 'background-image:linear-gradient(to right, rgba(126,217,87,0.12) 1px, transparent 1px),'
+      + 'linear-gradient(to bottom, rgba(126,217,87,0.12) 1px, transparent 1px);'
+      + 'background-size:'+gs+'px '+gs+'px;'
+      + 'background-position:0 0;';
+    // Major lines every 5 cells (e.g. every 100px) drawn brighter via a second pass
+    var maj = gs * 5;
+    h += '<div class="ep-grid-layer" style="'+gridStyle+'"></div>';
+    h += '<div class="ep-grid-layer" style="position:absolute;inset:0;transform:scale('+S.stageScale+');transform-origin:0 0;width:'+STAGE_W+'px;height:'+STAGE_H+'px;pointer-events:none;'
+       + 'background-image:linear-gradient(to right, rgba(126,217,87,0.22) 1px, transparent 1px),'
+       + 'linear-gradient(to bottom, rgba(126,217,87,0.22) 1px, transparent 1px);'
+       + 'background-size:'+maj+'px '+maj+'px;'
+       + 'background-position:0 0"></div>';
+  }
   h += '<div id="guidesLayer" style="position:absolute;inset:0;transform:scale('+S.stageScale+');transform-origin:0 0;width:'+STAGE_W+'px;height:'+STAGE_H+'px;pointer-events:none;overflow:visible"></div>';
   var isDrawTool = isDrawingTool(S.tool);
   h += '<canvas id="drawCanvas" class="draw-canvas'+(isDrawTool?' active':'')+(S.tool === 'lasso' ? ' lasso' : '')+'"></canvas>';
@@ -7295,11 +8898,17 @@ function render(){
   if(S.pop === 'icons' && S.popPos){
     h += renderIconsPopover();
   }
+  if(S.pop === 'stickers' && S.popPos){
+    h += renderStickersPopover();
+  }
   if(S.pop === 'insertMenu' && S.popPos){
     h += renderInsertMenu();
   }
   if(S.pop === 'fileMenu' && S.popPos){
     h += renderFileMenu();
+  }
+  if(S.pop === 'alignMenu' && S.popPos){
+    h += renderAlignMenu();
   }
 
   app.innerHTML = h;
@@ -7371,6 +8980,26 @@ function renderPropsPanel(el){
       propRow('Color', el.stroke, "updateEl('"+el.id+"',{stroke:this.value})", 'color'),
       propRow('Width', el.sw, "updateEl('"+el.id+"',{sw:+this.value})", 'number')
     ]);
+    // Phase 3 Level 2 + 3: connector path style.
+    //   Straight = simple x1→x2 line.
+    //   Elbow    = right-angle path that exits each anchor cleanly along its outward direction.
+    //   Avoid    = right-angle path that ALSO routes around other shapes between the endpoints.
+    var curPathStyle = el.style || 'straight';
+    h += '<div class="ps"><div class="ps-t">Path</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px">';
+    var pathStyles = [['straight','Straight'],['elbow','Elbow'],['avoid','Avoid']];
+    pathStyles.forEach(function(s){
+      var active = curPathStyle === s[0];
+      h += '<button class="sp-btn" style="padding:7px 0'+(active?';border-color:var(--g);color:var(--g)':'')+'" onclick="updateEl(\''+el.id+'\',{style:\''+s[0]+'\'})" title="'+s[1]+' connector path">'+s[1]+'</button>';
+    });
+    h += '</div>';
+    var pathHint = curPathStyle === 'elbow' ? 'Right-angle path. Best for flowcharts and architecture diagrams.'
+                 : curPathStyle === 'avoid' ? 'Right-angle path that routes AROUND other shapes between the endpoints.'
+                 : 'Direct line between endpoints.';
+    h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:6px">'+pathHint+'</div>';
+    // Arrow toggle — was previously only set at creation time, now editable
+    h += '<div class="pr"><span class="pr-l">Arrow head</span><label style="cursor:pointer;display:flex;align-items:center;gap:5px"><input type="checkbox"'+(el.arrow?' checked':'')+' onchange="updateEl(\''+el.id+'\',{arrow:this.checked})" style="cursor:pointer;accent-color:var(--g)"></label></div>';
+    h += '</div>';
   }
 
   if(el.type === 'text'){
@@ -7469,6 +9098,24 @@ function renderPropsPanel(el){
       h += '<div class="note-c'+(el.bg===NOTE_COLORS[ni]?' a':'')+'" style="background:'+NOTE_COLORS[ni]+'" onclick="setNoteColor(\''+el.id+'\',\''+NOTE_COLORS[ni]+'\')"></div>';
     }
     h += '</div></div>';
+  }
+
+  // Phase 4f: animated sticker properties — change kind, resize.
+  if(el.type === 'sticker'){
+    h += '<div class="ps"><div class="ps-t">Sticker</div>';
+    h += '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.4">Animated, looping. Drag corners to resize.</div>';
+    h += '<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Change kind</div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">';
+    STICKER_LIBRARY.forEach(function(s){
+      var active = s.id === el.kind;
+      var preview = s.render(50, 50, performance.now());
+      h += '<div class="sticker-tile" style="padding:5px;'+(active?'border-color:var(--g);background:rgba(126,217,87,0.1)':'')+'" onclick="updateEl(\''+el.id+'\',{kind:\''+s.id+'\'})">';
+      h += '<svg class="ep-sticker" data-sticker-id="prop-'+el.id+'-'+s.id+'" data-sticker-kind="'+s.id+'" data-w="50" data-h="50" data-t="0" width="50" height="50" viewBox="0 0 50 50" style="overflow:visible">'+preview+'</svg>';
+      h += '<div class="sticker-tile-label" style="font-size:9px">'+esc(s.label)+'</div>';
+      h += '</div>';
+    });
+    h += '</div>';
+    h += '</div>';
   }
 
   if(el.type === 'screenshare'){
@@ -8287,6 +9934,53 @@ function renderTemplatesPopover(){
 // =========================================================
 // PHASE 4e: TOOLBAR DROPDOWN MENUS
 // =========================================================
+// PHASE 4g: ALIGNMENT MENU
+// =========================================================
+// Combines object-snap toggle, visual grid toggle, grid-snap toggle, and grid
+// size selector into one dropdown so they live next to each other in the UI.
+function renderAlignMenu(){
+  if(!S.popPos) return '';
+  var left = S.popPos.left, top = S.popPos.top;
+  var h = '<div class="popover-backdrop" onclick="closePopover()"></div>';
+  h += '<div class="popover menu-popover" style="left:'+left+'px;top:'+top+'px;transform:translateX(-50%);min-width:260px" onclick="event.stopPropagation()">';
+  h += '<div class="pop-title">Alignment</div>';
+
+  function toggleRow(label, sublabel, isOn, handler){
+    var row = '<div class="menu-item" onclick="'+handler+'" style="cursor:pointer">';
+    row += '<span class="menu-icon" style="color:'+(isOn?'var(--g)':'var(--muted)')+'">';
+    // Custom checkbox-style indicator
+    row += '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3" '+(isOn?'fill="currentColor" stroke="currentColor"':'')+'/>'+(isOn?'<polyline points="7 12 11 16 17 9" stroke="#1a1a1a" stroke-width="2.5" fill="none"/>':'')+'</svg>';
+    row += '</span>';
+    row += '<span class="menu-label">'+label+'<span style="display:block;font-size:10px;color:var(--muted);font-weight:400;margin-top:2px">'+sublabel+'</span></span>';
+    row += '<span class="menu-shortcut" style="color:'+(isOn?'var(--g)':'var(--muted)')+';font-weight:700">'+(isOn?'ON':'OFF')+'</span>';
+    row += '</div>';
+    return row;
+  }
+
+  h += '<div class="menu-group-label">Snap</div>';
+  h += toggleRow('Snap to objects', 'Align with edges and centers of other elements', S.snapEnabled, 'toggleSnap()');
+  h += toggleRow('Snap to grid', 'Lock positions to grid intersections while dragging', S.gridSnapEnabled, 'toggleGridSnap()');
+  h += '<div class="menu-divider"></div>';
+  h += '<div class="menu-group-label">Grid</div>';
+  h += toggleRow('Show grid', 'Display faint grid lines on the canvas', S.gridVisible, 'toggleGridVisible()');
+  // Grid size selector
+  h += '<div class="menu-item" style="cursor:default" onclick="event.stopPropagation()">';
+  h += '<span class="menu-icon" style="color:var(--muted)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span>';
+  h += '<span class="menu-label">Grid size<span style="display:block;font-size:10px;color:var(--muted);font-weight:400;margin-top:2px">Stage units between lines</span></span>';
+  h += '<span style="display:flex;gap:3px">';
+  [10, 20, 40, 80].forEach(function(sz){
+    var active = S.gridSize === sz;
+    h += '<button class="sp-btn" style="padding:4px 7px;font-size:10px;min-width:0'+(active?';border-color:var(--g);color:var(--g)':'')+'" onclick="setGridSize('+sz+')">'+sz+'</button>';
+  });
+  h += '</span>';
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+// =========================================================
+// PHASE 4e: TOOLBAR DROPDOWN MENUS
+// =========================================================
 // The Insert menu consolidates element-creation buttons that previously crowded
 // the toolbar. The File menu does the same for file ops + auto-save.
 // Both render as vertical lists of menu items with icons + labels, using the
@@ -8303,6 +9997,7 @@ function renderInsertMenu(){
   h += menuItem(I.text,           'Text',                'addText(); closePopover();',                   'T');
   h += menuItem(I.textTemplates,  'Text Templates',      'closePopover(); openTextTemplatesPopover();',  '');
   h += menuItem(I.emoji,          'Emoji',               'closePopover(); openEmojiPopover();',          '');
+  h += menuItem(I.sticker,        'Animated Stickers',   'closePopover(); openStickersPopover();',       'NEW');
   h += '<div class="menu-divider"></div>';
   h += '<div class="menu-group-label">Media</div>';
   h += menuItem(I.image,          'Image',               'triggerImageInput(); closePopover();',         '');
@@ -8379,6 +10074,14 @@ window.openTextTemplatesPopover = function(){
     render();
   }, 30);
 };
+// Phase 4f: chain-open the animated stickers picker.
+window.openStickersPopover = function(){
+  setTimeout(function(){
+    S.popPos = { left: window.innerWidth/2 - 100, top: 76 };
+    S.pop = 'stickers';
+    render();
+  }, 30);
+};
 window.openEmojiPopover = function(){
   setTimeout(function(){
     S.popPos = { left: window.innerWidth/2 - 100, top: 76 };
@@ -8449,6 +10152,47 @@ function renderShapesPopover(){
 // Tile grid showing all icons grouped by sub-category. Click a tile to drop
 // the icon onto the slide. Icons are entries in SHAPE_CATALOG with cat='icon',
 // so they share the shape pipeline (color, resize, anchors all work).
+// Phase 4f: animated stickers popover. Shows the curated library with
+// live-animated previews of each sticker. Click to drop.
+// Phase 4f v2: stickers organized by category.
+var STICKER_CATEGORIES = [
+  { id:'reactions',   label:'Reactions',   desc:'Hearts, claps, faces' },
+  { id:'celebration', label:'Celebration', desc:'Party, sparkle, trophy' },
+  { id:'status',      label:'Status',      desc:'Check, warning, loading' },
+  { id:'effects',     label:'Effects',     desc:'Lightning and energy' }
+];
+
+function renderStickersPopover(){
+  if(!S.popPos) return '';
+  var left = S.popPos.left, top = S.popPos.top;
+  var h = '<div class="popover-backdrop" onclick="closePopover()"></div>';
+  h += '<div class="popover" style="left:'+left+'px;top:'+top+'px;transform:translateX(-50%);min-width:360px;max-width:400px;max-height:80vh;overflow-y:auto" onclick="event.stopPropagation()">';
+  h += '<div class="pop-title">Animated Stickers</div>';
+  h += '<div style="font-size:10px;color:var(--muted);margin-bottom:14px;line-height:1.5">Click any sticker to drop it onto the slide. They animate continuously and are recorded in MP4 exports.</div>';
+
+  STICKER_CATEGORIES.forEach(function(cat, ci){
+    var inCat = STICKER_LIBRARY.filter(function(s){ return (s.cat || 'reactions') === cat.id; });
+    if(inCat.length === 0) return;
+    if(ci > 0) h += '<div style="height:14px"></div>';
+    h += '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px;padding:0 2px">';
+    h += '<div style="font-size:11px;font-weight:700;color:var(--g);text-transform:uppercase;letter-spacing:1.5px">'+esc(cat.label)+'</div>';
+    h += '<div style="font-size:9px;color:var(--muted)">'+esc(cat.desc)+'</div>';
+    h += '</div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">';
+    inCat.forEach(function(s){
+      var previewId = 'preview-' + s.id;
+      var initial = s.render(80, 80, performance.now());
+      h += '<div class="sticker-tile" onclick="addSticker(\''+s.id+'\')">';
+      h += '<svg class="ep-sticker" data-sticker-id="'+previewId+'" data-sticker-kind="'+s.id+'" data-w="80" data-h="80" data-t="0" width="80" height="80" viewBox="0 0 80 80" style="overflow:visible">'+initial+'</svg>';
+      h += '<div class="sticker-tile-label">'+esc(s.label)+'</div>';
+      h += '</div>';
+    });
+    h += '</div>';
+  });
+  h += '</div>';
+  return h;
+}
+
 function renderIconsPopover(){
   if(!S.popPos) return '';
   var left = S.popPos.left, top = S.popPos.top;
@@ -8498,22 +10242,43 @@ function renderIconsPopover(){
 // =========================================================
 // Tile grid showing live mini-previews of each text template. Click a tile
 // to drop the template onto the slide.
+// Phase 4f v2: text templates organized by category. Each category renders as
+// a labeled group with a 2-column grid of preview tiles. Order: titles, quotes,
+// stats, steps, callouts.
+var TEXT_TEMPLATE_CATEGORIES = [
+  { id:'titles',   label:'Titles',          desc:'Headlines and section starters' },
+  { id:'quotes',   label:'Quotes',          desc:'Pull quotes and attribution' },
+  { id:'stats',    label:'Stats & Numbers', desc:'Big numbers and metrics' },
+  { id:'steps',    label:'Steps & Lists',   desc:'Numbered steps, checklists, timelines' },
+  { id:'callouts', label:'Callouts',        desc:'Highlighted blocks and taglines' }
+];
+
 function renderTextTemplatesPopover(){
   if(!S.popPos) return '';
   var left = S.popPos.left, top = S.popPos.top;
   var h = '<div class="popover-backdrop" onclick="closePopover()"></div>';
-  h += '<div class="popover" style="left:'+left+'px;top:'+top+'px;transform:translateX(-50%);min-width:380px;max-width:420px;max-height:78vh;overflow-y:auto" onclick="event.stopPropagation()">';
+  h += '<div class="popover" style="left:'+left+'px;top:'+top+'px;transform:translateX(-50%);min-width:440px;max-width:480px;max-height:80vh;overflow-y:auto" onclick="event.stopPropagation()">';
   h += '<div class="pop-title">Text Templates</div>';
-  h += '<div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.5">Pre-styled text blocks. Click to drop one onto the slide \u2014 then double-click to edit the words.</div>';
-  h += '<div class="text-tpl-grid">';
-  TEXT_TEMPLATES.forEach(function(tpl){
-    h += '<div class="text-tpl-tile" onclick="addTextTemplate(\''+tpl.id+'\');closePopover()" title="'+tpl.desc+'">';
-    h += '<div class="text-tpl-preview">' + renderTextTemplatePreview(tpl) + '</div>';
-    h += '<div class="text-tpl-label">'+tpl.label+'</div>';
-    h += '<div class="text-tpl-desc">'+tpl.desc+'</div>';
+  h += '<div style="font-size:10px;color:var(--muted);margin-bottom:14px;line-height:1.5">Pre-styled text blocks. Click to drop one onto the slide \u2014 then double-click to edit the words.</div>';
+
+  TEXT_TEMPLATE_CATEGORIES.forEach(function(cat, ci){
+    var inCat = TEXT_TEMPLATES.filter(function(t){ return (t.cat || 'callouts') === cat.id; });
+    if(inCat.length === 0) return;
+    if(ci > 0) h += '<div style="height:14px"></div>';
+    h += '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px;padding:0 2px">';
+    h += '<div style="font-size:11px;font-weight:700;color:var(--g);text-transform:uppercase;letter-spacing:1.5px">'+esc(cat.label)+'</div>';
+    h += '<div style="font-size:9px;color:var(--muted)">'+esc(cat.desc)+'</div>';
+    h += '</div>';
+    h += '<div class="text-tpl-grid">';
+    inCat.forEach(function(tpl){
+      h += '<div class="text-tpl-tile" onclick="addTextTemplate(\''+tpl.id+'\');closePopover()" title="'+esc(tpl.desc)+'">';
+      h += '<div class="text-tpl-preview">' + renderTextTemplatePreview(tpl) + '</div>';
+      h += '<div class="text-tpl-label">'+esc(tpl.label)+'</div>';
+      h += '<div class="text-tpl-desc">'+esc(tpl.desc)+'</div>';
+      h += '</div>';
+    });
     h += '</div>';
   });
-  h += '</div>';
   h += '</div>';
   return h;
 }
@@ -8526,11 +10291,18 @@ function renderTextTemplatePreview(tpl){
   var els = tpl.spawn(0, 0);
   var maxX = 0, maxY = 0;
   els.forEach(function(e){
-    if(typeof e.x === 'number'){
-      var rx = e.x + (e.w || 0);
-      var ry = e.y + (e.h || 0);
+    if(e.type === 'line'){
+      var rx = Math.max(e.x1||0, e.x2||0);
+      var ry = Math.max(e.y1||0, e.y2||0);
       if(rx > maxX) maxX = rx;
       if(ry > maxY) maxY = ry;
+      return;
+    }
+    if(typeof e.x === 'number'){
+      var rx2 = e.x + (e.w || 0);
+      var ry2 = e.y + (e.h || 0);
+      if(rx2 > maxX) maxX = rx2;
+      if(ry2 > maxY) maxY = ry2;
     }
   });
   if(maxX === 0 || maxY === 0) return '';
@@ -8549,8 +10321,16 @@ function renderTextTemplatePreview(tpl){
       h += '<span style="color:'+e.color+';font-size:'+e.fs+'px;font-weight:'+e.fw+';font-style:'+fStyle+';text-transform:'+tt+';letter-spacing:'+ls+'px;text-align:'+hAlign+';white-space:nowrap;font-family:Outfit">'+esc(e.text)+'</span>';
       h += '</div>';
     } else if(e.type === 'shape'){
-      // Simplified shape preview — just a rect with the fill
-      h += '<div style="position:absolute;left:'+e.x+'px;top:'+e.y+'px;width:'+e.w+'px;height:'+e.h+'px;background:'+(e.fill||'transparent')+';border:'+(e.sw||0)+'px solid '+(e.stroke||'transparent')+';border-radius:'+(e.shape === 'rrect' ? 8 : 0)+'px"></div>';
+      // Simplified shape preview — rect or circle, otherwise default to rounded rect
+      var br = (e.shape === 'rrect') ? 8 : (e.shape === 'circle' ? 9999 : 0);
+      h += '<div style="position:absolute;left:'+e.x+'px;top:'+e.y+'px;width:'+e.w+'px;height:'+e.h+'px;background:'+(e.fill||'transparent')+';border:'+(e.sw||0)+'px solid '+(e.stroke||'transparent')+';border-radius:'+br+'px"></div>';
+    } else if(e.type === 'line'){
+      // Approximate a line as a thin rect along its bbox
+      var x1 = e.x1, y1 = e.y1, x2 = e.x2, y2 = e.y2;
+      var lx = Math.min(x1, x2), ly = Math.min(y1, y2);
+      var lw = Math.max(2, Math.abs(x2 - x1));
+      var lh = Math.max(2, Math.abs(y2 - y1));
+      h += '<div style="position:absolute;left:'+lx+'px;top:'+ly+'px;width:'+lw+'px;height:'+lh+'px;background:'+(e.stroke||'#7ed957')+'"></div>';
     }
   });
   h += '</div></div>';
@@ -9084,6 +10864,32 @@ var STARTUP_PREF_KEY = 'epPresenterStartupPref';
   // localStorage flag to suppress the Alt+click hint after first use. The hint
   // is now a hover tooltip, so the flag is obsolete — clear it.
   try{ localStorage.removeItem('ep-alt-click-learned'); }catch(e){}
+
+  // v1.0.4 one-time cleanup: any existing user (whether dev/tester or upgrader)
+  // had grid preferences saved from earlier dev builds. Reset them once so
+  // everyone lands on the v1.0.4 defaults: snap ON, grid OFF, grid-snap OFF.
+  // After this first run, normal preference persistence resumes — if the user
+  // turns grid on, that choice persists going forward.
+  try{
+    if(localStorage.getItem('ep-v104-init') !== '1'){
+      localStorage.removeItem('ep-grid-visible');
+      localStorage.removeItem('ep-grid-snap');
+      localStorage.removeItem('ep-grid-size');
+      localStorage.setItem('ep-v104-init', '1');
+    }
+  }catch(e){}
+
+  // Phase 4f: start the global animation tick for stickers. Runs as long as
+  // the app is open; cheap when no stickers are visible.
+  startStickerTick();
+
+  // Phase 4g: restore grid visibility / snap / size preferences.
+  try{
+    if(localStorage.getItem('ep-grid-visible') === '1') S.gridVisible = true;
+    if(localStorage.getItem('ep-grid-snap') === '1') S.gridSnapEnabled = true;
+    var savedSize = parseInt(localStorage.getItem('ep-grid-size'), 10);
+    if(!isNaN(savedSize) && savedSize >= 4 && savedSize <= 200) S.gridSize = savedSize;
+  }catch(e){}
 
   var savedDraft = loadAutoSave();
   var hasValidDraft = !!(savedDraft && savedDraft.slides && savedDraft.slides.length &&
