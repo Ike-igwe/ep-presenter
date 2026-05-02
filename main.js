@@ -1,359 +1,133 @@
-// =========================================================
 // EP Presenter — Electron main process
 // =========================================================
-// This file runs in Node.js context (not the browser renderer).
-// It creates the browser window, defines the application menu,
-// and wires up auto-update checking.
+// This file boots the Electron window, wires up auto-update, and implements
+// the IPC handlers the renderer talks to:
+//   ep:get-version              → app version string
+//   ep:open-external            → open URL in default browser
+//   ep:list-desktop-sources     → list screens/windows for screen-share picker
+//   ep:show-in-folder           → reveal a file in OS file explorer
+//   ep:probe-encoders           → detect available H.264 encoders (GPU first)
+//   ep:convert-video            → spawn ffmpeg to transcode a recorded webm
+//   ep:convert-progress         → (event, not handler) per-frame progress %
 // =========================================================
 
-const { app, BrowserWindow, Menu, shell, dialog, ipcMain, session, desktopCapturer } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, dialog, desktopCapturer, session } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const { spawn } = require('child_process');
+const { autoUpdater } = require('electron-updater');
 
-// Auto-update support (loaded lazily so dev mode doesn't crash without a signed build)
-let autoUpdater = null;
-try {
-  autoUpdater = require('electron-updater').autoUpdater;
-  autoUpdater.autoDownload = false;   // Ask user before downloading
-  autoUpdater.autoInstallOnAppQuit = true;
-} catch (e) {
-  console.warn('electron-updater not available; auto-updates disabled:', e.message);
+// ---------------------------------------------------------
+// FFmpeg binary resolution
+// ---------------------------------------------------------
+// In dev: ffmpeg-static returns the path inside node_modules.
+// In packaged app: the binary is unpacked from app.asar to app.asar.unpacked
+// (configured via "asarUnpack" in package.json's "build" section).
+// We rewrite the path at runtime so spawn() can find it.
+function resolveFfmpegPath() {
+  let p;
+  try {
+    p = require('ffmpeg-static');
+  } catch (e) {
+    return null;
+  }
+  if (!p) return null;
+  // When packaged, ffmpeg-static returns a path containing "app.asar" — the
+  // binary is actually at the corresponding "app.asar.unpacked" path.
+  if (p.includes('app.asar') && !p.includes('app.asar.unpacked')) {
+    p = p.replace('app.asar', 'app.asar.unpacked');
+  }
+  // Verify the file exists; if not, return null so the caller can show an error.
+  try {
+    if (!fs.existsSync(p)) return null;
+  } catch (e) {
+    return null;
+  }
+  return p;
 }
 
-// Keep a global reference to the main window so it isn't garbage collected
+// ---------------------------------------------------------
+// Window
+// ---------------------------------------------------------
 let mainWindow = null;
-// Optional presenter view window (opened from within the app via window.open)
-let presenterWindow = null;
 
-const isDev = !app.isPackaged;
-
-// =========================================================
-// WINDOW CREATION
-// =========================================================
-function createMainWindow() {
+function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1440,
+    width: 1400,
     height: 900,
-    minWidth: 1024,
-    minHeight: 700,
+    minWidth: 1100,
+    minHeight: 720,
+    backgroundColor: '#0a0a0c',
     title: 'EP Presenter',
-    backgroundColor: '#1a1a1a',
-    icon: path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
-    show: false,   // don't show until ready-to-show fires (prevents white flash)
+    icon: path.join(__dirname, 'build', 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
-      webSecurity: true,
-      // Features required by EP Presenter's web stack:
-      webviewTag: false,
-      spellcheck: true
+      sandbox: false
     }
   });
 
-  // Load the app's HTML
+  // Screen-share picker support: when the renderer calls getDisplayMedia(),
+  // Electron asks us how to handle it. useSystemPicker uses the OS picker on
+  // newer Electron versions; if unavailable, the renderer's custom picker
+  // (built on listDesktopSources) takes over.
+  if (session && session.defaultSession && session.defaultSession.setDisplayMediaRequestHandler) {
+    session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+      // Default: let the renderer's custom picker drive (it calls
+      // listDesktopSources → getUserMedia with chromeMediaSourceId). So we
+      // just deny the getDisplayMedia call here; the renderer falls back.
+      callback(null);
+    }, { useSystemPicker: false });
+  }
+
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  mainWindow.on('closed', () => { mainWindow = null; });
 
-  // Show once content is ready
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-    if (isDev) mainWindow.webContents.openDevTools({ mode: 'detach' });
-  });
-
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
-
-  // Intercept window.open calls — route to the presenter window handler
-  mainWindow.webContents.setWindowOpenHandler(({ url, features, frameName }) => {
-    // The in-app "Presenter View" feature opens a 2nd window via window.open('','ep-presenter-view',...)
-    if (frameName === 'ep-presenter-view') {
-      return {
-        action: 'allow',
-        overrideBrowserWindowOptions: {
-          width: 1100,
-          height: 720,
-          title: 'EP Presenter — Presenter View',
-          backgroundColor: '#0a0a0c',
-          icon: path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
-          webPreferences: {
-            contextIsolation: true,
-            nodeIntegration: false
-          }
-        }
-      };
-    }
-    // External http/https links → open in default browser, not the app
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      shell.openExternal(url);
-      return { action: 'deny' };
-    }
-    return { action: 'allow' };
-  });
-
-  // External links clicked inside the app → default browser
-  mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
-    const parsedUrl = new URL(navigationUrl);
-    const currentUrl = new URL(mainWindow.webContents.getURL());
-    if (parsedUrl.origin !== currentUrl.origin && !parsedUrl.protocol.startsWith('file')) {
-      event.preventDefault();
-      shell.openExternal(navigationUrl);
-    }
-  });
+  // Build a minimal app menu (File, Edit, View, Present, Window, Help)
+  buildAppMenu();
 }
 
-// =========================================================
-// APPLICATION MENU — EP-branded custom menu
-// =========================================================
 function buildAppMenu() {
+  const isMac = process.platform === 'darwin';
   const template = [
     {
       label: 'File',
       submenu: [
-        {
-          label: 'New Deck',
-          accelerator: 'CmdOrCtrl+N',
-          click: () => mainWindow && mainWindow.webContents.send('ep:new-deck')
-        },
-        { type: 'separator' },
-        {
-          label: 'Open…',
-          accelerator: 'CmdOrCtrl+O',
-          click: () => mainWindow && mainWindow.webContents.send('ep:trigger-open')
-        },
-        {
-          label: 'Save',
-          accelerator: 'CmdOrCtrl+S',
-          click: () => mainWindow && mainWindow.webContents.send('ep:trigger-save')
-        },
-        { type: 'separator' },
-        {
-          label: 'Import PowerPoint (.pptx)…',
-          click: () => mainWindow && mainWindow.webContents.send('ep:trigger-import-pptx')
-        },
-        {
-          label: 'Export PDF',
-          click: () => mainWindow && mainWindow.webContents.send('ep:trigger-export-pdf')
-        },
-        {
-          label: 'Export PowerPoint (.pptx)',
-          click: () => mainWindow && mainWindow.webContents.send('ep:trigger-export-pptx')
-        },
-        { type: 'separator' },
-        { role: 'quit', label: 'Quit EP Presenter' }
+        { role: isMac ? 'close' : 'quit' }
       ]
     },
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectAll' }
-      ]
-    },
-    {
-      label: 'View',
-      submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools', accelerator: 'CmdOrCtrl+Shift+I' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' }
-      ]
-    },
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
     {
       label: 'Present',
       submenu: [
-        {
-          label: 'Start Presentation',
-          accelerator: 'F5',
-          click: () => mainWindow && mainWindow.webContents.send('ep:start-present')
-        },
-        {
-          label: 'Open Presenter View',
-          accelerator: 'F6',
-          click: () => mainWindow && mainWindow.webContents.send('ep:open-presenter-view')
-        }
+        { label: 'Start Presentation (F5)', click: () => mainWindow && mainWindow.webContents.executeJavaScript('typeof startPresent === "function" && startPresent()') }
       ]
     },
+    { role: 'windowMenu' },
     {
-      label: 'Window',
+      role: 'help',
       submenu: [
-        { role: 'minimize' },
-        { role: 'zoom' },
-        { role: 'close' }
-      ]
-    },
-    {
-      label: 'Help',
-      submenu: [
-        {
-          label: 'Visit ikeigwe.com',
-          click: () => shell.openExternal('https://ikeigwe.com')
-        },
-        {
-          label: 'The Trading Edge',
-          click: () => shell.openExternal('https://ikeigwe.com')
-        },
-        { type: 'separator' },
-        {
-          label: 'Check for Updates…',
-          click: () => checkForUpdates(true)
-        },
-        { type: 'separator' },
-        {
-          label: 'About EP Presenter',
-          click: () => showAboutDialog()
-        }
+        { label: 'EP Presenter on the web', click: () => shell.openExternal('https://ikeigwe.com') },
+        { label: 'Check for Updates', click: () => autoUpdater.checkForUpdatesAndNotify() }
       ]
     }
   ];
-  const menu = Menu.buildFromTemplate(template);
-  Menu.setApplicationMenu(menu);
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-function showAboutDialog() {
-  const version = app.getVersion();
-  dialog.showMessageBox(mainWindow, {
-    type: 'info',
-    title: 'About EP Presenter',
-    message: 'EP Presenter',
-    detail: [
-      'Version ' + version,
-      '',
-      'Eze Profit — forex trading education presentation tool.',
-      'Built by Ike Igwe for traders who teach.',
-      '',
-      'https://ikeigwe.com'
-    ].join('\n'),
-    buttons: ['OK', 'Visit ikeigwe.com'],
-    defaultId: 0,
-    cancelId: 0
-  }).then(result => {
-    if (result.response === 1) shell.openExternal('https://ikeigwe.com');
-  });
-}
-
-// =========================================================
-// AUTO-UPDATE
-// =========================================================
-function checkForUpdates(userInitiated = false) {
-  if (!autoUpdater) {
-    if (userInitiated) {
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        message: 'Auto-updates unavailable',
-        detail: 'electron-updater is not loaded. Check the console for details.'
-      });
-    }
-    return;
-  }
-  if (isDev) {
-    if (userInitiated) {
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        message: 'Development build',
-        detail: 'Auto-updates only run in the packaged app.'
-      });
-    }
-    return;
-  }
-
-  autoUpdater.checkForUpdates().catch(err => {
-    console.error('Update check failed:', err);
-    if (userInitiated) {
-      dialog.showMessageBox(mainWindow, {
-        type: 'error',
-        message: 'Update check failed',
-        detail: String(err && err.message || err)
-      });
-    }
-  });
-
-  if (userInitiated) {
-    autoUpdater.once('update-not-available', () => {
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        message: 'You are up to date',
-        detail: 'EP Presenter ' + app.getVersion() + ' is the latest version.'
-      });
-    });
-  }
-}
-
-if (autoUpdater) {
-  autoUpdater.on('update-available', (info) => {
-    dialog.showMessageBox(mainWindow, {
-      type: 'question',
-      buttons: ['Download', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
-      title: 'Update available',
-      message: 'EP Presenter ' + info.version + ' is available',
-      detail: 'Current version: ' + app.getVersion() + '\nDownload now?'
-    }).then(result => {
-      if (result.response === 0) autoUpdater.downloadUpdate();
-    });
-  });
-
-  autoUpdater.on('update-downloaded', () => {
-    dialog.showMessageBox(mainWindow, {
-      type: 'question',
-      buttons: ['Restart now', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
-      title: 'Update ready',
-      message: 'Update downloaded. Restart to install?'
-    }).then(result => {
-      if (result.response === 0) autoUpdater.quitAndInstall();
-    });
-  });
-
-  autoUpdater.on('error', (err) => {
-    console.error('Auto-updater error:', err);
-  });
-}
-
-// =========================================================
-// APP LIFECYCLE
-// =========================================================
+// ---------------------------------------------------------
+// App lifecycle
+// ---------------------------------------------------------
 app.whenReady().then(() => {
-  // Standard browser permissions — media (camera/mic) and display-media (screen share)
-  // must be allowed for EP Presenter's webcam overlay + screen share element to work.
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    const allowed = [
-      'media',           // camera + mic
-      'display-capture', // screen share (getDisplayMedia)
-      'clipboard-read',
-      'clipboard-sanitized-write',
-      'fullscreen'
-    ];
-    callback(allowed.includes(permission));
-  });
-
-  // No setDisplayMediaRequestHandler — this makes getDisplayMedia() reject in the
-  // packaged build, which triggers our renderer's fallback to the custom picker
-  // built on top of desktopCapturer. We do this because:
-  // 1. Windows 11's native picker (useSystemPicker: true) had inconsistent behavior
-  // 2. Our custom picker gives us full UI control, branding, refresh button, etc.
-  // 3. Predictable behavior across Windows 10 and 11
-
-  buildAppMenu();
-  createMainWindow();
-
-  // Check for updates 3s after launch (non-blocking, silent if no update)
-  setTimeout(() => checkForUpdates(false), 3000);
+  createWindow();
+  // Auto-update check (silent if no update available)
+  try { autoUpdater.checkForUpdatesAndNotify(); } catch (e) { /* offline ok */ }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
@@ -361,21 +135,18 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// =========================================================
-// RENDERER ↔ MAIN IPC
-// =========================================================
-// Keyboard shortcuts and menu items in the renderer can ask main to do things.
+// ---------------------------------------------------------
+// IPC: simple
+// ---------------------------------------------------------
 ipcMain.handle('ep:get-version', () => app.getVersion());
-ipcMain.handle('ep:open-external', (_event, url) => {
-  if (typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
-    shell.openExternal(url);
-    return true;
-  }
-  return false;
+
+ipcMain.handle('ep:open-external', async (_event, url) => {
+  if (!url || typeof url !== 'string') return false;
+  try { await shell.openExternal(url); return true; } catch (e) { return false; }
 });
 
-// List the user's available screens and windows so the renderer can
-// show a custom picker UI. Thumbnails are returned as data URLs.
+// Returns array of { id, name, thumbnail (data URL), appIcon (data URL or null) }.
+// Renderer uses this to build its custom screen-source picker.
 ipcMain.handle('ep:list-desktop-sources', async () => {
   try {
     const sources = await desktopCapturer.getSources({
@@ -383,15 +154,339 @@ ipcMain.handle('ep:list-desktop-sources', async () => {
       thumbnailSize: { width: 320, height: 180 },
       fetchWindowIcons: true
     });
-    return sources.map((s) => ({
+    return sources.map(s => ({
       id: s.id,
       name: s.name,
-      display_id: s.display_id,
       thumbnail: s.thumbnail ? s.thumbnail.toDataURL() : null,
       appIcon: s.appIcon ? s.appIcon.toDataURL() : null
     }));
-  } catch (err) {
-    console.error('list-desktop-sources failed:', err);
+  } catch (e) {
+    console.error('listDesktopSources failed:', e);
     return [];
   }
+});
+
+ipcMain.handle('ep:show-in-folder', async (_event, filePath) => {
+  if (!filePath || typeof filePath !== 'string') return false;
+  try { shell.showItemInFolder(filePath); return true; } catch (e) { return false; }
+});
+
+// ---------------------------------------------------------
+// IPC: save-webm — direct disk save without browser download
+// ---------------------------------------------------------
+// The renderer's previous WebM save used a temporary <a download> trick which
+// caused Chromium to write the file to a `.tmp` first and then rename. When
+// rename failed for any reason (large file, AV interception, locked path) the
+// `.tmp` was left orphaned alongside the saved .webm. This handler replaces
+// that flow: open a real Save dialog, write the bytes via fs.writeFileSync.
+// No temp file pattern, no orphan files.
+ipcMain.handle('ep:save-webm', async (_event, args) => {
+  const { sourceData, suggestedFilename } = args || {};
+  if (!sourceData) return { ok: false, error: 'No data provided' };
+
+  const defaultName = (suggestedFilename || 'ep-recording-' + Date.now()) + '.webm';
+  const saveResult = await dialog.showSaveDialog(mainWindow, {
+    title: 'Save recording',
+    defaultPath: path.join(app.getPath('downloads'), defaultName),
+    filters: [{ name: 'WebM video', extensions: ['webm'] }]
+  });
+  if (saveResult.canceled || !saveResult.filePath) {
+    return { ok: false, canceled: true };
+  }
+  try {
+    const buf = Buffer.from(sourceData);
+    fs.writeFileSync(saveResult.filePath, buf);
+    return { ok: true, outputPath: saveResult.filePath };
+  } catch (e) {
+    return { ok: false, error: 'Failed to write file: ' + e.message };
+  }
+});
+
+// ---------------------------------------------------------
+// FFMPEG: encoder probe
+// ---------------------------------------------------------
+// Runs `ffmpeg -encoders` once per session, scans output for hardware H.264
+// encoders, returns them in preference order: NVIDIA → Intel → AMD → CPU.
+// The renderer caches the result.
+let _encoderCache = null;
+
+ipcMain.handle('ep:probe-encoders', async () => {
+  if (_encoderCache) return _encoderCache;
+  const ffmpegPath = resolveFfmpegPath();
+  if (!ffmpegPath) {
+    _encoderCache = ['libx264'];
+    return _encoderCache;
+  }
+  return new Promise((resolve) => {
+    let buf = '';
+    const child = spawn(ffmpegPath, ['-hide_banner', '-encoders'], { windowsHide: true });
+    const timer = setTimeout(() => {
+      try { child.kill(); } catch (e) {}
+      _encoderCache = ['libx264'];
+      resolve(_encoderCache);
+    }, 4000);
+    child.stdout.on('data', d => { buf += d.toString(); });
+    child.stderr.on('data', d => { buf += d.toString(); });
+    child.on('close', () => {
+      clearTimeout(timer);
+      const list = [];
+      // Order matters: prefer GPU encoders, fall back to CPU.
+      if (/h264_nvenc/i.test(buf)) list.push('h264_nvenc');
+      if (/h264_qsv/i.test(buf))   list.push('h264_qsv');
+      if (/h264_amf/i.test(buf))   list.push('h264_amf');
+      if (/libx264/i.test(buf))    list.push('libx264');
+      if (list.length === 0) list.push('libx264'); // fallback
+      _encoderCache = list;
+      resolve(list);
+    });
+    child.on('error', () => {
+      clearTimeout(timer);
+      _encoderCache = ['libx264'];
+      resolve(_encoderCache);
+    });
+  });
+});
+
+// ---------------------------------------------------------
+// FFMPEG: build args per format / quality / encoder
+// ---------------------------------------------------------
+// Quality presets map to ffmpeg's speed/quality tradeoff:
+//   fast     → ultrafast preset, higher CRF (bigger file, ~realtime on CPU)
+//   balanced → medium preset, mid CRF (default)
+//   high     → slow preset, low CRF (best quality, slowest)
+// GPU encoders use their own preset names (NVENC: p1..p7, QSV/AMF: speed/quality).
+function buildFfmpegArgs(format, inputPath, outputPath, opts) {
+  opts = opts || {};
+  const quality = opts.quality || 'fast';
+  const encoder = opts.encoder || 'libx264';
+
+  if (format === 'mp4' || format === 'mov') {
+    const args = ['-y', '-i', inputPath];
+    // Video codec selection
+    if (encoder === 'h264_nvenc') {
+      // NVENC presets: p1=fastest, p7=slowest. CQ is constant-quality (lower = better).
+      const nvPreset = quality === 'fast' ? 'p2' : quality === 'balanced' ? 'p4' : 'p6';
+      const nvCq     = quality === 'fast' ? '28' : quality === 'balanced' ? '23' : '20';
+      args.push('-c:v', 'h264_nvenc', '-preset', nvPreset, '-cq', nvCq, '-rc', 'vbr');
+    } else if (encoder === 'h264_qsv') {
+      const qsvPreset = quality === 'fast' ? 'veryfast' : quality === 'balanced' ? 'medium' : 'slow';
+      const qsvQ      = quality === 'fast' ? '28' : quality === 'balanced' ? '23' : '20';
+      args.push('-c:v', 'h264_qsv', '-preset', qsvPreset, '-global_quality', qsvQ);
+    } else if (encoder === 'h264_amf') {
+      const amfQuality = quality === 'fast' ? 'speed' : quality === 'balanced' ? 'balanced' : 'quality';
+      const amfQp      = quality === 'fast' ? '28' : quality === 'balanced' ? '23' : '20';
+      args.push('-c:v', 'h264_amf', '-quality', amfQuality, '-rc', 'cqp', '-qp_i', amfQp, '-qp_p', amfQp);
+    } else {
+      // libx264 (CPU fallback). ultrafast is genuinely fast — fine for daily lesson exports.
+      const x264Preset = quality === 'fast' ? 'ultrafast' : quality === 'balanced' ? 'medium' : 'slow';
+      const x264Crf    = quality === 'fast' ? '24' : quality === 'balanced' ? '20' : '18';
+      args.push('-c:v', 'libx264', '-preset', x264Preset, '-crf', x264Crf);
+    }
+    // Common video output flags
+    args.push('-pix_fmt', 'yuv420p');
+    if (format === 'mp4') args.push('-movflags', '+faststart');
+    // Audio: AAC at decent bitrate
+    args.push('-c:a', 'aac', '-b:a', '192k');
+    args.push(outputPath);
+    return args;
+  }
+
+  if (format === 'mp3') {
+    return ['-y', '-i', inputPath, '-vn', '-c:a', 'libmp3lame', '-q:a', '2', outputPath];
+  }
+
+  if (format === 'gif') {
+    // Single-pass palette filter. Quality preset trades fps + width for file size.
+    const fpsMap   = { fast: 12, balanced: 15, high: 20 };
+    const widthMap = { fast: 640, balanced: 800, high: 960 };
+    const fps = fpsMap[quality] || 15;
+    const w   = widthMap[quality] || 800;
+    return [
+      '-y', '-i', inputPath,
+      '-vf', 'fps=' + fps + ',scale=' + w + ':-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse',
+      '-loop', '0',
+      outputPath
+    ];
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------
+// FFMPEG: convert-video handler
+// ---------------------------------------------------------
+// Renderer passes:
+//   sourceData: ArrayBuffer of the recorded WebM
+//   format: 'mp4' | 'mov' | 'gif' | 'mp3'
+//   suggestedFilename: e.g. 'ep-recording-1735000000000'
+//   opts: { quality: 'fast'|'balanced'|'high' }
+// We:
+//   1. Show a Save dialog so user picks output location
+//   2. Write the WebM to a temp .webm file
+//   3. Pick the best encoder (GPU > CPU)
+//   4. Spawn ffmpeg, parse stderr for progress, stream % to renderer
+//   5. On non-zero exit with a GPU encoder, retry with libx264 (fallback)
+//   6. Resolve with { ok, outputPath } or { ok: false, error / canceled }
+ipcMain.handle('ep:convert-video', async (event, args) => {
+  const { sourceData, format, suggestedFilename, opts } = args || {};
+  if (!sourceData || !format) return { ok: false, error: 'Missing arguments' };
+
+  const ffmpegPath = resolveFfmpegPath();
+  if (!ffmpegPath) {
+    return { ok: false, error: 'FFmpeg binary not available. Reinstall the app.' };
+  }
+
+  const formatMeta = {
+    mp4: { ext: 'mp4', label: 'MP4 video (H.264 + AAC)' },
+    mov: { ext: 'mov', label: 'QuickTime MOV (H.264 + AAC)' },
+    gif: { ext: 'gif', label: 'Animated GIF' },
+    mp3: { ext: 'mp3', label: 'MP3 audio' }
+  };
+  const meta = formatMeta[format];
+  if (!meta) return { ok: false, error: 'Unsupported format: ' + format };
+
+  // Save dialog
+  const defaultName = (suggestedFilename || 'ep-recording-' + Date.now()) + '.' + meta.ext;
+  const saveResult = await dialog.showSaveDialog(mainWindow, {
+    title: 'Save converted recording',
+    defaultPath: path.join(app.getPath('downloads'), defaultName),
+    filters: [{ name: meta.label, extensions: [meta.ext] }]
+  });
+  if (saveResult.canceled || !saveResult.filePath) {
+    return { ok: false, canceled: true };
+  }
+  const outputPath = saveResult.filePath;
+
+  // Write the input bytes to a temp .webm file
+  const tmpInputPath = path.join(os.tmpdir(), 'ep-conv-input-' + Date.now() + '.webm');
+  try {
+    const buf = Buffer.from(sourceData);
+    fs.writeFileSync(tmpInputPath, buf);
+  } catch (e) {
+    return { ok: false, error: 'Failed to stage temp file: ' + e.message };
+  }
+
+  // Decide encoder. Probe lazily if we haven't already.
+  let encoderList = _encoderCache;
+  if (!encoderList) {
+    encoderList = await new Promise(resolve => {
+      let buf = '';
+      const c = spawn(ffmpegPath, ['-hide_banner', '-encoders'], { windowsHide: true });
+      const t = setTimeout(() => { try { c.kill(); } catch (e) {} resolve(['libx264']); }, 4000);
+      c.stdout.on('data', d => { buf += d.toString(); });
+      c.stderr.on('data', d => { buf += d.toString(); });
+      c.on('close', () => {
+        clearTimeout(t);
+        const list = [];
+        if (/h264_nvenc/i.test(buf)) list.push('h264_nvenc');
+        if (/h264_qsv/i.test(buf))   list.push('h264_qsv');
+        if (/h264_amf/i.test(buf))   list.push('h264_amf');
+        if (/libx264/i.test(buf))    list.push('libx264');
+        if (!list.length) list.push('libx264');
+        _encoderCache = list;
+        resolve(list);
+      });
+      c.on('error', () => { clearTimeout(t); resolve(['libx264']); });
+    });
+  }
+  // For GIF/MP3 the encoder choice doesn't matter, but we still pick one
+  // for the args builder so the function signature stays uniform.
+  const primaryEncoder = encoderList[0];
+
+  // Run the conversion. Returns a promise resolving to { ok, outputPath?, error? }.
+  function runConversion(encoderToUse) {
+    const ffArgs = buildFfmpegArgs(format, tmpInputPath, outputPath, {
+      quality: (opts && opts.quality) || 'fast',
+      encoder: encoderToUse
+    });
+    if (!ffArgs) return Promise.resolve({ ok: false, error: 'Could not build ffmpeg args' });
+
+    return new Promise((resolve) => {
+      const child = spawn(ffmpegPath, ffArgs, { windowsHide: true });
+      let stderrBuf = '';
+      let totalDurationMs = null;
+
+      // Notify renderer which encoder is in use (for the progress label)
+      try {
+        if (event && event.sender && !event.sender.isDestroyed()) {
+          event.sender.send('ep:convert-progress', { pct: 0, encoder: encoderToUse });
+        }
+      } catch (e) {}
+
+      child.stderr.on('data', (chunk) => {
+        const s = chunk.toString();
+        stderrBuf += s;
+        // Cap stderr buffer so very long encodes don't balloon memory
+        if (stderrBuf.length > 16000) stderrBuf = stderrBuf.slice(-8000);
+
+        // Parse total duration (first line containing "Duration: HH:MM:SS.MS")
+        if (totalDurationMs === null) {
+          const dm = s.match(/Duration:\s*(\d+):(\d+):(\d+\.\d+)/);
+          if (dm) {
+            totalDurationMs = (parseInt(dm[1], 10) * 3600 + parseInt(dm[2], 10) * 60 + parseFloat(dm[3])) * 1000;
+          }
+        }
+        // Parse current time so we can compute %
+        const tm = s.match(/time=\s*(\d+):(\d+):(\d+\.\d+)/);
+        if (tm && totalDurationMs && totalDurationMs > 0) {
+          const curMs = (parseInt(tm[1], 10) * 3600 + parseInt(tm[2], 10) * 60 + parseFloat(tm[3])) * 1000;
+          const pct = Math.max(0, Math.min(100, Math.round((curMs / totalDurationMs) * 100)));
+          try {
+            if (event && event.sender && !event.sender.isDestroyed()) {
+              event.sender.send('ep:convert-progress', { pct: pct, encoder: encoderToUse });
+            }
+          } catch (e) {}
+        }
+      });
+
+      child.on('error', (err) => {
+        resolve({ ok: false, error: 'ffmpeg failed to start: ' + err.message });
+      });
+
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve({ ok: true, outputPath: outputPath });
+        } else {
+          resolve({
+            ok: false,
+            error: 'ffmpeg exited with code ' + code,
+            log: stderrBuf.slice(-2000)
+          });
+        }
+      });
+    });
+  }
+
+  // First attempt with the best available encoder
+  let result = await runConversion(primaryEncoder);
+
+  // GPU encoders sometimes appear in the encoder list but fail at runtime
+  // (old drivers, missing license, locked GPU). Auto-fall-back to libx264.
+  const isGpu = primaryEncoder !== 'libx264';
+  const isVideoFormat = (format === 'mp4' || format === 'mov');
+  if (!result.ok && isGpu && isVideoFormat) {
+    try {
+      if (event && event.sender && !event.sender.isDestroyed()) {
+        event.sender.send('ep:convert-progress', { pct: 0, encoder: 'libx264', fellBack: true });
+      }
+    } catch (e) {}
+    result = await runConversion('libx264');
+  }
+
+  // Clean up temp input
+  try { fs.unlinkSync(tmpInputPath); } catch (e) {}
+
+  return result;
+});
+
+// ---------------------------------------------------------
+// Auto-updater event wiring (silent unless update found)
+// ---------------------------------------------------------
+autoUpdater.on('update-downloaded', () => {
+  // Quietly install on quit; user doesn't need a popup mid-session.
+  // A future version could show a "Restart to update" toast.
+});
+
+autoUpdater.on('error', (err) => {
+  console.warn('Auto-update error:', err && err.message ? err.message : err);
 });
