@@ -26,7 +26,7 @@ body{font-family:'Outfit',sans-serif;background:var(--d1);color:var(--w);overflo
 .sp-hdr{padding:14px 12px 8px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:2px;display:flex;justify-content:space-between;align-items:center}
 .sp-count{color:var(--g);font-weight:600}
 .sp-list{flex:1;overflow-y:auto;padding:4px 0}
-.st{margin:4px 10px;border-radius:10px;border:2px solid var(--brd);cursor:pointer;position:relative;overflow:hidden;transition:all .15s;background:#000;aspect-ratio:16/9}
+.st{margin:4px 10px;border-radius:10px;border:2px solid var(--brd);cursor:pointer;position:relative;overflow:hidden;transition:all .15s;background:#000;aspect-ratio:var(--ep-stage-aspect, 16/9)}
 .st:hover{border-color:var(--gray)}
 .st.a{border-color:var(--g);box-shadow:0 0 14px rgba(126,217,87,.25)}
 .st-n{position:absolute;top:4px;left:6px;font-size:11px;font-weight:700;color:var(--w);background:rgba(0,0,0,0.55);border-radius:4px;padding:1px 5px;z-index:2;pointer-events:none}
@@ -572,8 +572,31 @@ body.ep-speed-slow{--ep-trans-dur:1.1s;--ep-reveal-dur:0.85s}
 // =========================================================
 // CONSTANTS
 // =========================================================
+// Stage dimensions are MUTABLE — they change based on the current deck's aspect.
+// Landscape (default): 1440 × 810 (16:9). Portrait: 810 × 1440 (9:16).
+// Recording multiplies these by 1.333 to hit 1920×1080 / 1080×1920 output.
 var STAGE_W = 1440;
 var STAGE_H = 810;
+
+// Set the stage dimensions to match a given aspect. Called when a deck is
+// created, loaded, or its aspect is otherwise determined.
+function setStageAspect(aspect){
+  if(aspect === 'portrait'){
+    STAGE_W = 810;
+    STAGE_H = 1440;
+  } else {
+    // 'landscape' or anything else (backward compat) → 16:9
+    STAGE_W = 1440;
+    STAGE_H = 810;
+  }
+  // Update CSS variable so thumbnails / aspect-ratio:16/9 elsewhere reflow
+  if(document.body){
+    document.body.style.setProperty('--ep-stage-aspect', STAGE_W + '/' + STAGE_H);
+  }
+}
+function getStageAspect(){
+  return STAGE_W < STAGE_H ? 'portrait' : 'landscape';
+}
 var PEN_COLORS = ['#ef4444','#f97316','#ffa500','#facc15','#7ed957','#10b981','#06b6d4','#3b82f6','#6366f1','#a855f7','#ec4899','#ffffff'];
 var BORDER_COLORS = ['#7ed957','#ffa500','#3b82f6','#a855f7','#ec4899','#ef4444','#ffffff','#66667a'];
 var NOTE_COLORS = ['#fff9c4','#ffe0b2','#ffcdd2','#f8bbd0','#e1bee7','#c5cae9','#b3e5fc','#b2dfdb','#c8e6c9','#f0f4c3','#d7ccc8','#cfd8dc'];
@@ -2729,6 +2752,9 @@ function gEl(id){var e=cs().els;for(var i=0;i<e.length;i++)if(e[i].id===id)retur
 
 S.slides = [newSlide()];
 
+// Initialize stage aspect (will be overridden by loaded deck or aspect picker on welcome screen)
+setStageAspect('landscape');
+
 // =========================================================
 // FACTORIES
 // =========================================================
@@ -3336,6 +3362,39 @@ window.toggleWebcam = async function(){
     });
     S.webcamStream = stream;
     S.webcamActive = true;
+    // Pick a sensible default position based on deck aspect (only on first activation,
+    // or if user hasn't dragged the camera somewhere specific).
+    if(getStageAspect() === 'portrait' && S.webcamPosX === null && S.webcamPosY === null){
+      // Smaller default for portrait (160 instead of 220) since canvas is narrow
+      if(S.webcamSize === 220) S.webcamSize = 160;
+      // In portrait, the stage occupies a narrow vertical band on screen with
+      // black bars on left/right. The window-corner classes (.corner-tr etc.)
+      // would put the camera in those black bars — outside the visible deck.
+      // Compute a position INSIDE the stage rect and store as viewport %.
+      var stageEl = document.getElementById('presStage') || document.getElementById('stage');
+      if(stageEl){
+        var sr = stageEl.getBoundingClientRect();
+        if(sr.width > 0 && sr.height > 0){
+          // Top-right of stage with a small margin (5% of stage width)
+          var marginX = sr.width * 0.05;
+          var marginY = sr.height * 0.04;
+          var camLeft = sr.left + sr.width - S.webcamSize - marginX;
+          var camTop  = sr.top + marginY;
+          // Clamp so it's never off-screen even if stage is unusually placed
+          camLeft = Math.max(0, Math.min(window.innerWidth  - S.webcamSize, camLeft));
+          camTop  = Math.max(0, Math.min(window.innerHeight - S.webcamSize, camTop));
+          // Store as viewport percentages — this is how positions are persisted
+          S.webcamPosX = camLeft / window.innerWidth;
+          S.webcamPosY = camTop  / window.innerHeight;
+        } else {
+          // Stage rect not yet available — fall back to top-right corner class
+          S.webcamCorner = 'tr';
+        }
+      } else {
+        // No stage element at all — fall back to top-right corner class
+        S.webcamCorner = 'tr';
+      }
+    }
     renderPres(); // refresh toolbar button state; ensureWebcamOverlay called from renderPres
     // ensureWebcamOverlay (called from renderPres) creates the video element and attaches the stream
   } catch(e){
@@ -4269,9 +4328,10 @@ window.startRecording = async function(){
   S.recIncludeSlideAudio = includeAudio;
 
   try {
-    // 1. Create canvas (1920×1080)
+    // 1. Create canvas matching deck aspect (landscape: 1920×1080, portrait: 1080×1920)
     var cv = document.createElement('canvas');
-    cv.width = 1920; cv.height = 1080;
+    cv.width = Math.round(STAGE_W * 1.333);
+    cv.height = Math.round(STAGE_H * 1.333);
     S.recCanvas = cv;
 
     // Force-clear the canvas pixels (defensive: new canvases default transparent, but be explicit)
@@ -7363,7 +7423,12 @@ window.deleteSlide = function(){
 };
 
 window.savePresentation = function(){
-  var b = new Blob([JSON.stringify({slides:S.slides, v:4})], {type:'application/json'});
+  var deckData = {
+    slides: S.slides,
+    aspect: getStageAspect(),  // 'landscape' | 'portrait' — pinned to current stage
+    v: 4
+  };
+  var b = new Blob([JSON.stringify(deckData)], {type:'application/json'});
   var u = URL.createObjectURL(b);
   var a = document.createElement('a');
   a.href = u;
@@ -7380,6 +7445,8 @@ window.loadPresentation = function(evt){
     try {
       var d = JSON.parse(ev.target.result);
       if(d.slides){
+        // Set stage aspect from deck file (or default to landscape for old files)
+        setStageAspect(d.aspect || 'landscape');
         S.slides = d.slides;
         S.si = 0;
         S.sel = null;
@@ -8196,7 +8263,7 @@ function autoSave(){
   if(autosaveTimer) clearTimeout(autosaveTimer);
   autosaveTimer = setTimeout(function(){
     try {
-      var data = {slides:S.slides, si:S.si, v:4, savedAt:Date.now()};
+      var data = {slides:S.slides, si:S.si, aspect:getStageAspect(), v:4, savedAt:Date.now()};
       localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
       lastAutoSaveAt = Date.now();
       var ind = document.getElementById('autosaveInd');
@@ -11691,7 +11758,7 @@ function renderTemplatesPopover(){
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
   SLIDE_TEMPLATES.forEach(function(t){
     h += '<div onclick="applyTemplate(\''+t.key+'\')" style="padding:12px;border:1.5px solid var(--brd);border-radius:10px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor=\'var(--g)\'" onmouseout="this.style.borderColor=\'var(--brd)\'">';
-    h += '<div style="width:100%;aspect-ratio:16/9;background:#111113;border-radius:6px;margin-bottom:8px;overflow:hidden;position:relative">';
+    h += '<div style="width:100%;aspect-ratio:'+STAGE_W+'/'+STAGE_H+';background:#111113;border-radius:6px;margin-bottom:8px;overflow:hidden;position:relative">';
     h += t.preview || '';
     h += '</div>';
     h += '<div style="font-size:12px;font-weight:600;color:var(--w);margin-bottom:2px">'+t.label+'</div>';
@@ -12188,11 +12255,14 @@ window.pickEmoji = function(emoji){
   el.bc = 'transparent';
   el.bw = 0;
   el.bg = 'transparent';
-  updateSlide(function(s){ s.els.push(el); return s; });
+  // Close popover and set selection BEFORE updateSlide. updateSlide calls
+  // render() — if S.pop were still 'emoji' at that moment, the popover would
+  // remain drawn. State must be settled before render runs.
+  S.pop = null;
   S.sel = el.id;
   S.selIds = [el.id];
   S.tool = 'select';
-  S.pop = null;
+  updateSlide(function(s){ s.els.push(el); return s; });
   showToast('Added ' + emoji);
 };
 
@@ -12669,11 +12739,19 @@ var STARTUP_PREF_KEY = 'epPresenterStartupPref';
   var pref = 'ask';
   try {
     var stored = localStorage.getItem(STARTUP_PREF_KEY);
-    if(stored === 'always-new' || stored === 'always-restore') pref = stored;
+    if(stored === 'always-new' || stored === 'always-restore' ||
+       stored === 'always-new-landscape' || stored === 'always-new-portrait') pref = stored;
   } catch(e){}
 
   // Fast paths: skip the modal if the user chose a durable preference
-  if(pref === 'always-new'){
+  if(pref === 'always-new' || pref === 'always-new-landscape'){
+    setStageAspect('landscape');
+    finishBoot();
+    return;
+  }
+  if(pref === 'always-new-portrait'){
+    setStageAspect('portrait');
+    S.slides = [newSlide()];  // ensure slides exist with the new aspect
     finishBoot();
     return;
   }
@@ -12692,6 +12770,7 @@ var STARTUP_PREF_KEY = 'epPresenterStartupPref';
   showStartupModal(savedDraft, finishBoot);
 
   function applyDraft(d){
+    setStageAspect(d.aspect || 'landscape');
     S.slides = d.slides;
     S.si = Math.min(d.si || 0, S.slides.length - 1);
     S.slides.forEach(function(s){
@@ -12728,9 +12807,13 @@ function showStartupModal(savedDraft, onDone){
       '<h2 class="ep-startup-title">Welcome to EP Presenter</h2>' +
       '<p class="ep-startup-sub">How would you like to start?</p>' +
       '<div class="ep-startup-opts">' +
-        '<button class="ep-startup-opt" data-action="new">' +
-          '<div class="ep-startup-opt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></div>' +
-          '<div class="ep-startup-opt-body"><div class="ep-startup-opt-t">New Deck</div><div class="ep-startup-opt-d">Start with a blank slide</div></div>' +
+        '<button class="ep-startup-opt" data-action="new-landscape">' +
+          '<div class="ep-startup-opt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="2"/></svg></div>' +
+          '<div class="ep-startup-opt-body"><div class="ep-startup-opt-t">New Landscape Deck</div><div class="ep-startup-opt-d">16:9 — desktop, YouTube, tutorials</div></div>' +
+        '</button>' +
+        '<button class="ep-startup-opt" data-action="new-portrait">' +
+          '<div class="ep-startup-opt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="3" width="12" height="18" rx="2"/></svg></div>' +
+          '<div class="ep-startup-opt-body"><div class="ep-startup-opt-t">New Portrait Deck</div><div class="ep-startup-opt-d">9:16 — TikTok, Reels, Shorts, Stories</div></div>' +
         '</button>' +
         '<button class="ep-startup-opt ep-startup-opt-primary" data-action="restore">' +
           '<div class="ep-startup-opt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></div>' +
@@ -12752,8 +12835,16 @@ function showStartupModal(savedDraft, onDone){
     var action = btn.getAttribute('data-action');
     var remember = document.getElementById('ep-startup-remember-cb').checked;
 
-    if(action === 'new'){
-      if(remember){ try { localStorage.setItem(STARTUP_PREF_KEY, 'always-new'); } catch(e){} }
+    if(action === 'new-landscape' || action === 'new-portrait'){
+      var aspect = action === 'new-portrait' ? 'portrait' : 'landscape';
+      setStageAspect(aspect);
+      // Reset slides to a single fresh slide using the chosen aspect
+      S.slides = [newSlide()];
+      S.si = 0;
+      S.sel = null;
+      if(remember){
+        try { localStorage.setItem(STARTUP_PREF_KEY, 'always-' + action); } catch(e){}
+      }
       closeOverlay();
       onDone();
     } else if(action === 'restore'){
