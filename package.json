@@ -1,7 +1,7 @@
 {
   "name": "ep-presenter",
   "productName": "EP Presenter",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Eze Profit Presenter — forex trading education presentation tool",
   "author": {
     "name": "Ike Igwe",
@@ -30,7 +30,7 @@
   "build": {
     "appId": "com.ikeigwe.eppresenter",
     "productName": "EP Presenter",
-    "copyright": "Copyright © 2026 Ike Igwe / Eze Profit",
+    "copyright": "Copyright (c) 2026 IKEIGWE AI Solutions Ltd",
     "directories": {
       "output": "dist",
       "buildResources": "build"

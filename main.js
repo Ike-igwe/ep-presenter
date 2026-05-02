@@ -119,11 +119,36 @@ function buildAppMenu() {
       role: 'help',
       submenu: [
         { label: 'EP Presenter on the web', click: () => shell.openExternal('https://ikeigwe.com') },
-        { label: 'Check for Updates', click: () => checkForUpdates(true) }
+        { label: 'Check for Updates', click: () => checkForUpdates(true) },
+        { type: 'separator' },
+        { label: 'About EP Presenter', click: () => showAboutDialog() }
       ]
     }
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+// About dialog — shown when the user picks Help → About EP Presenter
+function showAboutDialog() {
+  const version = app.getVersion();
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'About EP Presenter',
+    message: 'EP Presenter v' + version,
+    detail: [
+      'Professional presentation tool for educators,',
+      'content creators, and trainers.',
+      '',
+      '© 2026 IKEIGWE AI Solutions Ltd',
+      'Built by Ike Igwe — ikeigwe.com',
+      'Originally designed for Eze Profit forex training'
+    ].join('\n'),
+    buttons: ['OK', 'Visit ikeigwe.com'],
+    defaultId: 0,
+    cancelId: 0
+  }).then(result => {
+    if (result.response === 1) shell.openExternal('https://ikeigwe.com');
+  });
 }
 
 // ---------------------------------------------------------
