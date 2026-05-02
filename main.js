@@ -18,6 +18,14 @@ const os = require('os');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 
+// Auto-update behavior:
+// - autoDownload:false so we can ASK the user before downloading (otherwise
+//   the download starts silently and the "Download / Later" dialog is meaningless).
+// - autoInstallOnAppQuit:true so once downloaded (after user consent), it
+//   installs cleanly when the app exits.
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+
 // ---------------------------------------------------------
 // FFmpeg binary resolution
 // ---------------------------------------------------------
@@ -111,7 +119,7 @@ function buildAppMenu() {
       role: 'help',
       submenu: [
         { label: 'EP Presenter on the web', click: () => shell.openExternal('https://ikeigwe.com') },
-        { label: 'Check for Updates', click: () => autoUpdater.checkForUpdatesAndNotify() }
+        { label: 'Check for Updates', click: () => checkForUpdates(true) }
       ]
     }
   ];
@@ -123,8 +131,8 @@ function buildAppMenu() {
 // ---------------------------------------------------------
 app.whenReady().then(() => {
   createWindow();
-  // Auto-update check (silent if no update available)
-  try { autoUpdater.checkForUpdatesAndNotify(); } catch (e) { /* offline ok */ }
+  // Auto-update check on startup (silent if no update; dialog flow if update exists)
+  setTimeout(() => checkForUpdates(false), 3000);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -480,11 +488,91 @@ ipcMain.handle('ep:convert-video', async (event, args) => {
 });
 
 // ---------------------------------------------------------
-// Auto-updater event wiring (silent unless update found)
+// Auto-updater wrapper + dialog flow
 // ---------------------------------------------------------
+// User-friendly update flow (replaces silent checkForUpdatesAndNotify).
+//
+// When an update is found:
+//   1. Dialog: "EP Presenter X.Y.Z is available — Download / Later"
+//   2. If user picks Download, autoUpdater.downloadUpdate() runs
+//   3. Dialog: "Update downloaded — Restart now / Later"
+//   4. Either restart immediately or it installs on next quit
+//
+// Called from two places:
+//   - 3 seconds after launch (userInitiated=false — silent if no update)
+//   - Help → Check for Updates (userInitiated=true — shows "up to date" dialog)
+function checkForUpdates(userInitiated) {
+  // Auto-updater only works in packaged builds (it needs a signed app and
+  // the latest.yml metadata next to the .exe). In `npm start` dev mode,
+  // skip silently — but tell the user if they explicitly checked.
+  if (!app.isPackaged) {
+    if (userInitiated && mainWindow) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        message: 'Development build',
+        detail: 'Auto-updates only run in the packaged app.'
+      });
+    }
+    return;
+  }
+
+  autoUpdater.checkForUpdates().catch(err => {
+    console.error('Update check failed:', err);
+    if (userInitiated && mainWindow) {
+      dialog.showMessageBox(mainWindow, {
+        type: 'error',
+        message: 'Update check failed',
+        detail: String(err && err.message || err)
+      });
+    }
+  });
+
+  // For user-initiated checks: if no update, show "up to date" dialog.
+  // The .once() registration is fresh per check — won't fire on later checks.
+  if (userInitiated) {
+    autoUpdater.once('update-not-available', () => {
+      if (mainWindow) {
+        dialog.showMessageBox(mainWindow, {
+          type: 'info',
+          message: 'You are up to date',
+          detail: 'EP Presenter ' + app.getVersion() + ' is the latest version.'
+        });
+      }
+    });
+  }
+}
+
+// Update is AVAILABLE on the server (not yet downloaded). Ask the user
+// before downloading so we don't eat their bandwidth without consent.
+autoUpdater.on('update-available', (info) => {
+  if (!mainWindow) return;
+  dialog.showMessageBox(mainWindow, {
+    type: 'question',
+    buttons: ['Download', 'Later'],
+    defaultId: 0,
+    cancelId: 1,
+    title: 'Update available',
+    message: 'EP Presenter ' + info.version + ' is available',
+    detail: 'Current version: ' + app.getVersion() + '\nDownload now?'
+  }).then(result => {
+    if (result.response === 0) autoUpdater.downloadUpdate();
+  });
+});
+
+// Update has finished downloading. Ask whether to restart now or later.
+// If they pick Later, autoInstallOnAppQuit:true means it'll install on next quit.
 autoUpdater.on('update-downloaded', () => {
-  // Quietly install on quit; user doesn't need a popup mid-session.
-  // A future version could show a "Restart to update" toast.
+  if (!mainWindow) return;
+  dialog.showMessageBox(mainWindow, {
+    type: 'question',
+    buttons: ['Restart now', 'Later'],
+    defaultId: 0,
+    cancelId: 1,
+    title: 'Update ready',
+    message: 'Update downloaded. Restart to install?'
+  }).then(result => {
+    if (result.response === 0) autoUpdater.quitAndInstall();
+  });
 });
 
 autoUpdater.on('error', (err) => {
