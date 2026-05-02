@@ -136,6 +136,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 
 /* ========= DRAWING SUB-TOOLBAR (Notability-style) ========= */
 .draw-subbar{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);background:rgba(20,20,28,0.92);backdrop-filter:blur(16px);border:1px solid var(--brd);border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:18px;box-shadow:0 12px 40px rgba(0,0,0,0.5);z-index:500;font-family:Outfit;animation:popIn 0.18s ease-out}
+.draw-subbar.draw-subbar-no-anim{animation:none}
 .draw-subbar-grp{display:flex;align-items:center;gap:8px;padding-right:18px;border-right:1px solid var(--brd)}
 .draw-subbar-grp:last-child{border-right:none;padding-right:0}
 .draw-subbar-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;font-weight:700}
@@ -201,8 +202,20 @@ input[type=range].draw-size-slider::-moz-range-track,input[type=range].draw-opac
 .txt-box{display:flex;padding:10px 14px;overflow:hidden}
 .txt-box span,.txt-box textarea{width:100%;line-height:1.3;white-space:pre-wrap;word-wrap:break-word}
 .txt-box textarea{background:transparent;border:none;outline:none;resize:none;font-family:'Outfit'}
-.note{padding:12px;border-radius:6px;box-shadow:3px 3px 8px rgba(0,0,0,0.4);font-family:'Outfit'}
-.note textarea{width:100%;background:transparent;border:none;outline:none;resize:none;font-family:'Outfit';font-size:14px;color:#1a1a1a;font-weight:500}
+.note{font-family:'Outfit';transition:box-shadow 0.18s ease}
+.note.note-lifted:hover{box-shadow:0 2px 2px rgba(0,0,0,0.14), 0 12px 26px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.5) !important}
+.note.note-flat:hover{box-shadow:0 4px 12px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.10) !important}
+/* Note text area: thin custom scrollbar, fits the paper aesthetic.
+   Applied to both the textarea (edit mode) and the display div via .note-textarea. */
+.note-textarea::-webkit-scrollbar{width:6px;height:6px}
+.note-textarea::-webkit-scrollbar-track{background:transparent}
+.note-textarea::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.18);border-radius:3px}
+.note-textarea::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,0.32)}
+
+/* Custom font picker (Phase A — sticky note Text Format → Font dropdown).
+   Hover state for dropdown options. The active option uses inline styles
+   so it shows the green tint regardless of hover. */
+.ep-font-option:hover{background:rgba(255,255,255,0.12) !important;color:var(--g) !important}
 
 /* ========= PROPERTIES PANEL ========= */
 .pp{width:240px;background:var(--d2);border-left:1px solid var(--brd);overflow-y:auto;padding:14px;font-size:12px;flex-shrink:0}
@@ -215,17 +228,32 @@ input[type=range].draw-size-slider::-moz-range-track,input[type=range].draw-opac
 .laser-dot{position:fixed;width:18px;height:18px;border-radius:50%;background:radial-gradient(circle,#ff2a2a 0%,#ff0000 40%,rgba(255,0,0,0.6) 70%,rgba(255,0,0,0) 100%);box-shadow:0 0 20px 6px rgba(255,30,30,0.6),0 0 40px 10px rgba(255,0,0,0.3);pointer-events:none;z-index:2000;transform:translate(-50%,-50%);transition:opacity 0.15s}
 
 /* ========= WEBCAM OVERLAY ========= */
-.webcam-overlay{position:fixed;border-radius:50%;overflow:hidden;z-index:1500;box-shadow:0 8px 32px rgba(0,0,0,0.6),0 0 0 3px rgba(126,217,87,0.6),0 0 0 5px rgba(0,0,0,0.4);background:#000;transition:all 0.25s}
-.webcam-overlay video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.webcam-overlay{position:fixed;z-index:1500;filter:drop-shadow(0 8px 32px rgba(0,0,0,0.6));transition:width 0.25s,height 0.25s;cursor:grab}
+.webcam-frame{position:relative;width:100%;height:100%;box-sizing:border-box;overflow:hidden}
+.webcam-overlay video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);pointer-events:none;background:#000;display:block}
 .webcam-overlay.corner-tl{top:20px;left:20px}
 .webcam-overlay.corner-tr{top:20px;right:20px}
 .webcam-overlay.corner-bl{bottom:20px;left:20px}
 .webcam-overlay.corner-br{bottom:20px;right:20px}
 .webcam-overlay.dragging{transition:none;cursor:grabbing}
-.webcam-controls{position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px;opacity:0;transition:opacity 0.2s}
+.webcam-controls{position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px;opacity:0;transition:opacity 0.2s;z-index:2}
 .webcam-overlay:hover .webcam-controls{opacity:1}
 .webcam-controls button{width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,0.75);border:1px solid rgba(255,255,255,0.15);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-size:12px;font-weight:700}
 .webcam-controls button:hover{background:rgba(126,217,87,0.4)}
+
+/* Floating Camera settings popover */
+.webcam-settings-pop{position:fixed;z-index:2000;background:rgba(20,20,28,0.96);backdrop-filter:blur(16px);border:1px solid var(--brd);border-radius:12px;padding:14px;box-shadow:0 12px 40px rgba(0,0,0,0.5);font-family:Outfit,sans-serif;color:#f0f0f5}
+.webcam-settings-pop .ws-title{font-size:11px;font-weight:700;color:var(--g);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+.webcam-settings-pop .ws-section{margin-bottom:10px}
+.webcam-settings-pop .ws-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px}
+.webcam-settings-pop .ws-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px}
+.webcam-settings-pop .ws-btn{padding:6px 4px;font-size:10px;background:rgba(255,255,255,0.04);border:1px solid var(--brd);border-radius:6px;color:#f0f0f5;cursor:pointer;font-family:inherit}
+.webcam-settings-pop .ws-btn:hover{background:rgba(126,217,87,0.1)}
+.webcam-settings-pop .ws-btn.on{border-color:var(--g);color:var(--g)}
+.webcam-settings-pop .ws-colors{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
+.webcam-settings-pop .ws-color{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;box-sizing:border-box}
+.webcam-settings-pop .ws-color.on{border-color:#fff;box-shadow:0 0 0 1px var(--g)}
+.webcam-settings-pop input[type=range]{width:100%;margin-top:4px}
 
 /* ========= RECORDING INDICATOR ========= */
 .rec-indicator{position:fixed;top:18px;left:18px;z-index:1600;background:rgba(0,0,0,0.85);backdrop-filter:blur(12px);border:1px solid rgba(255,40,40,0.35);border-radius:24px;padding:8px 16px 8px 12px;display:flex;align-items:center;gap:10px;font-family:Outfit;font-size:13px;font-weight:600;color:#fff;box-shadow:0 6px 20px rgba(0,0,0,0.5)}
@@ -549,6 +577,33 @@ var STAGE_H = 810;
 var PEN_COLORS = ['#ef4444','#f97316','#ffa500','#facc15','#7ed957','#10b981','#06b6d4','#3b82f6','#6366f1','#a855f7','#ec4899','#ffffff'];
 var BORDER_COLORS = ['#7ed957','#ffa500','#3b82f6','#a855f7','#ec4899','#ef4444','#ffffff','#66667a'];
 var NOTE_COLORS = ['#fff9c4','#ffe0b2','#ffcdd2','#f8bbd0','#e1bee7','#c5cae9','#b3e5fc','#b2dfdb','#c8e6c9','#f0f4c3','#d7ccc8','#cfd8dc'];
+
+// Tiny color helpers used by the sticky-note style variants. They take a
+// "#RRGGBB" hex and return a slightly lighter or darker version. Used to
+// build the subtle gradient on lifted-style notes (top-left highlight,
+// bottom-right shade — mimics ambient light on real paper).
+function lightenHex(hex, percent){
+  if(!hex || hex.charAt(0) !== '#' || hex.length !== 7) return hex;
+  var r = parseInt(hex.substr(1,2), 16);
+  var g = parseInt(hex.substr(3,2), 16);
+  var b = parseInt(hex.substr(5,2), 16);
+  var p = (percent || 0) / 100;
+  r = Math.min(255, Math.round(r + (255 - r) * p));
+  g = Math.min(255, Math.round(g + (255 - g) * p));
+  b = Math.min(255, Math.round(b + (255 - b) * p));
+  return '#' + ('0'+r.toString(16)).slice(-2) + ('0'+g.toString(16)).slice(-2) + ('0'+b.toString(16)).slice(-2);
+}
+function darkenHex(hex, percent){
+  if(!hex || hex.charAt(0) !== '#' || hex.length !== 7) return hex;
+  var r = parseInt(hex.substr(1,2), 16);
+  var g = parseInt(hex.substr(3,2), 16);
+  var b = parseInt(hex.substr(5,2), 16);
+  var p = (percent || 0) / 100;
+  r = Math.max(0, Math.round(r * (1 - p)));
+  g = Math.max(0, Math.round(g * (1 - p)));
+  b = Math.max(0, Math.round(b * (1 - p)));
+  return '#' + ('0'+r.toString(16)).slice(-2) + ('0'+g.toString(16)).slice(-2) + ('0'+b.toString(16)).slice(-2);
+}
 
 // =========================================================
 // SHAPE CATALOG
@@ -2123,6 +2178,409 @@ var I = {
 // =========================================================
 function uid(){return Math.random().toString(36).slice(2,10)}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+// =========================================================
+// NOTE HTML SANITIZER (Phase B+C — sticky note rich text)
+// =========================================================
+// Sticky notes now store their content as HTML so they can have per-character
+// formatting (bold/italic/underline/font/size/color on selected text). The
+// HTML is persisted in the deck file. If a deck file ever contained hostile
+// HTML — e.g. <script>, <img onerror>, <iframe> — that HTML would execute
+// when loaded. This sanitizer strips everything that isn't on the small
+// whitelist of formatting tags. It runs on save (before storing into el.text)
+// and on render (defense in depth — load-time check too).
+//
+// Whitelist tags:    B, STRONG, I, EM, U, BR, DIV, P, SPAN
+// Whitelist styles:  color, font-family, font-size, font-weight, font-style, text-decoration
+// All other tags become their text content. All other attributes are stripped.
+var _NOTE_ALLOWED_TAGS = {B:1, STRONG:1, I:1, EM:1, U:1, BR:1, DIV:1, P:1, SPAN:1};
+var _NOTE_ALLOWED_STYLES = {'color':1, 'font-family':1, 'font-size':1, 'font-weight':1, 'font-style':1, 'text-decoration':1};
+
+function sanitizeNoteHTML(html){
+  if(html == null) return '';
+  var s = String(html);
+  // Quick path: plain string with no HTML special chars — already safe.
+  if(s.indexOf('<') < 0 && s.indexOf('&') < 0) return s;
+  var parser = new DOMParser();
+  var doc = parser.parseFromString('<div id="root">'+s+'</div>', 'text/html');
+  var root = doc.getElementById('root');
+  if(!root) return s;
+  _noteSanitizeNode(root);
+  return root.innerHTML;
+}
+
+function _noteSanitizeNode(node){
+  for(var i = node.childNodes.length - 1; i >= 0; i--){
+    var child = node.childNodes[i];
+    if(child.nodeType === 3) continue;
+    if(child.nodeType !== 1){ node.removeChild(child); continue; }
+    var tag = child.tagName;
+    if(!_NOTE_ALLOWED_TAGS[tag]){
+      var txt = child.textContent || '';
+      node.replaceChild(node.ownerDocument.createTextNode(txt), child);
+      continue;
+    }
+    var attrs = child.attributes;
+    for(var j = attrs.length - 1; j >= 0; j--){
+      var a = attrs[j];
+      if(tag === 'SPAN' && a.name === 'style'){
+        child.setAttribute('style', _filterStyleAttr(a.value));
+      } else {
+        child.removeAttribute(a.name);
+      }
+    }
+    _noteSanitizeNode(child);
+  }
+}
+
+function _filterStyleAttr(styleStr){
+  if(!styleStr) return '';
+  var clean = [];
+  var parts = String(styleStr).split(';');
+  for(var i = 0; i < parts.length; i++){
+    var p = parts[i];
+    var idx = p.indexOf(':');
+    if(idx < 0) continue;
+    var prop = p.slice(0, idx).trim().toLowerCase();
+    var val = p.slice(idx + 1).trim();
+    if(!_NOTE_ALLOWED_STYLES[prop]) continue;
+    if(/url\s*\(|expression\s*\(|javascript:|@import/i.test(val)) continue;
+    if(val.length > 200) continue;
+    clean.push(prop + ':' + val);
+  }
+  return clean.join(';');
+}
+
+function noteHTMLToPlainText(html){
+  if(html == null) return '';
+  var s = String(html);
+  if(s.indexOf('<') < 0 && s.indexOf('&') < 0) return s;
+  var html2 = sanitizeNoteHTML(s)
+    .replace(/<br\s*\/?\s*>/gi, '\n')
+    .replace(/<\/(div|p)>/gi, '\n')
+    .replace(/<[^>]+>/g, '');
+  var d = document.createElement('div');
+  d.innerHTML = html2;
+  return d.textContent || '';
+}
+
+// =========================================================
+// SHIP 2 — Sticky note rich-text canvas rendering
+// =========================================================
+// Walks the HTML in el.text and draws each text run with its own font/
+// size/color/bold/italic/underline onto the canvas at recording time.
+// Mirrors the editor's CSS so recordings match what users see in the
+// editor and presentation mode. Word-wraps at note width using per-run
+// font metrics. Draws underlines manually (canvas fillText has no
+// text-decoration support).
+//
+// Style fields per run: fontSize, fontFamily, color, bold, italic, underline.
+// These are FULLY COMPUTED at parse time (not inherited at draw time).
+// Each run also has either text content OR isBreak=true (for forced breaks).
+
+// CSS font-family value — same map used by the renderer and other helpers.
+// Kept inline so this function is self-contained.
+function _noteCanvasFontFamily(name){
+  return ({
+    'Outfit':     "'Outfit', sans-serif",
+    'Sans-serif': "Arial, Helvetica, sans-serif",
+    'Serif':      "Georgia, 'Times New Roman', serif",
+    'Monospace':  "Consolas, Menlo, 'Courier New', monospace",
+    'Cursive':    "'Comic Sans MS', cursive"
+  })[name] || "'Outfit', sans-serif";
+}
+
+// Resolve the default style for a note (its whole-note settings act as the
+// style baseline; runs with their own spans override these).
+function _noteDefaultStyle(el){
+  var fSize    = (typeof el.fontSize === 'number' && el.fontSize > 0) ? el.fontSize : 14;
+  var fFamily  = el.fontFamily || 'Outfit';
+  var fColor   = el.fontColor || '#1a1a1a';
+  return {
+    fontSize:   fSize,
+    fontFamily: fFamily,
+    color:      fColor,
+    bold:       !!el.bold,
+    italic:     !!el.italic,
+    underline:  !!el.underline
+  };
+}
+
+// Parse a CSS-style string like "color:red;font-size:18px" into key/value object.
+// Lower-cased keys; values trimmed. Returns {} if input is falsy.
+function _parseInlineStyle(str){
+  var out = {};
+  if(!str) return out;
+  var parts = String(str).split(';');
+  for(var i = 0; i < parts.length; i++){
+    var idx = parts[i].indexOf(':');
+    if(idx < 0) continue;
+    var k = parts[i].slice(0, idx).trim().toLowerCase();
+    var v = parts[i].slice(idx + 1).trim();
+    if(k && v) out[k] = v;
+  }
+  return out;
+}
+
+// Apply style overrides from a SPAN's inline style attribute onto a base style.
+// Returns a NEW style object (doesn't mutate base). Only known properties are
+// honored: color, font-family, font-size, font-weight, font-style, text-decoration.
+function _applySpanStyle(base, styleAttr){
+  var out = {
+    fontSize: base.fontSize,
+    fontFamily: base.fontFamily,
+    color: base.color,
+    bold: base.bold,
+    italic: base.italic,
+    underline: base.underline
+  };
+  var s = _parseInlineStyle(styleAttr);
+  if(s.color) out.color = s.color;
+  if(s['font-family']){
+    // The editor stores font-family as the full CSS value (e.g. "'Outfit', sans-serif").
+    // Reverse-look-up the short name so canvas rendering uses the same as the renderer.
+    var raw = s['font-family'];
+    if(/Outfit/i.test(raw)) out.fontFamily = 'Outfit';
+    else if(/Georgia/i.test(raw) || /serif/i.test(raw) && !/sans/i.test(raw)) out.fontFamily = 'Serif';
+    else if(/Consolas|Menlo|Courier|monospace/i.test(raw)) out.fontFamily = 'Monospace';
+    else if(/Comic Sans|cursive/i.test(raw)) out.fontFamily = 'Cursive';
+    else if(/Arial|Helvetica|sans-serif/i.test(raw)) out.fontFamily = 'Sans-serif';
+    // else: leave as base (unknown family — Outfit fallback at draw time)
+  }
+  if(s['font-size']){
+    var px = parseFloat(s['font-size']);
+    if(isFinite(px) && px > 0) out.fontSize = px;
+  }
+  if(s['font-weight']){
+    // 'bold' or '700+' = bold
+    var w = s['font-weight'];
+    if(w === 'bold' || w === 'bolder' || (parseInt(w, 10) >= 600)) out.bold = true;
+    else if(w === 'normal' || (parseInt(w, 10) > 0 && parseInt(w, 10) < 600)) out.bold = false;
+  }
+  if(s['font-style']){
+    out.italic = (s['font-style'] === 'italic' || s['font-style'] === 'oblique');
+  }
+  if(s['text-decoration']){
+    out.underline = /underline/i.test(s['text-decoration']);
+  }
+  return out;
+}
+
+// Walk a parsed DOM tree and emit a flat list of runs.
+// Each run is {text, style, isBreak}. Block-level boundaries (<br>, end of <div>/<p>)
+// emit a zero-text run with isBreak=true so the layout knows where to force breaks.
+function _walkNoteDOM(node, currentStyle, runs){
+  for(var i = 0; i < node.childNodes.length; i++){
+    var child = node.childNodes[i];
+    if(child.nodeType === 3){
+      // Text node — emit as a run if non-empty
+      var t = child.nodeValue;
+      if(t && t.length > 0){
+        runs.push({text: t, style: currentStyle, isBreak: false});
+      }
+      continue;
+    }
+    if(child.nodeType !== 1) continue; // skip comments, etc.
+    var tag = child.tagName;
+    if(tag === 'BR'){
+      runs.push({text: '', style: currentStyle, isBreak: true});
+      continue;
+    }
+    // Compute the style for this element's children
+    var newStyle = currentStyle;
+    if(tag === 'B' || tag === 'STRONG'){
+      newStyle = _applySpanStyle(currentStyle, '');
+      newStyle.bold = true;
+    } else if(tag === 'I' || tag === 'EM'){
+      newStyle = _applySpanStyle(currentStyle, '');
+      newStyle.italic = true;
+    } else if(tag === 'U'){
+      newStyle = _applySpanStyle(currentStyle, '');
+      newStyle.underline = true;
+    } else if(tag === 'SPAN'){
+      newStyle = _applySpanStyle(currentStyle, child.getAttribute('style'));
+    }
+    // For DIV/P/etc., just descend without changing style.
+    // Bug fix: emit a break BEFORE entering DIV/P if the current line already
+    // has content. Otherwise Chrome-style HTML "line1<div>line2</div>" produces
+    // [line1, line2, BREAK] with no break between line1 and line2 — they
+    // visually merge in recordings. With the pre-break: [line1, BREAK, line2, BREAK].
+    // The all-div case "<div>line1</div><div>line2</div>" still works correctly:
+    // first DIV finds line empty (no pre-break), emits "line1" + BREAK at end.
+    // Second DIV finds line empty (just had break), no pre-break, emits "line2" + BREAK.
+    if(tag === 'DIV' || tag === 'P'){
+      var lineHasContent = runs.length > 0 && !runs[runs.length - 1].isBreak;
+      if(lineHasContent){
+        runs.push({text: '', style: currentStyle, isBreak: true});
+      }
+    }
+    _walkNoteDOM(child, newStyle, runs);
+    // Block-level elements: emit a break after their contents
+    if(tag === 'DIV' || tag === 'P'){
+      runs.push({text: '', style: currentStyle, isBreak: true});
+    }
+  }
+}
+
+// Parse el.text (HTML) into a flat list of styled runs.
+// Returns [] for empty content.
+function _noteRichTextToRuns(el){
+  var html = el.text || '';
+  // Plain string fast path: just one run with default style
+  if(typeof html === 'string' && html.indexOf('<') < 0 && html.indexOf('&') < 0){
+    if(html.length === 0) return [];
+    return [{text: html, style: _noteDefaultStyle(el), isBreak: false}];
+  }
+  // Sanitize then parse — sanitization keeps only whitelisted tags and styles.
+  var safe = sanitizeNoteHTML(html);
+  var parser = new DOMParser();
+  var doc = parser.parseFromString('<div id="root">'+safe+'</div>', 'text/html');
+  var root = doc.getElementById('root');
+  if(!root) return [];
+  var runs = [];
+  _walkNoteDOM(root, _noteDefaultStyle(el), runs);
+  return runs;
+}
+
+// Build the canvas font string for a run: "[italic ][weight] [size]px [family]"
+function _runFontString(style){
+  var parts = [];
+  if(style.italic) parts.push('italic');
+  parts.push(style.bold ? 700 : 500);
+  parts.push(style.fontSize + 'px');
+  parts.push(_noteCanvasFontFamily(style.fontFamily));
+  return parts.join(' ');
+}
+
+// Lay out runs into lines that fit within maxWidth pixels.
+// Returns an array of lines; each line is an array of "pieces" — pieces are
+// runs (or run sub-strings) with computed widths from measureText.
+//
+// Algorithm: walk runs in order. For each run, split its text into "atoms"
+// (a run of non-space chars + trailing space, like a word + space). Try to
+// add each atom to the current line; if the atom would exceed maxWidth, start
+// a new line with that atom. Hard breaks (isBreak runs) flush the current line.
+//
+// Lines also carry a height = max fontSize of pieces in the line × 1.45.
+function _layoutRuns(ctx, runs, maxWidth){
+  var lines = [[]];
+  var lineWidth = 0;
+
+  // Helper: push a piece onto the last line
+  function pushPiece(piece){
+    lines[lines.length - 1].push(piece);
+    lineWidth += piece.width;
+  }
+  function startNewLine(){
+    lines.push([]);
+    lineWidth = 0;
+  }
+
+  for(var ri = 0; ri < runs.length; ri++){
+    var run = runs[ri];
+    if(run.isBreak){
+      // Forced line break
+      startNewLine();
+      continue;
+    }
+    if(!run.text) continue;
+    // Set font on context to measure
+    ctx.font = _runFontString(run.style);
+    // Split text into atoms: words + trailing space, plus any newlines as breaks
+    // Note: \n inside a run also forces a break.
+    var text = run.text;
+    var segments = text.split('\n');
+    for(var si = 0; si < segments.length; si++){
+      if(si > 0){
+        // The split removed a \n — emit a break before continuing
+        startNewLine();
+      }
+      var seg = segments[si];
+      if(!seg) continue;
+      // Tokenize: each "atom" is a word + any trailing whitespace. We use a regex
+      // that captures non-space chars followed by optional trailing space chars.
+      var atoms = seg.match(/\S+\s*|\s+/g) || [];
+      for(var ai = 0; ai < atoms.length; ai++){
+        var atom = atoms[ai];
+        var atomWidth = ctx.measureText(atom).width;
+        // If atom is a run of whitespace at the start of a new line, skip it (no leading space).
+        var lineEmpty = lines[lines.length - 1].length === 0;
+        if(lineEmpty && /^\s+$/.test(atom)) continue;
+        // If adding this atom exceeds maxWidth AND the current line isn't empty,
+        // start a new line first.
+        if(!lineEmpty && lineWidth + atomWidth > maxWidth){
+          startNewLine();
+          // After break, don't preserve leading whitespace
+          if(/^\s+$/.test(atom)) continue;
+          // Re-measure atom width is the same (font hasn't changed)
+        }
+        // If the atom alone is wider than maxWidth (super-long word), we have to
+        // accept overflow — wrapping mid-word is more code than it's worth here.
+        pushPiece({
+          text: atom,
+          style: run.style,
+          width: atomWidth,
+          height: run.style.fontSize
+        });
+      }
+    }
+  }
+  // Compute line metrics: height (max fontSize × 1.45) and ascent (max fontSize × 1.15)
+  return lines.map(function(line){
+    var maxSize = 14;
+    line.forEach(function(p){ if(p.height > maxSize) maxSize = p.height; });
+    return {
+      pieces: line,
+      lineHeight: Math.round(maxSize * 1.45),
+      ascent: Math.round(maxSize * 1.15)
+    };
+  });
+}
+
+// Main entry: draw a sticky note's rich-text content onto the canvas.
+// Called from the canvas-render path inside an x.save()/x.restore() block
+// that's already set up the rotation, shadow disabled, etc. The caller has
+// also clipped to the note's interior — we just draw text.
+//
+// (insetX, insetY) is the top-left of the text area inside the note.
+// (textW) is the available width. We don't need height — we just keep
+// drawing until we run out of lines or run past the note's clip rect.
+function drawNoteRichText(ctx, el, insetX, insetY, textW){
+  var runs = _noteRichTextToRuns(el);
+  if(!runs.length) return;
+  var lines = _layoutRuns(ctx, runs, textW);
+  // Compute starting baseline. Editor adds 14px top padding then ~1.15 × fontSize ascent.
+  // We use the first line's actual ascent.
+  var y = insetY + (lines[0] ? lines[0].ascent : 18);
+  for(var li = 0; li < lines.length; li++){
+    var line = lines[li];
+    var x = insetX;
+    for(var pi = 0; pi < line.pieces.length; pi++){
+      var p = line.pieces[pi];
+      ctx.font = _runFontString(p.style);
+      ctx.fillStyle = p.style.color;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText(p.text, x, y);
+      // Underline this piece if its style says so
+      if(p.style.underline){
+        // Offset from baseline scales with font size (~12% below)
+        var ulY = y + Math.max(2, Math.round(p.style.fontSize * 0.12));
+        var ulThick = Math.max(1, Math.round(p.style.fontSize / 14));
+        // Underline width is the text width minus trailing whitespace
+        var trimmed = p.text.replace(/\s+$/, '');
+        var ulW = trimmed === p.text ? p.width : ctx.measureText(trimmed).width;
+        ctx.fillRect(x, ulY, ulW, ulThick);
+      }
+      x += p.width;
+    }
+    // Advance to next line
+    if(li + 1 < lines.length){
+      y += lines[li + 1].lineHeight;
+    }
+  }
+}
+
 function clone(o){return JSON.parse(JSON.stringify(o))}
 function clamp(v,min,max){return Math.max(min,Math.min(max,v))}
 
@@ -2202,9 +2660,18 @@ var S = {
   laserActive:false,
   laserPos:null,       // {x, y} in stage coords while visible
   webcamActive:false,
-  webcamCorner:'br',   // 'tl' | 'tr' | 'bl' | 'br'
+  webcamCorner:'br',   // 'tl' | 'tr' | 'bl' | 'br' — used when webcamPosX/Y are null
+  webcamPosX:null,     // viewport x as percentage 0-1 (null = use corner). Stored as % so position survives window resize.
+  webcamPosY:null,     // viewport y as percentage 0-1 (null = use corner)
   webcamStream:null,   // MediaStream when active
   webcamSize:220,      // diameter in px
+  // Floating overlay styling (parity with slide-element webcam)
+  webcamShape:'circle',          // 'circle' | 'rounded' | 'rect'
+  webcamRoundedRadius:14,        // border-radius (px) when shape is 'rounded'
+  webcamBorderStyle:'solid',     // 'solid' | 'gradient' | 'animated'
+  webcamBorderColor:'#7ed957',   // primary color (also used as ring color when solid)
+  webcamBorderColor2:'#9b59ff',  // secondary color for gradient/animated
+  webcamBorderWidth:4,           // border thickness (px). 4 matches the legacy green ring width
   // Recording state
   recActive:false,      // true while recording
   recPaused:false,      // true if paused
@@ -2222,6 +2689,8 @@ var S = {
   showPanel:true,
   showNotes:false,     // speaker notes panel visible in editor
   pop:null, popPos:null,
+  fontPickerOpen:null,  // when non-null, stores the note id whose font picker is open
+  _subbarShown:false,   // transient: true when the lasso/draw subbar has been rendered already, used to suppress the pop-in animation on re-renders
   ctxMenu:null,
   hist:[], hi:-1,
   stageScale:1,
@@ -2248,6 +2717,7 @@ var isDrawing=false, currentStroke=[];
 // Lasso state — totally separate from ink drawing
 var lassoActive = false;     // true while user is drawing the lasso loop
 var lassoPath = [];          // freehand loop points (stage coords)
+var lassoPendingClear = false; // true when startLasso saw an outside-bbox click but is waiting for actual drag before wiping selection (prevents accidental wipes from clicks on UI controls)
 var lassoDragActive = false; // true while user is moving selected strokes
 var lassoDragOrig = null;    // {x, y, origPts: { strokeId: [original points] }}
 var drawCtx=null, drawCanvas=null;
@@ -2266,7 +2736,7 @@ function mkText(x,y){return{id:uid(),type:'text',x:x,y:y,w:420,h:70,text:'Double
 function mkLine(x1,y1,x2,y2,arrow){return{id:uid(),type:'line',x1:x1,y1:y1,x2:x2,y2:y2,stroke:'#7ed957',sw:3,arrow:!!arrow,style:'straight',lk:false}}
 function mkShape(sh,x,y){return{id:uid(),type:'shape',shape:sh,x:x,y:y,w:140,h:140,fill:'transparent',fillOp:1,stroke:'#7ed957',sw:3,lk:false}}
 function mkImage(src,x,y,w,h){return{id:uid(),type:'image',x:x,y:y,w:w,h:h,src:src,bc:'transparent',bw:0,br:0,op:1,lk:false}}
-function mkNote(x,y){return{id:uid(),type:'note',x:x,y:y,w:200,h:160,text:'Note...',bg:NOTE_COLORS[0],lk:false}}
+function mkNote(x,y){return{id:uid(),type:'note',x:x,y:y,w:200,h:160,text:'Note...',bg:NOTE_COLORS[0],lk:false,style:'lifted',fontSize:14,fontFamily:'Outfit',fontColor:'#1a1a1a',bold:false,italic:false,underline:false}}
 // Phase 4f: animated sticker. `kind` selects which animation; `t` is a phase
 // offset so identical stickers can animate out of sync. Stickers render via
 // the STICKER_LIBRARY render functions (live SVG with browser-driven CSS
@@ -2398,6 +2868,7 @@ window.setTool = function(t){
     S.lassoIds = [];
     lassoActive = false;
     lassoPath = [];
+    lassoPendingClear = false;
     lassoDragActive = false;
     lassoDragOrig = null;
   }
@@ -2491,8 +2962,16 @@ window.setPenColor = function(c){
     }
     return;
   }
-  // No sub-toolbar visible (e.g. presentation mode popover) — full render
-  if(S.pres) renderPres(); else render();
+  // No sub-toolbar visible (e.g. presentation mode popover) — full render.
+  // In pres mode, also dismiss the popover so the user can immediately draw
+  // without clicking outside first. Sliders (size/opacity) intentionally don't
+  // dismiss — they're continuous interactions.
+  if(S.pres){
+    S.pop = null;
+    renderPres();
+  } else {
+    render();
+  }
 };
 window.setPenSize = function(v){
   S.penSize = parseInt(v);
@@ -2841,7 +3320,8 @@ window.toggleWebcam = async function(){
     }
     S.webcamStream = null;
     S.webcamActive = false;
-    renderPres();
+    ensureWebcamOverlay(); // removes the overlay from DOM since active=false
+    renderPres(); // refresh toolbar button state
     return;
   }
   // Turn on — request webcam
@@ -2856,12 +3336,8 @@ window.toggleWebcam = async function(){
     });
     S.webcamStream = stream;
     S.webcamActive = true;
-    renderPres();
-    // After render, attach stream to video element
-    setTimeout(function(){
-      var v = document.getElementById('webcamVideo');
-      if(v){ v.srcObject = stream; v.play().catch(function(){}); }
-    }, 50);
+    renderPres(); // refresh toolbar button state; ensureWebcamOverlay called from renderPres
+    // ensureWebcamOverlay (called from renderPres) creates the video element and attaches the stream
   } catch(e){
     console.error('Webcam failed:', e);
     if(e.name === 'NotAllowedError') showToast('Webcam permission denied');
@@ -2872,6 +3348,11 @@ window.toggleWebcam = async function(){
 
 window.cycleWebcamCorner = function(evt){
   if(evt) evt.stopPropagation();
+  // Cycling corner explicitly clears any free-drag position so the corner
+  // takes over again. Without this, the user couldn't return to corner mode
+  // after dragging — the free position would always win.
+  S.webcamPosX = null;
+  S.webcamPosY = null;
   var order = ['br','bl','tl','tr'];
   var i = order.indexOf(S.webcamCorner);
   S.webcamCorner = order[(i+1) % order.length];
@@ -2879,7 +3360,63 @@ window.cycleWebcamCorner = function(evt){
   var overlay = document.getElementById('webcamOverlay');
   if(overlay){
     overlay.className = 'webcam-overlay corner-' + S.webcamCorner;
+    // Clear any inline left/top from a previous drag
+    overlay.style.left = '';
+    overlay.style.top = '';
+    overlay.style.right = '';
+    overlay.style.bottom = '';
   }
+};
+
+// Free-drag the webcam overlay. mousedown on the overlay (NOT on its child
+// controls) starts a drag; mousemove updates position; mouseup ends. Position
+// is tracked in viewport-percentage coordinates so it survives window resizes.
+window.startWebcamDrag = function(evt){
+  if(!evt) return;
+  // Don't start drag if the click originated on a button (the corner/size controls).
+  // Those have their own onclick handlers and shouldn't initiate drag.
+  if(evt.target && evt.target.closest && evt.target.closest('.webcam-controls')) return;
+  var overlay = document.getElementById('webcamOverlay');
+  if(!overlay) return;
+  evt.preventDefault();
+  evt.stopPropagation();
+
+  // Compute the offset between the click point and the overlay's top-left
+  // so the overlay doesn't jump when drag starts.
+  var rect = overlay.getBoundingClientRect();
+  var offsetX = evt.clientX - rect.left;
+  var offsetY = evt.clientY - rect.top;
+
+  overlay.classList.add('dragging');
+
+  function onMove(e){
+    // Convert to top-left coordinates of the overlay
+    var newLeft = e.clientX - offsetX;
+    var newTop  = e.clientY - offsetY;
+    // Clamp to viewport so it can't be dragged off-screen
+    var w = overlay.offsetWidth, h = overlay.offsetHeight;
+    var maxX = window.innerWidth - w;
+    var maxY = window.innerHeight - h;
+    newLeft = Math.max(0, Math.min(maxX, newLeft));
+    newTop  = Math.max(0, Math.min(maxY, newTop));
+    // Apply via inline style. Clear any corner-class positioning.
+    overlay.classList.remove('corner-tl','corner-tr','corner-bl','corner-br');
+    overlay.style.left = newLeft + 'px';
+    overlay.style.top  = newTop  + 'px';
+    overlay.style.right = 'auto';
+    overlay.style.bottom = 'auto';
+    // Persist as percentages so the position survives window resizes /
+    // re-renders / and gets used by the recording canvas-render path.
+    S.webcamPosX = window.innerWidth  > 0 ? newLeft / window.innerWidth  : 0;
+    S.webcamPosY = window.innerHeight > 0 ? newTop  / window.innerHeight : 0;
+  }
+  function onUp(){
+    overlay.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
 };
 
 window.resizeWebcam = function(delta, evt){
@@ -2889,6 +3426,293 @@ window.resizeWebcam = function(delta, evt){
   if(overlay){
     overlay.style.width = S.webcamSize + 'px';
     overlay.style.height = S.webcamSize + 'px';
+  }
+};
+
+// Manage the webcam overlay as a persistent DOM element OUTSIDE the main
+// render tree. Without this, every render() / renderPres() would destroy and
+// recreate the <video> element via innerHTML, causing a brief blank frame
+// (the new video hasn't received its first frame yet from the stream). That
+// blank frame is the "flicker" users see during drawing, popover changes,
+// slide transitions, etc. By appending the overlay to document.body and
+// updating it in-place, the video element persists for the entire session.
+//
+// Called from render() and renderPres() at the end. Also called when webcam
+// state changes (toggle, resize, drag) — though those paths can also update
+// the overlay directly if it already exists.
+function ensureWebcamOverlay(){
+  var overlay = document.getElementById('webcamOverlay');
+
+  // If webcam isn't active, remove any existing overlay and bail.
+  if(!S.webcamActive){
+    if(overlay){
+      var vid = document.getElementById('webcamVideo');
+      if(vid){ try { vid.srcObject = null; } catch(e){} }
+      overlay.parentNode.removeChild(overlay);
+    }
+    // Also close the settings popover if it's open
+    var pop = document.getElementById('webcamSettingsPop');
+    if(pop) pop.parentNode.removeChild(pop);
+    return;
+  }
+
+  // Webcam is active — create overlay if missing, otherwise just update.
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'webcamOverlay';
+    overlay.className = 'webcam-overlay';
+    overlay.onmousedown = function(e){ window.startWebcamDrag(e); };
+
+    // Frame wrapper: carries border styling (solid color, or gradient bg with
+    // padding for gradient/animated). The video sits inside, clipped to shape.
+    var frame = document.createElement('div');
+    frame.className = 'webcam-frame';
+    overlay.appendChild(frame);
+
+    var video = document.createElement('video');
+    video.id = 'webcamVideo';
+    video.autoplay = true;
+    video.muted = true;
+    video.playsInline = true;
+    frame.appendChild(video);
+
+    var controls = document.createElement('div');
+    controls.className = 'webcam-controls';
+
+    var btnSettings = document.createElement('button');
+    btnSettings.title = 'Style settings';
+    btnSettings.textContent = '\u2699'; // ⚙
+    btnSettings.onclick = function(e){ window.toggleWebcamSettings(e); };
+
+    var btnCorner = document.createElement('button');
+    btnCorner.title = 'Snap to corner';
+    btnCorner.textContent = '\u2921'; // ⤡
+    btnCorner.onclick = function(e){ window.cycleWebcamCorner(e); };
+
+    var btnMinus = document.createElement('button');
+    btnMinus.title = 'Smaller';
+    btnMinus.textContent = '\u2212'; // −
+    btnMinus.onclick = function(e){ window.resizeWebcam(-20, e); };
+
+    var btnPlus = document.createElement('button');
+    btnPlus.title = 'Larger';
+    btnPlus.textContent = '+';
+    btnPlus.onclick = function(e){ window.resizeWebcam(20, e); };
+
+    controls.appendChild(btnSettings);
+    controls.appendChild(btnCorner);
+    controls.appendChild(btnMinus);
+    controls.appendChild(btnPlus);
+    frame.appendChild(controls);
+
+    document.body.appendChild(overlay);
+  }
+
+  // Update size on the OUTER overlay
+  overlay.style.width = S.webcamSize + 'px';
+  overlay.style.height = S.webcamSize + 'px';
+
+  // Update position: free-drag percentages OR corner class
+  var useFreePos = (S.webcamPosX !== null && S.webcamPosY !== null);
+  overlay.classList.remove('corner-tl','corner-tr','corner-bl','corner-br');
+  if(useFreePos){
+    var leftPx = Math.round(S.webcamPosX * window.innerWidth);
+    var topPx  = Math.round(S.webcamPosY * window.innerHeight);
+    leftPx = Math.max(0, Math.min(window.innerWidth  - S.webcamSize, leftPx));
+    topPx  = Math.max(0, Math.min(window.innerHeight - S.webcamSize, topPx));
+    overlay.style.left = leftPx + 'px';
+    overlay.style.top  = topPx  + 'px';
+    overlay.style.right = 'auto';
+    overlay.style.bottom = 'auto';
+  } else {
+    overlay.classList.add('corner-' + S.webcamCorner);
+    overlay.style.left = '';
+    overlay.style.top = '';
+    overlay.style.right = '';
+    overlay.style.bottom = '';
+  }
+
+  // Apply shape + border styling to the frame
+  _applyFloatingWebcamStyling(overlay);
+
+  // Attach stream
+  var video = document.getElementById('webcamVideo');
+  if(video && S.webcamStream && video.srcObject !== S.webcamStream){
+    video.srcObject = S.webcamStream;
+    video.play().catch(function(){});
+  }
+}
+
+// Apply the current S.webcam* styling to the frame element + video.
+// Idempotent — safe to call any time the user changes a setting.
+function _applyFloatingWebcamStyling(overlay){
+  if(!overlay) overlay = document.getElementById('webcamOverlay');
+  if(!overlay) return;
+  var frame = overlay.querySelector('.webcam-frame');
+  var video = overlay.querySelector('#webcamVideo');
+  if(!frame) return;
+
+  var shape = S.webcamShape || 'circle';
+  var borderStyle = S.webcamBorderStyle || 'solid';
+  var bw = (typeof S.webcamBorderWidth === 'number') ? S.webcamBorderWidth : 4;
+  var bc1 = S.webcamBorderColor || '#7ed957';
+  var bc2 = S.webcamBorderColor2 || '#9b59ff';
+
+  // Compute border-radius from shape
+  var radius;
+  if(shape === 'circle') radius = '50%';
+  else if(shape === 'rect') radius = '0';
+  else radius = (S.webcamRoundedRadius || 14) + 'px';
+
+  // Reset frame styles before reapplying so old gradient backgrounds don't linger
+  frame.style.cssText = '';
+  frame.classList.remove('ep-border-anim');
+
+  // The frame fills the overlay
+  frame.style.width = '100%';
+  frame.style.height = '100%';
+  frame.style.position = 'relative';
+  frame.style.boxSizing = 'border-box';
+  frame.style.borderRadius = radius;
+  frame.style.overflow = 'hidden';
+
+  if(borderStyle === 'gradient' || borderStyle === 'animated'){
+    // Gradient frame: fill background with linear gradient, inset video by bw
+    frame.style.background = 'linear-gradient(135deg, '+bc1+' 0%, '+bc2+' 50%, '+bc1+' 100%)';
+    frame.style.backgroundSize = '300% 300%';
+    frame.style.padding = bw + 'px';
+    if(borderStyle === 'animated') frame.classList.add('ep-border-anim');
+  } else {
+    // Solid: standard CSS border
+    frame.style.border = bw + 'px solid ' + bc1;
+    frame.style.padding = '0';
+  }
+
+  // Video must inherit the inner shape (smaller corner radius if shape=rounded)
+  if(video){
+    var innerRadius;
+    if(shape === 'circle') innerRadius = '50%';
+    else if(shape === 'rect') innerRadius = '0';
+    else innerRadius = Math.max(0, (S.webcamRoundedRadius || 14) - Math.min(bw, 4)) + 'px';
+    video.style.borderRadius = innerRadius;
+  }
+}
+
+// Settings popover for the floating overlay. Lives in document.body so it
+// survives renders and isn't clipped by the overlay's overflow:hidden frame.
+window.toggleWebcamSettings = function(evt){
+  if(evt){ evt.stopPropagation(); evt.preventDefault(); }
+  var existing = document.getElementById('webcamSettingsPop');
+  if(existing){
+    existing.parentNode.removeChild(existing);
+    return;
+  }
+  var overlay = document.getElementById('webcamOverlay');
+  if(!overlay) return;
+  var rect = overlay.getBoundingClientRect();
+
+  var pop = document.createElement('div');
+  pop.id = 'webcamSettingsPop';
+  pop.className = 'webcam-settings-pop';
+  pop.onmousedown = function(e){ e.stopPropagation(); };
+  pop.onclick = function(e){ e.stopPropagation(); };
+
+  // Position: prefer above the overlay; fall back to below if no room
+  var popW = 240;
+  var popH = 320;
+  var left = rect.left + rect.width / 2 - popW / 2;
+  var top  = rect.top - popH - 12;
+  if(top < 8) top = rect.bottom + 12;
+  left = Math.max(8, Math.min(window.innerWidth - popW - 8, left));
+  pop.style.left = Math.round(left) + 'px';
+  pop.style.top  = Math.round(top) + 'px';
+  pop.style.width = popW + 'px';
+
+  pop.innerHTML = _renderWebcamSettingsHTML();
+  document.body.appendChild(pop);
+
+  // Click-outside-to-close
+  setTimeout(function(){
+    var closer = function(ev){
+      if(!pop.contains(ev.target)){
+        if(pop.parentNode) pop.parentNode.removeChild(pop);
+        document.removeEventListener('mousedown', closer, true);
+      }
+    };
+    document.addEventListener('mousedown', closer, true);
+  }, 0);
+};
+
+function _renderWebcamSettingsHTML(){
+  var shape = S.webcamShape || 'circle';
+  var borderStyle = S.webcamBorderStyle || 'solid';
+  var bw = (typeof S.webcamBorderWidth === 'number') ? S.webcamBorderWidth : 4;
+  var bc1 = S.webcamBorderColor || '#7ed957';
+  var bc2 = S.webcamBorderColor2 || '#9b59ff';
+  var palette = ['#7ed957','#9b59ff','#3da9fc','#ff5757','#ffd23f','#ff8c42','#ffffff','#888888'];
+
+  var h = '<div class="ws-title">Floating Camera Style</div>';
+
+  // Shape
+  h += '<div class="ws-section"><div class="ws-label">Shape</div><div class="ws-row">';
+  ['circle','rounded','rect'].forEach(function(s){
+    var lbl = s === 'circle' ? 'Circle' : (s === 'rounded' ? 'Rounded' : 'Sharp');
+    var active = shape === s;
+    h += '<button class="ws-btn'+(active?' on':'')+'" onclick="setFloatingWebcamProp(\'webcamShape\',\''+s+'\')">'+lbl+'</button>';
+  });
+  h += '</div></div>';
+
+  // Border style
+  h += '<div class="ws-section"><div class="ws-label">Border Style</div><div class="ws-row">';
+  ['solid','gradient','animated'].forEach(function(s){
+    var lbl = s.charAt(0).toUpperCase() + s.slice(1);
+    var active = borderStyle === s;
+    h += '<button class="ws-btn'+(active?' on':'')+'" onclick="setFloatingWebcamProp(\'webcamBorderStyle\',\''+s+'\')">'+lbl+'</button>';
+  });
+  h += '</div></div>';
+
+  // Color 1
+  h += '<div class="ws-section"><div class="ws-label">'+(borderStyle==='solid'?'Color':'Color 1')+'</div><div class="ws-colors">';
+  palette.forEach(function(c){
+    var active = bc1.toLowerCase() === c.toLowerCase();
+    h += '<div class="ws-color'+(active?' on':'')+'" style="background:'+c+'" onclick="setFloatingWebcamProp(\'webcamBorderColor\',\''+c+'\')"></div>';
+  });
+  h += '</div></div>';
+
+  // Color 2 (only when gradient/animated)
+  if(borderStyle !== 'solid'){
+    h += '<div class="ws-section"><div class="ws-label">Color 2</div><div class="ws-colors">';
+    palette.forEach(function(c){
+      var active = bc2.toLowerCase() === c.toLowerCase();
+      h += '<div class="ws-color'+(active?' on':'')+'" style="background:'+c+'" onclick="setFloatingWebcamProp(\'webcamBorderColor2\',\''+c+'\')"></div>';
+    });
+    h += '</div></div>';
+  }
+
+  // Border width
+  h += '<div class="ws-section"><div class="ws-label">Border Width: <b id="wsBwLabel">'+bw+'</b>px</div>';
+  h += '<input type="range" min="0" max="20" value="'+bw+'" oninput="setFloatingWebcamProp(\'webcamBorderWidth\',+this.value); document.getElementById(\'wsBwLabel\').textContent = this.value">';
+  h += '</div>';
+
+  return h;
+}
+
+// Update an S.webcam* property and re-apply styling without re-rendering the popover.
+// (We re-render the popover ONLY when borderStyle changes since it shows/hides Color 2.)
+window.setFloatingWebcamProp = function(prop, value){
+  S[prop] = value;
+  _applyFloatingWebcamStyling();
+  // If the user changed border style, re-render the popover so Color 2 shows/hides.
+  if(prop === 'webcamBorderStyle'){
+    var pop = document.getElementById('webcamSettingsPop');
+    if(pop) pop.innerHTML = _renderWebcamSettingsHTML();
+  }
+  // Update active highlight on color/shape/style buttons by re-rendering the popover.
+  // For other props (color, width), we do it in-place above; but for shape and
+  // border style toggle highlights, re-rendering is simpler.
+  if(prop === 'webcamShape' || prop === 'webcamBorderStyle' || prop === 'webcamBorderColor' || prop === 'webcamBorderColor2'){
+    var pop2 = document.getElementById('webcamSettingsPop');
+    if(pop2) pop2.innerHTML = _renderWebcamSettingsHTML();
   }
 };
 
@@ -2906,6 +3730,12 @@ var _screenShareStreams = {};
 // Runtime-only: map of webcam-element-id → MediaStream.
 // Like screen shares, these are not persisted — browsers don't serialize MediaStreams.
 var _webcamElStreams = {};
+// Pool of persistent <video> elements for slide-element webcams, keyed by
+// element id. The video is created once on first connect and reused across
+// all subsequent renders. Without this, every render would destroy and
+// recreate the video, causing flicker every time a webcam property is
+// changed in the editor.
+var _webcamVideoPool = {};
 
 // Most recent rendered slide bitmap for the recording loop.
 // Used regardless of cache policy so the compose frame always has SOMETHING to draw.
@@ -2922,12 +3752,43 @@ function slideHasLiveScreenShare(slide){
   return false;
 }
 
-async function getSlideBitmap(slide){
-  // If slide has a live screen share, never use cache — stream content changes every frame
-  var liveSS = slideHasLiveScreenShare(slide);
+// Animated stickers need to be re-rendered every frame — caching freezes
+// them on whatever frame was first captured. Worse: the first capture
+// usually happens before the sticker's async image cache loaded, producing
+// a blank rectangle that stays blank forever (the symptom users see in
+// recordings). Treat sticker-bearing slides the same as live-screen-share
+// slides: always re-render, never cache.
+function slideHasAnimatedSticker(slide){
+  if(!slide || !slide.els) return false;
+  for(var i=0; i<slide.els.length; i++){
+    if(slide.els[i].type === 'sticker') return true;
+  }
+  return false;
+}
 
-  // Cache is valid only if: no live screen share AND all identity checks match
-  if(!liveSS &&
+// Connected slide-element webcams need cache-skip too: their video frame
+// changes every tick, AND their borders may animate (gradient/animated styles).
+// Without skipping, the recording would freeze the webcam on whatever frame
+// was first cached, and animated borders would not animate.
+function slideHasConnectedWebcam(slide){
+  if(!slide || !slide.els) return false;
+  for(var i=0; i<slide.els.length; i++){
+    var el = slide.els[i];
+    if(el.type === 'webcam' && _webcamElStreams[el.id]) return true;
+  }
+  return false;
+}
+
+async function getSlideBitmap(slide){
+  // If slide has live content (screen share, animated sticker, connected webcam),
+  // never use cache — all have frame-by-frame state that the cache would freeze.
+  var liveSS = slideHasLiveScreenShare(slide);
+  var hasSticker = slideHasAnimatedSticker(slide);
+  var liveWC = slideHasConnectedWebcam(slide);
+  var skipCache = liveSS || hasSticker || liveWC;
+
+  // Cache is valid only if: not skipping AND all identity checks match
+  if(!skipCache &&
      _recSlideCache.canvas &&
      _recSlideCache.slideId === slide.id &&
      _recSlideCache.revealStep === S.revealStep &&
@@ -2944,8 +3805,9 @@ async function getSlideBitmap(slide){
   var drawsCopy = (slide.draws || []).slice(); // snapshot to avoid mid-render mutation
   var slideClone = { id: slide.id, bg: slide.bg, els: visibleEls, draws: drawsCopy };
   var cv = await renderSlideToCanvas(slideClone, 1.333); // 1440*1.333 ≈ 1920
-  // Only update cache when NOT live — storing a live-stream snapshot would be stale immediately
-  if(!liveSS){
+  // Only update cache when not skipping — storing a live-stream / animated
+  // snapshot would be stale immediately
+  if(!skipCache){
     _recSlideCache = {
       slideId: slide.id,
       revealStep: S.revealStep,
@@ -2961,7 +3823,12 @@ async function getSlideBitmap(slide){
 function invalidateRecCache(){
   _recCacheGeneration++;
   _recSlideCache = { slideId:null, revealStep:-1, drawsRef:null, drawsLen:-1, canvas:null, generation:-1 };
-  _lastRecBitmap = null;
+  // Don't null _lastRecBitmap — the old bitmap is better than no bitmap. Next
+  // recComposeFrame kicks an async re-render that updates _lastRecBitmap when
+  // ready. Without keeping the old one, the recording would draw a solid
+  // color fill for ~1 frame at the moment of every cache invalidation
+  // (after each pen/highlighter stroke), producing a visible flicker exactly
+  // where strokes were drawn.
   console.log('[EP] Rec cache invalidated. New gen=' + _recCacheGeneration);
 }
 
@@ -3007,27 +3874,89 @@ function recComposeFrame(){
       size = Math.min(size, Math.floor(H * 0.35));
       var margin = Math.floor(size * 0.12);
       var px, py;
-      if(S.webcamCorner === 'tl'){ px = margin; py = margin; }
+      if(S.webcamPosX !== null && S.webcamPosY !== null){
+        px = Math.round(S.webcamPosX * W);
+        py = Math.round(S.webcamPosY * H);
+        px = Math.max(0, Math.min(W - size, px));
+        py = Math.max(0, Math.min(H - size, py));
+      } else if(S.webcamCorner === 'tl'){ px = margin; py = margin; }
       else if(S.webcamCorner === 'tr'){ px = W - size - margin; py = margin; }
       else if(S.webcamCorner === 'bl'){ px = margin; py = H - size - margin; }
       else { px = W - size - margin; py = H - size - margin; } // br
+
+      // Read styling from S
+      var oShape = S.webcamShape || 'circle';
+      var oBStyle = S.webcamBorderStyle || 'solid';
+      var oBW = (typeof S.webcamBorderWidth === 'number') ? S.webcamBorderWidth : 4;
+      // Scale border width proportionally to canvas size
+      oBW = Math.round(oBW * (W / window.innerWidth) * 1.2);
+      var oBC1 = S.webcamBorderColor || '#7ed957';
+      var oBC2 = S.webcamBorderColor2 || '#9b59ff';
+      var oRR = (S.webcamRoundedRadius || 14) * (W / window.innerWidth) * 1.2;
+
+      // Helper to walk the shape's path on ctx
+      function walkOverlayPath(c, x, y, w, h){
+        c.beginPath();
+        if(oShape === 'circle'){
+          var r = Math.min(w, h) / 2;
+          c.arc(x + w/2, y + h/2, r, 0, Math.PI*2);
+        } else if(oShape === 'rounded'){
+          var rr = Math.min(oRR, w/2, h/2);
+          c.moveTo(x + rr, y);
+          c.lineTo(x + w - rr, y);
+          c.quadraticCurveTo(x + w, y, x + w, y + rr);
+          c.lineTo(x + w, y + h - rr);
+          c.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+          c.lineTo(x + rr, y + h);
+          c.quadraticCurveTo(x, y + h, x, y + h - rr);
+          c.lineTo(x, y + rr);
+          c.quadraticCurveTo(x, y, x + rr, y);
+          c.closePath();
+        } else {
+          c.rect(x, y, w, h);
+        }
+      }
+
+      // Clip to shape and draw video frame
       ctx.save();
-      ctx.beginPath();
-      ctx.arc(px + size/2, py + size/2, size/2, 0, Math.PI*2);
+      walkOverlayPath(ctx, px, py, size, size);
       ctx.clip();
-      // Mirror the video to match display
       ctx.translate(px + size, py);
       ctx.scale(-1, 1);
       try { ctx.drawImage(v, 0, 0, size, size); } catch(e){}
       ctx.restore();
-      // Green ring
-      ctx.save();
-      ctx.strokeStyle = 'rgba(126,217,87,0.9)';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(px + size/2, py + size/2, size/2 - 2, 0, Math.PI*2);
-      ctx.stroke();
-      ctx.restore();
+
+      // Border
+      if(oBW > 0){
+        if(oBStyle === 'solid'){
+          ctx.strokeStyle = oBC1;
+        } else {
+          var ocx = px + size/2, ocy = py + size/2;
+          var oRad = size;
+          var oAngle;
+          if(oBStyle === 'animated'){
+            var oPhase = (performance.now() / 3000) % 1;
+            oAngle = oPhase * Math.PI * 2;
+          } else {
+            oAngle = Math.PI * 0.75; // 135deg
+          }
+          var oGrad = ctx.createLinearGradient(
+            ocx - Math.cos(oAngle) * oRad,
+            ocy - Math.sin(oAngle) * oRad,
+            ocx + Math.cos(oAngle) * oRad,
+            ocy + Math.sin(oAngle) * oRad
+          );
+          oGrad.addColorStop(0,   oBC1);
+          oGrad.addColorStop(0.5, oBC2);
+          oGrad.addColorStop(1,   oBC1);
+          ctx.strokeStyle = oGrad;
+        }
+        ctx.lineWidth = oBW;
+        // Inset stroke by half its width so it sits inside the shape
+        var inset = oBW / 2;
+        walkOverlayPath(ctx, px + inset, py + inset, size - oBW, size - oBW);
+        ctx.stroke();
+      }
     }
   }
   // Note: no RAF reschedule — setInterval handles the next tick.
@@ -3092,8 +4021,8 @@ function showRecordingExportDialog(blob, durStr){
   overlay.className = 'ep-export-overlay';
 
   var formats = [
-    { v:'webm', l:'WebM',  d:'Native, no conversion. Instant.', recommended:false, icon:'⚡', always:true },
-    { v:'mp4',  l:'MP4',   d:'H.264 + AAC. Best for After Effects, Camtasia, YouTube.', recommended:true,  icon:'🎬' },
+    { v:'webm', l:'WebM',  d:'Saves instantly. No quality loss. Plays in VLC, Chrome, modern players.', recommended:true, icon:'⚡', always:true },
+    { v:'mp4',  l:'MP4',   d:'For After Effects, Camtasia, YouTube, older players. Slower (transcoding required).', recommended:false, icon:'🎬' },
     { v:'mov',  l:'MOV',   d:'QuickTime container, H.264 + AAC.', recommended:false, icon:'🎞️' },
     { v:'gif',  l:'GIF',   d:'Short clips only. Quality affects size dramatically.', recommended:false, icon:'🌀' },
     { v:'mp3',  l:'MP3',   d:'Audio only (strips video).', recommended:false, icon:'🎵' }
@@ -3817,10 +4746,14 @@ function startLasso(evt){
       startLassoDrag(pt);
       return;
     }
-    // Click outside bbox — clear selections and start a fresh lasso
-    S.lassoIds = [];
-    S.selIds = [];
-    S.sel = null;
+    // Click outside bbox: DON'T wipe the selection yet. We defer until the
+    // user actually drags (in moveLasso). A click-without-drag should preserve
+    // the selection so accidental clicks (e.g. on toolbar elements that didn't
+    // stop propagation, or just imprecise clicks near the selection) don't
+    // destroy the user's work.
+    lassoPendingClear = true;
+  } else {
+    lassoPendingClear = false;
   }
   lassoActive = true;
   lassoPath = [pt];
@@ -3831,6 +4764,15 @@ function moveLasso(evt){
   var pt = getStagePoint(evt);
   lassoPath.push(pt);
   if(lassoPath.length < 2) return;
+  // First real drag movement — now we know the user actually intends to draw
+  // a new lasso loop. Apply the deferred selection wipe from startLasso.
+  if(lassoPendingClear){
+    S.lassoIds = [];
+    S.selIds = [];
+    S.sel = null;
+    lassoPendingClear = false;
+    render(); // refresh the sub-toolbar to drop reveal/group sections
+  }
   // Draw the dashed loop preview live on the canvas
   drawCtx.save();
   drawCtx.strokeStyle = '#ffa500';
@@ -3848,7 +4790,17 @@ function moveLasso(evt){
 function endLasso(){
   if(!lassoActive) return;
   lassoActive = false;
-  if(lassoPath.length < 3){ lassoPath = []; redrawStrokes(); return; }
+  if(lassoPath.length < 3){
+    // Click-without-drag (or trivial drag): no actual lasso loop to evaluate.
+    // The pending wipe never triggered, so the user's prior selection is intact.
+    lassoPendingClear = false;
+    lassoPath = [];
+    redrawStrokes();
+    return;
+  }
+  // Drag completed; pendingClear was already applied during moveLasso, so
+  // just defensively clear it here in case a code path got out of sync.
+  lassoPendingClear = false;
   var slide = cs();
   if(!slide){ lassoPath = []; redrawStrokes(); return; }
 
@@ -4033,7 +4985,6 @@ window.lassoRevealNext = function(){
   var nextStep = maxStep + 1;
   setSelectionReveal(nextStep);
   showToast('Reveal step \u2192 ' + nextStep + ' (will appear on click ' + nextStep + ')');
-  refreshLassoSubbar();
 };
 
 // Update the lasso sub-toolbar in-place when selection changes (avoids full
@@ -4155,6 +5106,16 @@ function recognizeShape(stroke){
 // CANVAS MOUSE HANDLERS
 // =========================================================
 window.onCanvasDown = function(evt){
+  // Defensive: if the click originated from the drawing sub-toolbar (or any of
+  // its children — buttons, inputs, color swatches), don't treat it as a
+  // canvas click. The subbar already calls event.stopPropagation() in its own
+  // onmousedown, but this guard catches edge cases where bubbling reaches us
+  // anyway (e.g. focus transitions on input elements). Without this guard,
+  // clicking the lasso reveal-step input could start a new lasso loop and
+  // wipe the user's current selection.
+  if(evt.target && typeof evt.target.closest === 'function' && evt.target.closest('.draw-subbar')){
+    return;
+  }
   if(isDrawingTool(S.tool)){
     startDraw(evt);
     return;
@@ -4897,10 +5858,8 @@ window.connectWebcamEl = async function(id, evt){
       });
     }
     if(S.pres) renderPres(); else render();
-    setTimeout(function(){
-      var v = document.getElementById('wc-video-' + id);
-      if(v){ v.srcObject = stream; v.play().catch(function(){}); }
-    }, 50);
+    // reattachWebcamStreams (called from render) creates the video element
+    // and attaches the stream — no setTimeout hack needed anymore.
     showToast('Camera connected');
   } catch(e){
     console.error('Camera failed:', e);
@@ -4917,6 +5876,13 @@ window.disconnectWebcamEl = function(id, evt, silent){
     try { stream.getTracks().forEach(function(t){ t.stop(); }); } catch(e){}
   }
   delete _webcamElStreams[id];
+  // Clean up the persistent video element too
+  var pooledVideo = _webcamVideoPool[id];
+  if(pooledVideo){
+    try { pooledVideo.srcObject = null; } catch(e){}
+    if(pooledVideo.parentNode) pooledVideo.parentNode.removeChild(pooledVideo);
+    delete _webcamVideoPool[id];
+  }
   if(S.pres) renderPres(); else render();
   if(!silent) showToast('Camera disconnected');
 };
@@ -4949,16 +5915,118 @@ window.switchWebcamDevice = async function(id, deviceId){
 
 // Re-attach active webcam streams to their video elements after re-render
 function reattachWebcamStreams(){
-  var ids = Object.keys(_webcamElStreams);
-  for(var i=0; i<ids.length; i++){
-    var id = ids[i];
-    var v = document.getElementById('wc-video-' + id);
-    if(v && _webcamElStreams[id] && v.srcObject !== _webcamElStreams[id]){
-      v.srcObject = _webcamElStreams[id];
-      v.play().catch(function(){});
+  // Position-sync approach: each pooled video lives in document.body permanently
+  // (never detached, never re-appended). After every render, we walk the DOM
+  // placeholders in the slide and update each video's position:fixed coordinates
+  // to match where its placeholder sits on screen. This way the video element
+  // is never moved/removed by innerHTML wipes, which previously caused
+  // detach-reattach flicker every render.
+  //
+  // The host placeholder div (rendered inside the slide HTML) acts purely as a
+  // layout anchor: we read its getBoundingClientRect to know where to position
+  // the video. If a host is missing (different slide showing, element deleted),
+  // we hide the video but keep it pooled.
+  //
+  // Properties applied per-render:
+  //   - left/top/width/height from host's screen rect
+  //   - mirror via transform on video itself
+  //   - clip-path/border-radius from el.shape
+  //   - border via box-shadow (since the video is now floating, not inside a
+  //     bordered wrapper)
+
+  var ids = Object.keys(_webcamVideoPool);
+  // Track which ids have a visible host this render
+  var visibleIds = {};
+
+  var hosts = document.querySelectorAll('[data-wc-host]');
+  for(var i=0; i<hosts.length; i++){
+    var host = hosts[i];
+    var id = host.getAttribute('data-wc-host');
+    var mirror = host.getAttribute('data-wc-mirror') === '1';
+    var stream = _webcamElStreams[id];
+    var video = _webcamVideoPool[id];
+
+    if(!stream){
+      // No stream — clean up any existing pooled video
+      if(video){
+        try { video.srcObject = null; } catch(e){}
+        if(video.parentNode) video.parentNode.removeChild(video);
+        delete _webcamVideoPool[id];
+      }
+      continue;
+    }
+
+    // Create the video on first use, append to BODY (not the host) so it's
+    // never detached by slide re-renders.
+    if(!video){
+      video = document.createElement('video');
+      video.id = 'wc-video-' + id;
+      video.autoplay = true;
+      video.muted = true;
+      video.playsInline = true;
+      video.style.position = 'fixed';
+      video.style.zIndex = '1100';   // above pres-root (1000) and slide content; below floating overlay (1500) and popovers (~2000)
+      video.style.objectFit = 'cover';
+      video.style.background = '#000';
+      video.style.display = 'block';
+      video.style.pointerEvents = 'none'; // host wrapper handles interactions
+      document.body.appendChild(video);
+      _webcamVideoPool[id] = video;
+    }
+
+    // Read host's on-screen rect to determine where to position the video
+    var rect = host.getBoundingClientRect();
+    if(rect.width <= 0 || rect.height <= 0){
+      // Host has zero size (probably hidden parent) — hide the video
+      video.style.display = 'none';
+      continue;
+    }
+    visibleIds[id] = true;
+    video.style.display = 'block';
+    video.style.left   = rect.left   + 'px';
+    video.style.top    = rect.top    + 'px';
+    video.style.width  = rect.width  + 'px';
+    video.style.height = rect.height + 'px';
+
+    // Mirror transform on video itself (no transform on host, so no double-scale).
+    video.style.transform = mirror ? 'scaleX(-1)' : 'none';
+
+    // Clip path / border radius from data-* attributes (set in renderWebcam)
+    var shape = host.getAttribute('data-wc-shape') || 'circle';
+    var br = parseInt(host.getAttribute('data-wc-br') || '14', 10);
+    if(shape === 'circle'){
+      video.style.borderRadius = '50%';
+    } else if(shape === 'rect'){
+      video.style.borderRadius = '0';
+    } else {
+      video.style.borderRadius = br + 'px';
+    }
+
+    // Attach stream and ensure it's playing
+    if(video.srcObject !== stream){
+      video.srcObject = stream;
+      video.play().catch(function(){});
+    } else if(video.paused){
+      video.play().catch(function(){});
+    }
+  }
+
+  // Hide pooled videos whose hosts aren't in the current DOM (different slide)
+  for(var k=0; k<ids.length; k++){
+    var pid = ids[k];
+    if(!visibleIds[pid] && _webcamVideoPool[pid]){
+      _webcamVideoPool[pid].style.display = 'none';
     }
   }
 }
+
+// Re-sync video positions when window resizes (the slide layout changes,
+// so hosts move; the videos must follow).
+window.addEventListener('resize', function(){
+  // Only sync if any pooled videos exist (cheap early exit)
+  if(Object.keys(_webcamVideoPool).length === 0) return;
+  reattachWebcamStreams();
+});
 
 // Populate the camera-device dropdown for a specific webcam element's props panel.
 // Called after render; reads enumerated devices and populates the container.
@@ -5720,6 +6788,384 @@ window.addNote = function(){
 };
 
 window.setNoteColor = function(id, c){ window.updateEl(id, {bg:c}); };
+window.setNoteStyle = function(id, style){ window.updateEl(id, {style:style}); };
+
+// =========================================================
+// NOTE EDIT HANDLERS (Phase B+C — contenteditable replaces textarea)
+// =========================================================
+// The note's edit-mode element is a contenteditable div. These handlers
+// manage saving, keyboard shortcuts, and selection-aware formatting.
+//
+// finishEditNote runs on blur. Sanitizes the current innerHTML and persists
+// it to el.text so the note is always stored with safe HTML.
+window.finishEditNote = function(elemNode){
+  if(!elemNode) return;
+  var id = elemNode.getAttribute('data-note-id');
+  if(!id) return;
+  var html = elemNode.innerHTML;
+  // Empty contenteditable can be just '<br>' or whitespace — normalize to ''
+  if(html === '<br>' || html === '<br/>' || html === '<br />' || html.trim() === '') html = '';
+  var safe = sanitizeNoteHTML(html);
+  // updateEl pushes history + re-renders. S.ed cleared after to match the
+  // pattern used by the original finishEdit (textarea-based) which worked
+  // correctly for double-click cycles. Reordering this broke dblclick somehow.
+  window.updateEl(id, {text: safe});
+  S.ed = null;
+};
+
+// Live input handler — placeholder for future live operations. We avoid
+// re-rendering on every keystroke because that would steal focus and reset
+// caret position. Instead, save happens on blur via finishEditNote.
+window.onNoteEditInput = function(elemNode){
+  // No-op for now. The contenteditable is the source of truth during editing.
+};
+
+// Keyboard shortcuts inside the note editor. Ctrl+B/I/U toggle formatting
+// on the current selection. Tab/Escape provide normal editor exit.
+window.onNoteEditKeydown = function(evt, elemNode){
+  if(!evt) return;
+  var key = evt.key;
+  // Escape exits edit mode (commits via blur)
+  if(key === 'Escape'){
+    evt.preventDefault();
+    if(elemNode && typeof elemNode.blur === 'function') elemNode.blur();
+    return;
+  }
+  // Ctrl/Cmd modifier shortcuts
+  var ctrl = evt.ctrlKey || evt.metaKey;
+  if(!ctrl) return;
+  if(key === 'b' || key === 'B'){ evt.preventDefault(); applyNoteFormat('bold'); return; }
+  if(key === 'i' || key === 'I'){ evt.preventDefault(); applyNoteFormat('italic'); return; }
+  if(key === 'u' || key === 'U'){ evt.preventDefault(); applyNoteFormat('underline'); return; }
+};
+
+// =========================================================
+// NOTE SELECTION-AWARE FORMATTING (Phase B+C — Selection/Range API)
+// =========================================================
+// applyNoteFormat is the single entry point for all formatting commands
+// triggered from the toolbar buttons or keyboard shortcuts. It operates
+// on the current selection inside the contenteditable note.
+//
+// Supported commands:
+//   bold      — wrap/unwrap selection in <b>
+//   italic    — wrap/unwrap selection in <i>
+//   underline — wrap/unwrap selection in <u>
+//   fontFamily(family)  — wrap selection in span with font-family
+//   fontSize(px)        — wrap selection in span with font-size
+//   fontColor(hex)      — wrap selection in span with color
+//
+// We use the Selection/Range API directly (not document.execCommand which
+// is deprecated). The implementation walks the selected DOM range and
+// applies formatting via surroundContents or by injecting span wrappers.
+
+// Lookup the active note edit element (the contenteditable). Returns null
+// if the user isn't currently editing a note.
+function _getActiveNoteEditor(){
+  var el = document.getElementById('editInput');
+  if(!el) return null;
+  if(!el.hasAttribute('contenteditable')) return null;
+  return el;
+}
+
+// Get the current selection range, but ONLY if it's inside the active note
+// editor. Returns null if the selection is empty, collapsed, or elsewhere.
+function _getNoteSelection(editor){
+  if(!editor) return null;
+  var sel = window.getSelection();
+  if(!sel || sel.rangeCount === 0) return null;
+  var range = sel.getRangeAt(0);
+  // Range must be entirely inside the editor
+  if(!editor.contains(range.commonAncestorContainer)) return null;
+  return {sel: sel, range: range};
+}
+
+// Toggle commands (bold/italic/underline) — wrap selection in tag if not
+// already inside one, otherwise unwrap.
+window.applyNoteFormat = function(cmd, value){
+  var editor = _getActiveNoteEditor();
+  if(!editor) return;
+  // Refocus in case the click on a toolbar button moved focus away
+  if(document.activeElement !== editor) editor.focus();
+  var info = _getNoteSelection(editor);
+  if(!info || info.range.collapsed){
+    // No selection — formatting toggle does nothing meaningful when nothing
+    // is selected. Future: could toggle pending-format state for next typed char.
+    return;
+  }
+  if(cmd === 'bold')      _toggleNoteWrap(info.range, 'B');
+  else if(cmd === 'italic')    _toggleNoteWrap(info.range, 'I');
+  else if(cmd === 'underline') _toggleNoteWrap(info.range, 'U');
+  else if(cmd === 'fontFamily') _wrapNoteWithStyle(info.range, 'font-family', value);
+  else if(cmd === 'fontSize')   _wrapNoteWithStyle(info.range, 'font-size', value + 'px');
+  else if(cmd === 'fontColor')  _wrapNoteWithStyle(info.range, 'color', value);
+};
+
+// After a render that destroys the contenteditable, we may want to re-focus
+// the new contenteditable so the user can keep typing. This finds the new
+// editor element and focuses it. Caret goes to end of content.
+function _refocusNoteEditorAfterRender(){
+  // The render is sync inside updateEl; on the next microtask the new
+  // editor element exists.
+  setTimeout(function(){
+    var ed = document.getElementById('editInput');
+    if(!ed || !ed.hasAttribute('contenteditable')) return;
+    ed.focus();
+    // Move caret to end of content
+    var sel = window.getSelection();
+    if(!sel) return;
+    var range = document.createRange();
+    range.selectNodeContents(ed);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }, 0);
+}
+
+// Commit the contenteditable's current innerHTML to el.text, triggering
+// a render. Used by selection-aware font/size/color paths so the picker
+// UI closes (via render) without losing edit mode (we re-focus after).
+function _commitNoteEdit(id){
+  // Polish: avoid full render after picker-based formatting. The contenteditable
+  // already has the formatting applied (via direct DOM manipulation in
+  // _wrapNoteWithStyle); we just need to close the picker UI without losing
+  // edit-state or focus. Closing the picker via render caused a visible flicker
+  // and required _refocusNoteEditorAfterRender to restore focus.
+  //
+  // Now: clear the state flag, manually remove the picker panel from DOM, and
+  // refocus directly. The contenteditable's innerHTML stays intact until
+  // finishEditNote saves it on blur (same data flow as Ctrl+B/I/U).
+  S.fontPickerOpen = null;
+  // Remove any visible picker dropdown panel — it's rendered as a child of
+  // .ep-font-picker. We just remove the panel sibling, leaving the trigger button.
+  var pickers = document.querySelectorAll('.ep-font-picker');
+  for(var pi = 0; pi < pickers.length; pi++){
+    var children = pickers[pi].children;
+    for(var ci = children.length - 1; ci >= 0; ci--){
+      var child = children[ci];
+      // The trigger is a <button>; the panel is a <div>. Remove the panel only.
+      if(child.tagName === 'DIV'){
+        child.parentNode.removeChild(child);
+      }
+    }
+  }
+  // Make sure the contenteditable stays focused so the user can keep typing.
+  var ed = document.getElementById('editInput');
+  if(ed && document.activeElement !== ed){
+    ed.focus();
+  }
+}
+
+// Router for toolbar buttons. If the user is currently editing the note
+// AND has a non-empty selection, apply formatting to the selection. Otherwise
+// update the whole-note default field. This means buttons "do something
+// useful" in both states: while editing they affect the selection (or
+// nothing if no selection), and otherwise they affect the whole note.
+window.noteFormatBtn = function(id, cmd, newWholeValue){
+  var editor = _getActiveNoteEditor();
+  if(editor && editor.getAttribute('data-note-id') === id){
+    var info = _getNoteSelection(editor);
+    if(info && !info.range.collapsed){
+      window.applyNoteFormat(cmd);
+      // For B/I/U: do NOT commit/render — let the user keep typing with
+      // the active selection. Save happens on blur. (The toolbar button
+      // highlight will appear stale during edit but functionality is correct.)
+      return;
+    }
+  }
+  if(cmd === 'bold')      window.updateEl(id, {bold: newWholeValue});
+  else if(cmd === 'italic')    window.updateEl(id, {italic: newWholeValue});
+  else if(cmd === 'underline') window.updateEl(id, {underline: newWholeValue});
+};
+
+// Router for font-family. Same logic as noteFormatBtn but for font picker.
+// Picker UI needs render to close, so we commit after applying to selection.
+window.noteFontBtn = function(id, fontName){
+  var editor = _getActiveNoteEditor();
+  if(editor && editor.getAttribute('data-note-id') === id){
+    var info = _getNoteSelection(editor);
+    if(info && !info.range.collapsed){
+      var ffCss = ({
+        'Outfit':     "'Outfit', sans-serif",
+        'Sans-serif': "Arial, Helvetica, sans-serif",
+        'Serif':      "Georgia, 'Times New Roman', serif",
+        'Monospace':  "Consolas, Menlo, 'Courier New', monospace",
+        'Cursive':    "'Comic Sans MS', cursive"
+      })[fontName] || "'Outfit', sans-serif";
+      window.applyNoteFormat('fontFamily', ffCss);
+      _commitNoteEdit(id);
+      return;
+    }
+  }
+  window.updateEl(id, {fontFamily: fontName});
+};
+
+// Router for font-size. Same pattern.
+window.noteSizeBtn = function(id, newPx){
+  var editor = _getActiveNoteEditor();
+  if(editor && editor.getAttribute('data-note-id') === id){
+    var info = _getNoteSelection(editor);
+    if(info && !info.range.collapsed){
+      window.applyNoteFormat('fontSize', newPx);
+      _commitNoteEdit(id);
+      return;
+    }
+  }
+  window.updateEl(id, {fontSize: newPx});
+};
+
+// Router for font-color. Same pattern.
+window.noteColorBtn = function(id, hex){
+  var editor = _getActiveNoteEditor();
+  if(editor && editor.getAttribute('data-note-id') === id){
+    var info = _getNoteSelection(editor);
+    if(info && !info.range.collapsed){
+      window.applyNoteFormat('fontColor', hex);
+      _commitNoteEdit(id);
+      return;
+    }
+  }
+  window.updateEl(id, {fontColor: hex});
+};
+
+// Wrap a Range's contents in a tag (B/I/U), or unwrap if already wrapped.
+function _toggleNoteWrap(range, tagName){
+  // Determine if the entire selection is already inside the given tag
+  var ancestor = range.commonAncestorContainer;
+  if(ancestor.nodeType === 3) ancestor = ancestor.parentNode;
+  var existing = _findAncestorTag(ancestor, tagName, _getNoteEditorRoot(ancestor));
+  if(existing){
+    // Already wrapped — unwrap by replacing tag with its children
+    _unwrapElement(existing);
+    return;
+  }
+  // Not wrapped — surround the range with the tag
+  try {
+    var wrapper = document.createElement(tagName);
+    range.surroundContents(wrapper);
+  } catch(e){
+    // surroundContents can throw if the range crosses element boundaries
+    // mid-element (e.g. <b>he|llo</b> wo|rld where | are selection edges).
+    // Fallback: extract contents, wrap them, reinsert.
+    var contents = range.extractContents();
+    var wrapper2 = document.createElement(tagName);
+    wrapper2.appendChild(contents);
+    range.insertNode(wrapper2);
+    // Restore selection around the wrapped contents
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    var newRange = document.createRange();
+    newRange.selectNodeContents(wrapper2);
+    sel.addRange(newRange);
+  }
+}
+
+// Find the editor root (the contenteditable note element) by walking up.
+function _getNoteEditorRoot(node){
+  while(node && node.nodeType === 1){
+    if(node.id === 'editInput' && node.hasAttribute('contenteditable')) return node;
+    node = node.parentNode;
+  }
+  return null;
+}
+
+// Find an ancestor with the given tag name, but stop at the editor root.
+function _findAncestorTag(node, tagName, root){
+  while(node && node !== root){
+    if(node.nodeType === 1 && node.tagName === tagName) return node;
+    node = node.parentNode;
+  }
+  return null;
+}
+
+// Replace an element with its children (preserves the formatted contents
+// but removes the wrapping tag).
+function _unwrapElement(elem){
+  var parent = elem.parentNode;
+  if(!parent) return;
+  while(elem.firstChild) parent.insertBefore(elem.firstChild, elem);
+  parent.removeChild(elem);
+  parent.normalize();
+}
+
+// Wrap a Range in a <span> with a single inline style (font-family/size/color).
+// If an enclosing <span> with the same property already exists, just update it.
+function _wrapNoteWithStyle(range, prop, value){
+  if(!value) return;
+  // Try to find an existing span with this property covering the selection
+  var ancestor = range.commonAncestorContainer;
+  if(ancestor.nodeType === 3) ancestor = ancestor.parentNode;
+  var root = _getNoteEditorRoot(ancestor);
+  // For style commands we always create a new span (don't try to reuse) —
+  // simpler and avoids subtle bugs with partial overlaps.
+  try {
+    var span = document.createElement('span');
+    span.style.setProperty(prop, value);
+    range.surroundContents(span);
+    // Restore selection inside the new span
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    var nr = document.createRange();
+    nr.selectNodeContents(span);
+    sel.addRange(nr);
+  } catch(e){
+    // Same fallback as toggle for cross-boundary selections
+    var contents = range.extractContents();
+    var span2 = document.createElement('span');
+    span2.style.setProperty(prop, value);
+    span2.appendChild(contents);
+    range.insertNode(span2);
+    var sel2 = window.getSelection();
+    sel2.removeAllRanges();
+    var nr2 = document.createRange();
+    nr2.selectNodeContents(span2);
+    sel2.addRange(nr2);
+  }
+}
+
+// Custom font picker (Phase A) — replaces the native <select> with a styled
+// dropdown that matches the dark theme.
+//
+// State lives on S.fontPickerOpen — set to the note id when the picker is
+// open, null when closed. Only one picker can be open at a time.
+window.toggleFontPicker = function(id, evt){
+  if(evt){ try { evt.stopPropagation(); } catch(e){} }
+  if(S.fontPickerOpen === id){
+    S.fontPickerOpen = null;
+    render();
+    return;
+  }
+  S.fontPickerOpen = id;
+  render();
+  // Install a one-shot click-outside listener that closes the picker when
+  // the user clicks anywhere that isn't inside the picker. Use setTimeout(0)
+  // so the current mousedown that opened the picker doesn't immediately
+  // re-fire this and close it.
+  setTimeout(function(){
+    function onAnyClick(e){
+      // If the picker has already been closed by another path (pickFont,
+      // re-render that wiped the picker DOM, etc.), self-remove and bail.
+      if(S.fontPickerOpen === null){
+        document.removeEventListener('mousedown', onAnyClick, true);
+        return;
+      }
+      var t = e.target;
+      // If the click is inside any element marked as the active picker, ignore.
+      if(t && typeof t.closest === 'function' && t.closest('.ep-font-picker')){
+        return;
+      }
+      // Otherwise close.
+      S.fontPickerOpen = null;
+      document.removeEventListener('mousedown', onAnyClick, true);
+      render();
+    }
+    document.addEventListener('mousedown', onAnyClick, true);
+  }, 0);
+};
+window.pickFont = function(id, fontName, evt){
+  if(evt){ try { evt.stopPropagation(); } catch(e){} }
+  S.fontPickerOpen = null;
+  window.noteFontBtn(id, fontName);
+};
 
 // Phase 4f: animated sticker. Drops a sticker onto the current slide.
 window.addSticker = function(kind){
@@ -7270,13 +8716,86 @@ async function renderSlideToCanvas(s, scale){
       }
     }
     if(el.type === 'note'){
-      x.fillStyle = el.bg;
-      x.fillRect(el.x, el.y, el.w, el.h);
-      x.fillStyle = '#1a1a1a';
-      x.font = '500 14px Outfit';
-      x.textAlign = 'left';
-      var noteLines = (el.text || '').split('\n');
-      for(var nli=0; nli<noteLines.length; nli++) x.fillText(noteLines[nli], el.x + 12, el.y + 24 + nli*20, el.w - 20);
+      var noteStyleC = el.style || 'lifted';
+      x.save();
+
+      // Compute the same stable rotation as the editor (lifted only)
+      var rotC = 0;
+      if(noteStyleC === 'lifted'){
+        var hashC = 0;
+        for(var hciC=0; hciC<el.id.length; hciC++) hashC = (hashC * 31 + el.id.charCodeAt(hciC)) | 0;
+        rotC = ((hashC % 31) - 15) / 10; // -1.5..+1.5 deg
+      }
+
+      // Apply rotation around the note's center
+      var ncx = el.x + el.w/2, ncy = el.y + el.h/2;
+      x.translate(ncx, ncy);
+      x.rotate(rotC * Math.PI / 180);
+      x.translate(-ncx, -ncy);
+
+      // Drop shadow
+      if(noteStyleC === 'flat'){
+        x.shadowColor = 'rgba(0,0,0,0.15)';
+        x.shadowBlur = 8;
+        x.shadowOffsetX = 0;
+        x.shadowOffsetY = 2;
+      } else {
+        x.shadowColor = 'rgba(0,0,0,0.25)';
+        x.shadowBlur = 14;
+        x.shadowOffsetX = 0;
+        x.shadowOffsetY = 6;
+      }
+
+      // Background fill (with optional gradient for lifted)
+      if(noteStyleC === 'lifted'){
+        var grad = x.createLinearGradient(el.x, el.y, el.x + el.w, el.y + el.h);
+        grad.addColorStop(0, lightenHex(el.bg, 6));
+        grad.addColorStop(0.38, el.bg);
+        grad.addColorStop(1, darkenHex(el.bg, 4));
+        x.fillStyle = grad;
+      } else {
+        x.fillStyle = el.bg;
+      }
+      // Use roundRect when available, fall back to rect for older Chromiums
+      if(typeof x.roundRect === 'function'){
+        x.beginPath();
+        x.roundRect(el.x, el.y, el.w, el.h, 8);
+        x.fill();
+      } else {
+        x.fillRect(el.x, el.y, el.w, el.h);
+      }
+
+      // Disable shadow for the text + border (we don't want them to also cast shadow)
+      x.shadowColor = 'transparent';
+      x.shadowBlur = 0;
+      x.shadowOffsetX = 0;
+      x.shadowOffsetY = 0;
+
+      // Subtle border
+      x.strokeStyle = noteStyleC === 'flat' ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.12)';
+      x.lineWidth = 1;
+      if(typeof x.roundRect === 'function'){
+        x.beginPath();
+        x.roundRect(el.x + 0.5, el.y + 0.5, el.w - 1, el.h - 1, 8);
+        x.stroke();
+      } else {
+        x.strokeRect(el.x + 0.5, el.y + 0.5, el.w - 1, el.h - 1);
+      }
+
+      // Text — Ship 2: drawNoteRichText handles all style resolution and
+      // rendering internally. It walks the HTML in el.text, splits into
+      // styled runs, word-wraps within the note width, and draws each run
+      // with its own font/color/bold/italic/underline.
+      // Clip text to the note's interior so overflow doesn't bleed outside.
+      // Live note has overflow:auto with scroll — exports just clip.
+      x.save();
+      x.beginPath();
+      x.rect(el.x + 4, el.y + 4, el.w - 8, el.h - 8);
+      x.clip();
+      drawNoteRichText(x, el, el.x + 16, el.y + 14, el.w - 32);
+      x.restore();
+
+      x.restore();
     }
     // Phase 4f: animated sticker. We maintain a per-sticker cached <img>
     // (keyed by sticker id) that gets refreshed asynchronously each frame
@@ -7509,7 +9028,41 @@ async function renderSlideToCanvas(s, scale){
       x.restore();
       // Border (draw outside clip)
       if(el.bw > 0){
-        x.strokeStyle = el.bc || '#7ed957';
+        // Match the DOM render's three border styles: solid, gradient, animated.
+        // - solid: single color (el.bc)
+        // - gradient: static 135° linear gradient bc1 → bc2 → bc1
+        // - animated: gradient with rotating angle (cycles every 3s)
+        var wcBorderStyle = el.borderStyle || 'solid';
+        var wcBC1 = el.bc || '#7ed957';
+        var wcBC2 = el.bc2 || '#9b59ff';
+        if(wcBorderStyle === 'solid'){
+          x.strokeStyle = wcBC1;
+        } else {
+          var wcCx = el.x + el.w/2, wcCy = el.y + el.h/2;
+          var wcRad = Math.max(el.w, el.h);
+          var wcAngle;
+          if(wcBorderStyle === 'animated'){
+            // Rotate gradient direction over time so colors sweep around the border.
+            // 3-second cycle. performance.now() ticks even between frames so this
+            // produces smooth motion when the cache is bypassed (which we ensure
+            // for any slide with a connected webcam — see slideHasConnectedWebcam).
+            var wcPhase = (performance.now() / 3000) % 1;
+            wcAngle = wcPhase * Math.PI * 2;
+          } else {
+            // Static 135° matches the DOM's `linear-gradient(135deg, ...)`
+            wcAngle = Math.PI * 0.75;
+          }
+          var wcGrad = x.createLinearGradient(
+            wcCx - Math.cos(wcAngle) * wcRad,
+            wcCy - Math.sin(wcAngle) * wcRad,
+            wcCx + Math.cos(wcAngle) * wcRad,
+            wcCy + Math.sin(wcAngle) * wcRad
+          );
+          wcGrad.addColorStop(0,   wcBC1);
+          wcGrad.addColorStop(0.5, wcBC2);
+          wcGrad.addColorStop(1,   wcBC1);
+          x.strokeStyle = wcGrad;
+        }
         x.lineWidth = el.bw;
         x.beginPath();
         if(wcShape === 'circle'){
@@ -7775,6 +9328,20 @@ document.addEventListener('keydown', function(evt){
   if(S.ed) return;
   var target = evt.target;
   if(target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
+  // Bail when typing inside a contenteditable element. Sticky notes use a
+  // contenteditable div for rich-text editing; without this check, letters
+  // that are tool hotkeys (T/S/R/K/P/etc.) get intercepted as tool changes
+  // instead of typed into the note. This also covers edge cases where S.ed
+  // was cleared by a blur but the user is still focused inside the editor.
+  if(target && target.isContentEditable) return;
+  // Also catch the case where the focused element is a child of a
+  // contenteditable region (e.g. the user typed inside a <span> within the
+  // note). Walk up until we hit the editor root or run out of ancestors.
+  var probe = target;
+  while(probe && probe.nodeType === 1){
+    if(probe.getAttribute && probe.getAttribute('contenteditable') === 'true') return;
+    probe = probe.parentNode;
+  }
 
   if(S.pres){
     if(evt.key === 'Escape'){ evt.preventDefault(); exitPresent(); return; }
@@ -7954,11 +9521,108 @@ function renderElInner(el, isPres, slideCtx){
     }
   }
   if(el.type === 'note'){
-    h += '<div class="note" style="width:'+el.w+'px;height:'+el.h+'px;background:'+el.bg+'">';
-    if(S.ed === el.id && !isPres){
-      h += '<textarea id="editInput" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" style="height:'+(el.h-24)+'px;cursor:text;user-select:text" onblur="finishEdit(\''+el.id+'\',this.value)">'+esc(el.text)+'</textarea>';
+    // Sticky note: two visual styles available ('flat' and 'lifted').
+    // Default to 'lifted' for a more dimensional, realistic-paper look.
+    // Old notes without a style field also default to 'lifted'.
+    var noteStyle = el.style || 'lifted';
+
+    // Compute a subtle stable rotation seeded from the note id so each note
+    // sits at a slightly different angle (lifted style only) — gives a
+    // hand-placed feel without being chaotic.
+    var noteRotation = 0;
+    if(noteStyle === 'lifted' && !isPres){
+      // Hash the id to a small angle in [-1.5, +1.5] degrees
+      var hash = 0;
+      for(var hci=0; hci<el.id.length; hci++) hash = (hash * 31 + el.id.charCodeAt(hci)) | 0;
+      noteRotation = ((hash % 31) - 15) / 10; // -1.5..+1.5 degrees in 0.1 steps
+    }
+
+    // Style: shadow, border, gradient
+    var noteShadow, noteBorder, noteBgStyle;
+    if(noteStyle === 'flat'){
+      // 2D: clean, soft, modern
+      noteShadow = '0 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)';
+      noteBorder = '1px solid rgba(0,0,0,0.08)';
+      noteBgStyle = 'background:'+el.bg+';';
     } else {
-      h += '<div style="font-size:14px;color:#1a1a1a;font-weight:500;white-space:pre-wrap;overflow:hidden;height:'+(el.h-24)+'px">'+esc(el.text)+'</div>';
+      // 3D "lifted": layered shadow + subtle gradient mimicking paper sheen
+      noteShadow = '0 1px 1px rgba(0,0,0,0.12), 0 6px 14px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.5)';
+      noteBorder = '1px solid rgba(0,0,0,0.12)';
+      noteBgStyle = 'background:linear-gradient(155deg, '+lightenHex(el.bg, 6)+' 0%, '+el.bg+' 38%, '+darkenHex(el.bg, 4)+' 100%);';
+    }
+
+    var transformStyle = noteRotation !== 0 ? 'transform:rotate('+noteRotation+'deg);' : '';
+    var noteWrapStyle = 'width:'+el.w+'px;height:'+el.h+'px;'+noteBgStyle+
+                       'border-radius:8px;'+
+                       'box-shadow:'+noteShadow+';'+
+                       'border:'+noteBorder+';'+
+                       'padding:14px 16px;'+
+                       'box-sizing:border-box;'+
+                       'font-family:Outfit;'+
+                       transformStyle;
+
+    h += '<div class="note note-'+noteStyle+'" style="'+noteWrapStyle+'">';
+
+    // Resolve text-formatting fields with backward-compatible defaults.
+    // Existing notes saved before this feature have no fontSize/etc — they
+    // get the same look as before via these fallbacks.
+    var fSize    = (typeof el.fontSize === 'number' && el.fontSize > 0) ? el.fontSize : 14;
+    var fFamily  = el.fontFamily || 'Outfit';
+    var fColor   = el.fontColor || '#1a1a1a';
+    var fBold    = el.bold ? '700' : '500';
+    var fItalic  = el.italic ? 'italic' : 'normal';
+    var fUnderline = el.underline ? 'underline' : 'none';
+    // CSS font-family value: most are direct names, with safe fallbacks.
+    var fFamilyCss = ({
+      'Outfit':     "'Outfit', sans-serif",
+      'Sans-serif': "Arial, Helvetica, sans-serif",
+      'Serif':      "Georgia, 'Times New Roman', serif",
+      'Monospace':  "Consolas, Menlo, 'Courier New', monospace",
+      'Cursive':    "'Comic Sans MS', cursive"
+    })[fFamily] || "'Outfit', sans-serif";
+
+    // Common text styling shared by edit-mode and display-mode. Includes
+    // overflow-y:auto + scrollbar styling so long notes get a visible
+    // scrollbar instead of clipping the top text. The custom-scrollbar
+    // class is defined in CSS for a thin, on-theme scrollbar.
+    //
+    // box-sizing:border-box + padding:0 + margin:0 normalize the textarea's
+    // dimensions. Without these, the textarea inherits browser-default
+    // padding (~2-4px each side) and content-box sizing, which makes its
+    // actual rendered height larger than the height we set. The result is
+    // a phantom scrollbar appearing even when there's clearly room below
+    // the text. Forcing box-sizing:border-box and padding:0 makes "height"
+    // match exactly what we calculate from the wrapper's content area.
+    var textCommonStyle =
+      'box-sizing:border-box;'+
+      'padding:0;'+
+      'margin:0;'+
+      'font-size:'+fSize+'px;'+
+      'font-family:'+fFamilyCss+';'+
+      'color:'+fColor+';'+
+      'font-weight:'+fBold+';'+
+      'font-style:'+fItalic+';'+
+      'text-decoration:'+fUnderline+';'+
+      'line-height:1.45;'+
+      'white-space:pre-wrap;'+
+      'word-wrap:break-word;'+
+      'overflow-y:auto;'+
+      'overflow-x:hidden;'+
+      'height:'+(el.h-28)+'px;'+
+      'width:100%;';
+
+    if(S.ed === el.id && !isPres){
+      h += '<div id="editInput" class="note-textarea" contenteditable="true" data-note-id="'+el.id+'" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" style="'+textCommonStyle+'cursor:text;user-select:text;background:transparent;border:none;outline:none" onblur="finishEditNote(this)" oninput="onNoteEditInput(this)" onkeydown="onNoteEditKeydown(event,this)">'+sanitizeNoteHTML(el.text)+'</div>';
+    } else {
+      // Display mode. Native ondblclick bypasses the lastClick-timer path in
+      // startElDrag. The native browser event is reliable across tools and
+      // doesn't depend on bookkeeping that might be wiped by intermediate
+      // renders. event.stopPropagation prevents the underlying drag init.
+      var noteCursor = isPres ? 'default' : 'text';
+      var noteDbl = isPres ? '' : ' ondblclick="event.stopPropagation();startEdit(\''+el.id+'\')"';
+      // Slight text shadow on the lifted version adds legibility against the gradient
+      var noteTextShadow = (noteStyle === 'lifted' && !isPres) ? 'text-shadow:0 1px 0 rgba(255,255,255,0.5);' : '';
+      h += '<div class="note-textarea" style="'+textCommonStyle+'cursor:'+noteCursor+';'+noteTextShadow+'"'+noteDbl+'>'+sanitizeNoteHTML(el.text)+'</div>';
     }
     h += '</div>';
   }
@@ -8127,8 +9791,13 @@ function renderWebcam(el, isPres){
       h += '<button class="disconnect" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();disconnectWebcamEl(\''+el.id+'\',event)">Disconnect</button>';
       h += '</div>';
     }
-    var videoStyle = 'width:100%;height:100%;object-fit:cover;display:block;background:#000;' + (mirror ? 'transform:scaleX(-1);' : '');
-    h += '<video id="wc-video-'+el.id+'" autoplay muted playsinline style="'+videoStyle+'"></video>';
+    // Placeholder for the persistent video element. The actual <video> is in
+    // _webcamVideoPool, lives in document.body permanently, and gets
+    // position-synced to this placeholder's screen rect by reattachWebcamStreams.
+    // Host carries shape + br data so the sync function can apply matching
+    // clip-path / border-radius to the floating video.
+    var hostBr = (shape === 'rounded') ? (el.br || 14) : 0;
+    h += '<div class="wc-video-host" data-wc-host="'+el.id+'" data-wc-mirror="'+(mirror?'1':'0')+'" data-wc-shape="'+shape+'" data-wc-br="'+hostBr+'" style="width:100%;height:100%"></div>';
   } else {
     h += '<div class="wc-placeholder">';
     h += I.webcam;
@@ -8829,6 +10498,11 @@ function render(){
   // Lives ABOVE the canvas in z-order, so it doesn't capture canvas events.
   if(isDrawTool){
     h += renderDrawSubToolbar();
+  } else {
+    // Reset the animation suppressor so the subbar pops in next time the
+    // user activates a draw tool. Without this, the animation would only
+    // play once per session — feels stale on tool re-entry.
+    S._subbarShown = false;
   }
   h += '</div>';
   h += '</div>';
@@ -8936,6 +10610,9 @@ function render(){
   // Re-attach active screen-share streams to their video elements (innerHTML wipes srcObject)
   reattachScreenShareStreams();
   reattachWebcamStreams();
+
+  // Webcam overlay lives outside the render tree to avoid flicker on every render.
+  ensureWebcamOverlay();
 
   if(S.ed){
     var ta = document.getElementById('editInput');
@@ -9093,6 +10770,102 @@ function renderPropsPanel(el){
   }
 
   if(el.type === 'note'){
+    var curStyle = el.style || 'lifted';
+    h += '<div class="ps"><div class="ps-t">Style</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px">';
+    h += '<button onclick="setNoteStyle(\''+el.id+'\',\'flat\')" style="padding:8px 6px;border-radius:6px;font-family:Outfit;font-size:11px;font-weight:600;cursor:pointer;'+
+         (curStyle==='flat'
+           ? 'background:rgba(126,217,87,0.18);border:1px solid var(--g);color:var(--g)'
+           : 'background:rgba(255,255,255,0.04);border:1px solid var(--brd);color:var(--w)')+'">Flat (2D)</button>';
+    h += '<button onclick="setNoteStyle(\''+el.id+'\',\'lifted\')" style="padding:8px 6px;border-radius:6px;font-family:Outfit;font-size:11px;font-weight:600;cursor:pointer;'+
+         (curStyle==='lifted'
+           ? 'background:rgba(126,217,87,0.18);border:1px solid var(--g);color:var(--g)'
+           : 'background:rgba(255,255,255,0.04);border:1px solid var(--brd);color:var(--w)')+'">Lifted (3D)</button>';
+    h += '</div>';
+    h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-top:4px">'+
+         (curStyle==='flat' ? 'Clean, modern, soft shadow.' : 'Layered shadow + slight tilt + paper sheen.')+
+         '</div>';
+    h += '</div>';
+
+    // ── Text Format section ─────────────────────────────────────────
+    var curFontSize   = (typeof el.fontSize === 'number' && el.fontSize > 0) ? el.fontSize : 14;
+    var curFontFamily = el.fontFamily || 'Outfit';
+    var curFontColor  = el.fontColor  || '#1a1a1a';
+    var curBold       = !!el.bold;
+    var curItalic     = !!el.italic;
+    var curUnderline  = !!el.underline;
+    var fontFamilies  = ['Outfit','Sans-serif','Serif','Monospace','Cursive'];
+
+    h += '<div class="ps"><div class="ps-t">Text Format</div>';
+
+    // Font family dropdown (custom — matches dark theme)
+    h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Font</div>';
+    var pickerOpen = (S.fontPickerOpen === el.id);
+    // Wrap in a positioned container so the dropdown panel can absolutely-position relative to it.
+    h += '<div class="ep-font-picker" style="position:relative;margin-bottom:10px">';
+    // Trigger button — styled to match other inputs in the panel
+    h += '<button onmousedown="event.stopPropagation();" onclick="event.stopPropagation();toggleFontPicker(\''+el.id+'\',event)" style="width:100%;padding:7px 10px;background:rgba(255,255,255,0.04);border:1px solid '+(pickerOpen?'var(--g)':'var(--brd)')+';color:var(--w);border-radius:6px;font-family:'+(curFontFamily==='Outfit'?"'Outfit', sans-serif":(curFontFamily==='Sans-serif'?"Arial, Helvetica, sans-serif":(curFontFamily==='Serif'?"Georgia, 'Times New Roman', serif":(curFontFamily==='Monospace'?"Consolas, Menlo, 'Courier New', monospace":"'Comic Sans MS', cursive"))))+';font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;text-align:left">';
+    h += '<span>'+esc(curFontFamily)+'</span>';
+    // Caret indicator (rotates when open)
+    h += '<span style="font-size:10px;color:var(--muted);transform:rotate('+(pickerOpen?180:0)+'deg);transition:transform 0.12s">▼</span>';
+    h += '</button>';
+
+    // Dropdown panel (only rendered when this note's picker is open)
+    if(pickerOpen){
+      h += '<div style="position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--d2);border:1px solid var(--brd);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.5);z-index:1000;overflow:hidden">';
+      for(var ffi=0; ffi<fontFamilies.length; ffi++){
+        var ff = fontFamilies[ffi];
+        var ffCss = (ff==='Outfit'?"'Outfit', sans-serif":(ff==='Sans-serif'?"Arial, Helvetica, sans-serif":(ff==='Serif'?"Georgia, 'Times New Roman', serif":(ff==='Monospace'?"Consolas, Menlo, 'Courier New', monospace":"'Comic Sans MS', cursive"))));
+        var isCur = (curFontFamily === ff);
+        h += '<div class="ep-font-option" onmousedown="event.stopPropagation();" onclick="event.stopPropagation();pickFont(\''+el.id+'\',\''+ff+'\',event)" style="padding:9px 12px;cursor:pointer;font-family:'+ffCss+';font-size:13px;color:'+(isCur?'var(--g)':'var(--w)')+';background:'+(isCur?'rgba(126,217,87,0.10)':'transparent')+';display:flex;align-items:center;justify-content:space-between">';
+        h += '<span>'+esc(ff)+'</span>';
+        if(isCur) h += '<span style="font-size:11px;color:var(--g)">✓</span>';
+        h += '</div>';
+      }
+      h += '</div>';
+    }
+    h += '</div>'; // end ep-font-picker
+
+    // Font size + Color row (side by side)
+    h += '<div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:10px;align-items:center">';
+    // Size with - / + steppers
+    h += '<div>';
+    h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Size</div>';
+    h += '<div style="display:flex;align-items:center;gap:4px">';
+    h += '<button onmousedown="event.preventDefault()" onclick="noteSizeBtn(\''+el.id+'\',Math.max(8,'+curFontSize+'-1))" style="width:24px;height:28px;background:rgba(255,255,255,0.04);border:1px solid var(--brd);color:var(--w);border-radius:5px;cursor:pointer;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;padding:0">−</button>';
+    h += '<input type="number" min="8" max="72" value="'+curFontSize+'" onchange="noteSizeBtn(\''+el.id+'\',Math.max(8,Math.min(72,+this.value||14)))" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" style="flex:1;min-width:0;padding:5px 6px;background:rgba(255,255,255,0.04);border:1px solid var(--brd);color:var(--w);border-radius:5px;font-family:Outfit;font-size:12px;text-align:center;font-variant-numeric:tabular-nums">';
+    h += '<button onmousedown="event.preventDefault()" onclick="noteSizeBtn(\''+el.id+'\',Math.min(72,'+curFontSize+'+1))" style="width:24px;height:28px;background:rgba(255,255,255,0.04);border:1px solid var(--brd);color:var(--w);border-radius:5px;cursor:pointer;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;padding:0">+</button>';
+    h += '</div>';
+    h += '</div>';
+    // Color
+    h += '<div>';
+    h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Color</div>';
+    h += '<input type="color" value="'+curFontColor+'" onchange="noteColorBtn(\''+el.id+'\',this.value)" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" style="width:36px;height:28px;background:transparent;border:1px solid var(--brd);border-radius:5px;cursor:pointer;padding:2px">';
+    h += '</div>';
+    h += '</div>';
+
+    // Bold + Italic + Underline toggle row
+    // Buttons route through noteFormatBtn — applies to text selection when
+    // the user is editing this note AND has a non-empty selection;
+    // otherwise updates the whole-note default field.
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">';
+    h += '<button onmousedown="event.preventDefault()" onclick="noteFormatBtn(\''+el.id+'\',\'bold\','+(!curBold)+')" style="padding:7px 6px;border-radius:6px;font-family:Outfit;font-size:13px;font-weight:700;cursor:pointer;'+
+         (curBold
+           ? 'background:rgba(126,217,87,0.18);border:1px solid var(--g);color:var(--g)'
+           : 'background:rgba(255,255,255,0.04);border:1px solid var(--brd);color:var(--w)')+'" title="Bold (Ctrl+B for selection)">B</button>';
+    h += '<button onmousedown="event.preventDefault()" onclick="noteFormatBtn(\''+el.id+'\',\'italic\','+(!curItalic)+')" style="padding:7px 6px;border-radius:6px;font-family:Outfit;font-size:13px;font-style:italic;font-weight:600;cursor:pointer;'+
+         (curItalic
+           ? 'background:rgba(126,217,87,0.18);border:1px solid var(--g);color:var(--g)'
+           : 'background:rgba(255,255,255,0.04);border:1px solid var(--brd);color:var(--w)')+'" title="Italic (Ctrl+I for selection)">I</button>';
+    h += '<button onmousedown="event.preventDefault()" onclick="noteFormatBtn(\''+el.id+'\',\'underline\','+(!curUnderline)+')" style="padding:7px 6px;border-radius:6px;font-family:Outfit;font-size:13px;text-decoration:underline;font-weight:600;cursor:pointer;'+
+         (curUnderline
+           ? 'background:rgba(126,217,87,0.18);border:1px solid var(--g);color:var(--g)'
+           : 'background:rgba(255,255,255,0.04);border:1px solid var(--brd);color:var(--w)')+'" title="Underline (Ctrl+U for selection)">U</button>';
+    h += '</div>';
+
+    h += '</div>';
+    // ── End Text Format section ─────────────────────────────────────
+
     h += '<div class="ps"><div class="ps-t">Note Color</div><div class="note-colors">';
     for(var ni=0; ni<NOTE_COLORS.length; ni++){
       h += '<div class="note-c'+(el.bg===NOTE_COLORS[ni]?' a':'')+'" style="background:'+NOTE_COLORS[ni]+'" onclick="setNoteColor(\''+el.id+'\',\''+NOTE_COLORS[ni]+'\')"></div>';
@@ -9110,7 +10883,7 @@ function renderPropsPanel(el){
       var active = s.id === el.kind;
       var preview = s.render(50, 50, performance.now());
       h += '<div class="sticker-tile" style="padding:5px;'+(active?'border-color:var(--g);background:rgba(126,217,87,0.1)':'')+'" onclick="updateEl(\''+el.id+'\',{kind:\''+s.id+'\'})">';
-      h += '<svg class="ep-sticker" data-sticker-id="prop-'+el.id+'-'+s.id+'" data-sticker-kind="'+s.id+'" data-w="50" data-h="50" data-t="0" width="50" height="50" viewBox="0 0 50 50" style="overflow:visible">'+preview+'</svg>';
+      h += '<svg class="ep-sticker" data-sticker-id="prop-'+el.id+'-'+s.id+'" data-sticker-kind="'+s.id+'" data-w="50" data-h="50" data-t="0" width="50" height="50" viewBox="0 0 50 50" style="overflow:visible;pointer-events:none">'+preview+'</svg>';
       h += '<div class="sticker-tile-label" style="font-size:9px">'+esc(s.label)+'</div>';
       h += '</div>';
     });
@@ -10183,7 +11956,7 @@ function renderStickersPopover(){
       var previewId = 'preview-' + s.id;
       var initial = s.render(80, 80, performance.now());
       h += '<div class="sticker-tile" onclick="addSticker(\''+s.id+'\')">';
-      h += '<svg class="ep-sticker" data-sticker-id="'+previewId+'" data-sticker-kind="'+s.id+'" data-w="80" data-h="80" data-t="0" width="80" height="80" viewBox="0 0 80 80" style="overflow:visible">'+initial+'</svg>';
+      h += '<svg class="ep-sticker" data-sticker-id="'+previewId+'" data-sticker-kind="'+s.id+'" data-w="80" data-h="80" data-t="0" width="80" height="80" viewBox="0 0 80 80" style="overflow:visible;pointer-events:none">'+initial+'</svg>';
       h += '<div class="sticker-tile-label">'+esc(s.label)+'</div>';
       h += '</div>';
     });
@@ -10433,9 +12206,17 @@ window.pickEmoji = function(emoji){
 // Floats above the canvas when a drawing tool (pen/highlighter/brush/eraser/lasso)
 // is active. Replaces the old "Ink Settings popover" — controls are now always
 // visible while drawing instead of hidden behind a button.
+//
+// Animation suppression: the .draw-subbar class has a CSS pop-in animation
+// (translateY + opacity fade) that's nice on first appearance but jarring
+// when it re-plays on every render. We track whether the subbar has been
+// rendered once via S._subbarShown — first render gets the animation, all
+// subsequent renders apply a 'no-anim' class that overrides it.
 function renderDrawSubToolbar(){
   var t = S.tool;
-  var h = '<div class="draw-subbar" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">';
+  var animClass = S._subbarShown ? ' draw-subbar-no-anim' : '';
+  S._subbarShown = true;
+  var h = '<div class="draw-subbar'+animClass+'" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">';
 
   // Lasso has a totally different sub-toolbar — selection actions, no color/size
   if(t === 'lasso'){
@@ -10494,10 +12275,10 @@ function renderDrawSubToolbar(){
         var revPlaceholder = allSameReveal ? '0' : 'mixed';
         h += '<div class="draw-subbar-grp">';
         h += '<div class="draw-subbar-label">Reveal step</div>';
-        h += '<input type="number" min="0" max="20" value="'+revVal+'" placeholder="'+revPlaceholder+'" class="draw-reveal-input" onchange="setSelectionReveal(+this.value); refreshLassoSubbar();" title="0 = always visible, 1+ = reveals on Nth click">';
+        h += '<input type="number" min="0" max="20" value="'+revVal+'" placeholder="'+revPlaceholder+'" class="draw-reveal-input" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" onchange="setSelectionReveal(+this.value)" title="0 = always visible, 1+ = reveals on Nth click">';
         h += '<button class="draw-action-btn" onclick="lassoRevealNext()" title="Set to next available reveal step on this slide">Next</button>';
         if(revVal && revVal !== 0){
-          h += '<button class="draw-action-btn" onclick="setSelectionReveal(0); refreshLassoSubbar();" title="Make always visible (no reveal)">Clear</button>';
+          h += '<button class="draw-action-btn" onclick="setSelectionReveal(0)" title="Make always visible (no reveal)">Clear</button>';
         }
         h += '</div>';
       }
@@ -10744,7 +12525,7 @@ function renderPres(){
   // Laser pointer toggle
   h += '<button class="tb-b'+(S.laserActive?' a':'')+'" onclick="toggleLaser()" data-tip="Laser Pointer (L)" style="'+(S.laserActive?'color:#ff2a2a':'')+'">'+I.laser+'</button>';
   // Webcam toggle
-  h += '<button class="tb-b'+(S.webcamActive?' a':'')+'" onclick="toggleWebcam()" data-tip="Webcam Overlay (W)" style="'+(S.webcamActive?'color:var(--g)':'')+'">'+I.webcam+'</button>';
+  h += '<button class="tb-b'+(S.webcamActive?' a':'')+'" onclick="toggleWebcam()" data-tip="Floating Camera (W) — separate from slide-element webcams" style="'+(S.webcamActive?'color:var(--g)':'')+'">'+I.webcam+'</button>';
   // Mic toggle (for recording)
   h += '<button class="tb-b" onclick="toggleRecAudio(event)" data-tip="Record audio: '+(S.recAudio?'ON':'OFF')+'" style="'+(S.recAudio?'color:var(--g)':'color:var(--muted)')+'">'+(S.recAudio?I.mic:I.micOff)+'</button>';
   // Record start/stop
@@ -10766,16 +12547,9 @@ function renderPres(){
     h += renderInkPopover(true);
   }
 
-  // WEBCAM OVERLAY
-  if(S.webcamActive){
-    h += '<div class="webcam-overlay corner-'+S.webcamCorner+'" id="webcamOverlay" style="width:'+S.webcamSize+'px;height:'+S.webcamSize+'px">';
-    h += '<video id="webcamVideo" autoplay muted playsinline></video>';
-    h += '<div class="webcam-controls">';
-    h += '<button onclick="cycleWebcamCorner(event)" title="Move corner">⤡</button>';
-    h += '<button onclick="resizeWebcam(-20, event)" title="Smaller">−</button>';
-    h += '<button onclick="resizeWebcam(20, event)" title="Larger">+</button>';
-    h += '</div></div>';
-  }
+  // WEBCAM OVERLAY — managed by ensureWebcamOverlay() outside the render tree.
+  // Don't render it here; it would be destroyed and recreated on every renderPres,
+  // causing visible flicker every time the user changes a popover, draws, etc.
 
   // RECORDING INDICATOR is rendered as a standalone element via ensureRecIndicator().
   // No inline render here.
@@ -10783,11 +12557,8 @@ function renderPres(){
   h += '</div>';
   app.innerHTML = h;
 
-  // Re-attach webcam stream after re-render (srcObject doesn't serialize in innerHTML)
-  if(S.webcamActive && S.webcamStream){
-    var v = document.getElementById('webcamVideo');
-    if(v){ v.srcObject = S.webcamStream; v.play().catch(function(){}); }
-  }
+  // Webcam overlay lives outside the render tree to avoid flicker — sync it now.
+  ensureWebcamOverlay();
 
   // Re-attach active screen-share streams too
   reattachScreenShareStreams();
