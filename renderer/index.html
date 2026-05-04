@@ -12069,6 +12069,52 @@ function lightenColor(color, factor){
   return 'rgb('+r+','+g+','+b+')';
 }
 
+// Canvas helper: trace an elliptical wedge (top face of a 3D pie/donut slice).
+// Builds the path on the given ctx. After this, caller does ctx.fill()/stroke().
+function canvasEllipticalWedgePath(ctx, cx, cy, rx, ry, innerRx, innerRy, startAngle, endAngle){
+  var sweep = endAngle - startAngle;
+  if(sweep >= Math.PI * 2 - 0.001) sweep = Math.PI * 2 - 0.001;
+  var actualEnd = startAngle + sweep;
+
+  var x1 = cx + Math.cos(startAngle) * rx;
+  var y1 = cy + Math.sin(startAngle) * ry;
+
+  ctx.beginPath();
+  if(innerRx > 0){
+    ctx.moveTo(x1, y1);
+    ctx.ellipse(cx, cy, rx, ry, 0, startAngle, actualEnd, false);
+    var x3 = cx + Math.cos(actualEnd) * innerRx;
+    var y3 = cy + Math.sin(actualEnd) * innerRy;
+    ctx.lineTo(x3, y3);
+    ctx.ellipse(cx, cy, innerRx, innerRy, 0, actualEnd, startAngle, true);
+    ctx.closePath();
+  } else {
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(x1, y1);
+    ctx.ellipse(cx, cy, rx, ry, 0, startAngle, actualEnd, false);
+    ctx.closePath();
+  }
+}
+
+// Canvas helper: trace a 3D side wall ribbon for a slice (visible side faces).
+function canvasEllipticalSideWallPath(ctx, cx, cy, rx, ry, startAngle, endAngle, depth){
+  var sweep = endAngle - startAngle;
+  if(sweep >= Math.PI * 2 - 0.001) sweep = Math.PI * 2 - 0.001;
+  var actualEnd = startAngle + sweep;
+
+  var x1 = cx + Math.cos(startAngle) * rx;
+  var y1 = cy + Math.sin(startAngle) * ry;
+  var x2 = cx + Math.cos(actualEnd) * rx;
+  var y2 = cy + Math.sin(actualEnd) * ry;
+
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.ellipse(cx, cy, rx, ry, 0, startAngle, actualEnd, false);
+  ctx.lineTo(x2, y2 + depth);
+  ctx.ellipse(cx, cy + depth, rx, ry, 0, actualEnd, startAngle, true);
+  ctx.closePath();
+}
+
 // If innerRadius > 0, builds a donut wedge (annular sector). Otherwise pie wedge.
 // Angles are in radians. Returns a closed path.
 function buildArcPath(cx, cy, outerR, innerR, startAngle, endAngle){
@@ -12656,6 +12702,18 @@ function drawPieChartToCanvas(ctx, el){
   var isDonut = el.chartType === 'donut';
   var innerRadius = isDonut ? radius * (el.donutInnerRadius || 0.55) : 0;
 
+  // 3D state — match SVG renderer's pie3D fields
+  var is3D = !!el.pie3D;
+  var tilt3D = Math.max(0.4, Math.min(0.95, Number(el.pie3DTilt) || 0.6));
+  var depth3D = Math.max(0, Math.min(60, Number(el.pie3DDepth) || 24));
+  var rx = radius;
+  var ry = is3D ? radius * tilt3D : radius;
+  var innerRx = innerRadius;
+  var innerRy = is3D ? innerRadius * tilt3D : innerRadius;
+  if(is3D){
+    cy = cy - depth3D / 2;
+  }
+
   var values = data.map(function(d){ return Math.abs(Number(d.value) || 0); });
   var total = values.reduce(function(a, b){ return a + b; }, 0);
   var revealSteps = chartBarRevealSteps(el);
@@ -12702,7 +12760,81 @@ function drawPieChartToCanvas(ctx, el){
     startAngle = endAngle;
   });
 
-  // Draw each slice
+  // Draw each slice. For 3D: walls back-to-front, then top faces.
+  if(is3D){
+    var sortedForWalls = slices.slice().sort(function(a, b){
+      return Math.sin(a.midAngle) - Math.sin(b.midAngle);
+    });
+    sortedForWalls.forEach(function(s){
+      if(S.pres && s.reveal > S.revealStep) return;
+      if(s.pct <= 0) return;
+      var sliceScale = (S.pres && s.reveal === S.revealStep) ? prog : 1;
+      if(sliceScale <= 0) return;
+      var midR = (innerRadius + radius) / 2;
+      var centX = cx + Math.cos(s.midAngle) * midR;
+      var centY = cy + Math.sin(s.midAngle) * (midR * tilt3D);
+      ctx.save();
+      if(sliceScale < 1){
+        ctx.translate(centX, centY);
+        ctx.scale(sliceScale, sliceScale);
+        ctx.translate(-centX, -centY);
+      }
+      ctx.fillStyle = darkenColor(s.color, 0.6);
+      ctx.strokeStyle = el.pieDividerColor || '#0a0a0c';
+      ctx.lineWidth = (el.pieDividerWidth || 2) * 0.5;
+      canvasEllipticalSideWallPath(ctx, cx, cy, rx, ry, s.startAngle, s.endAngle, depth3D);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    });
+    if(isDonut && innerRadius > 0){
+      sortedForWalls.forEach(function(s){
+        if(S.pres && s.reveal > S.revealStep) return;
+        if(s.pct <= 0) return;
+        var sliceScale = (S.pres && s.reveal === S.revealStep) ? prog : 1;
+        if(sliceScale <= 0) return;
+        var midR = (innerRadius + radius) / 2;
+        var centX = cx + Math.cos(s.midAngle) * midR;
+        var centY = cy + Math.sin(s.midAngle) * (midR * tilt3D);
+        ctx.save();
+        if(sliceScale < 1){
+          ctx.translate(centX, centY);
+          ctx.scale(sliceScale, sliceScale);
+          ctx.translate(-centX, -centY);
+        }
+        ctx.fillStyle = darkenColor(s.color, 0.5);
+        ctx.strokeStyle = el.pieDividerColor || '#0a0a0c';
+        ctx.lineWidth = (el.pieDividerWidth || 2) * 0.5;
+        canvasEllipticalSideWallPath(ctx, cx, cy, innerRx, innerRy, s.startAngle, s.endAngle, depth3D);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      });
+    }
+    slices.forEach(function(s){
+      if(S.pres && s.reveal > S.revealStep) return;
+      if(s.pct <= 0) return;
+      var sliceScale = (S.pres && s.reveal === S.revealStep) ? prog : 1;
+      if(sliceScale <= 0) return;
+      var midR = (innerRadius + radius) / 2;
+      var centX = cx + Math.cos(s.midAngle) * midR;
+      var centY = cy + Math.sin(s.midAngle) * (midR * tilt3D);
+      ctx.save();
+      if(sliceScale < 1){
+        ctx.translate(centX, centY);
+        ctx.scale(sliceScale, sliceScale);
+        ctx.translate(-centX, -centY);
+      }
+      ctx.fillStyle = s.color;
+      ctx.strokeStyle = el.pieDividerColor || '#0a0a0c';
+      ctx.lineWidth = el.pieDividerWidth || 2;
+      canvasEllipticalWedgePath(ctx, cx, cy, rx, ry, innerRx, innerRy, s.startAngle, s.endAngle);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    });
+  } else {
+  // Draw each slice (FLAT — original code path, unchanged)
   slices.forEach(function(s){
     if(S.pres && s.reveal > S.revealStep) return;
     if(s.pct <= 0) return;
@@ -12753,6 +12885,7 @@ function drawPieChartToCanvas(ctx, el){
 
     ctx.restore();
   });
+  } // end is3D else branch
 
   // Labels (outside)
   if(el.pieShowLabels || (el.pieValueDisplay && el.pieValueDisplay !== 'none')){
@@ -12775,7 +12908,11 @@ function drawPieChartToCanvas(ctx, el){
       if(labelOpacity <= 0) return;
       var labelR = radius + 10;
       var lx = cx + Math.cos(s.midAngle) * labelR;
-      var ly = cy + Math.sin(s.midAngle) * labelR;
+      var lyMul = is3D ? tilt3D : 1;
+      var ly = cy + Math.sin(s.midAngle) * labelR * lyMul;
+      if(is3D && Math.sin(s.midAngle) > 0){
+        ly += depth3D + 4;
+      }
       var anchor = (Math.cos(s.midAngle) >= 0) ? 'left' : 'right';
       ctx.textAlign = anchor;
       var parts = [];
@@ -12812,7 +12949,8 @@ function drawPieChartToCanvas(ctx, el){
       if(sliceScale < 0.5) return; // hide text until slice is mostly grown
       var labelR = (innerRadius + radius) / 2;
       var lx = cx + Math.cos(s.midAngle) * labelR;
-      var ly = cy + Math.sin(s.midAngle) * labelR;
+      var lyMul2 = is3D ? tilt3D : 1;
+      var ly = cy + Math.sin(s.midAngle) * labelR * lyMul2;
       var pctStr = (s.pct * 100).toFixed(s.pct >= 0.1 ? 0 : 1) + '%';
       ctx.fillText(pctStr, lx, ly);
     });
