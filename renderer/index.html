@@ -303,6 +303,63 @@ body.ep-speed-slow{--ep-trans-dur:1.1s;--ep-reveal-dur:0.85s}
 .ep-revealing.ep-anim-pop{animation:ep-reveal-pop var(--ep-reveal-dur) cubic-bezier(0.34,1.56,0.64,1) both}
 .ep-revealing.ep-anim-none{animation:none}
 
+/* Chart bar grow-in animation. Targets individual bars (not the whole chart)
+ * so already-visible bars don't re-animate when a new bar reveals. The
+ * 'bar-growing' class is added/removed per-bar by triggerChartAnimations. */
+/* Chart bar grow-in animation. Targets individual bars (not the whole chart)
+ * so already-visible bars don't re-animate when a new bar reveals. The
+ * 'bar-growing' class is added/removed per-bar by triggerChartAnimations. */
+.ep-chart-bar.bar-growing{
+  animation: ep-chart-bar-grow var(--ep-chart-anim-dur, 800ms) var(--ep-chart-anim-ease, cubic-bezier(0.2, 0.9, 0.3, 1)) both;
+  animation-delay: var(--ep-chart-anim-delay, 0ms);
+}
+@keyframes ep-chart-bar-grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes ep-chart-bar-grow-h{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.ep-chart-bar.bar-growing-h{
+  animation: ep-chart-bar-grow-h var(--ep-chart-anim-dur, 800ms) var(--ep-chart-anim-ease, cubic-bezier(0.2, 0.9, 0.3, 1)) both;
+  animation-delay: var(--ep-chart-anim-delay, 0ms);
+}
+
+/* Line chart point + value label fade-in (the line draw itself is JS-driven
+ * via stroke-dasharray, see triggerChartAnimations). The CSS variable
+ * --ep-chart-anim-dur is set on the chart wrapper. */
+.ep-line-point-anim, .ep-line-value-anim{
+  opacity: 0;
+  animation: ep-line-fade-in var(--ep-chart-anim-dur, 800ms) var(--ep-chart-anim-ease, ease-out) forwards;
+  animation-delay: calc(var(--ep-chart-anim-dur, 800ms) * 0.5);
+}
+@keyframes ep-line-fade-in{to{opacity:1}}
+
+/* Area fill fade-in. Applies on every render in pres mode where the line is
+ * also animating. The fade runs the full animation duration matching the line
+ * draw. Outside pres mode (editor), the area is shown at full opacity. */
+.ep-area-fill.area-fading{
+  animation: ep-area-fade var(--ep-chart-anim-dur, 800ms) var(--ep-chart-anim-ease, cubic-bezier(0.4, 0, 0.2, 1)) both;
+}
+@keyframes ep-area-fade{from{opacity:0}to{opacity:1}}
+
+/* Pie/donut slice grow-in. Slices scale from their centroid (transform-origin
+ * set inline). Newly-revealed slices get the slice-growing class; existing
+ * slices stay at scale 1. Same per-element pattern as bar chart. */
+.ep-pie-slice.slice-growing{
+  animation: ep-pie-slice-grow var(--ep-chart-anim-dur, 800ms) var(--ep-chart-anim-ease, cubic-bezier(0.34, 1.4, 0.64, 1)) both;
+  animation-delay: var(--ep-chart-anim-delay, 0ms);
+}
+@keyframes ep-pie-slice-grow{from{transform:scale(0)}to{transform:scale(1)}}
+.ep-pie-label-anim{
+  opacity: 0;
+  animation: ep-line-fade-in var(--ep-chart-anim-dur, 800ms) var(--ep-chart-anim-ease, ease-out) forwards;
+  animation-delay: calc(var(--ep-chart-anim-dur, 800ms) * 0.5);
+}
+
+/* Scatter chart point grow-in. Points scale from 0 to 1 from their own
+ * position. Newly-revealed points get the point-growing class. */
+.ep-scatter-point.point-growing{
+  animation: ep-scatter-point-grow var(--ep-chart-anim-dur, 800ms) var(--ep-chart-anim-ease, cubic-bezier(0.34, 1.4, 0.64, 1)) both;
+  animation-delay: var(--ep-chart-anim-delay, 0ms);
+}
+@keyframes ep-scatter-point-grow{from{transform:scale(0)}to{transform:scale(1)}}
+
 /* ========= SLIDE TRANSITIONS ========= */
 .ep-slide-transition{animation:ep-slide-fade var(--ep-trans-dur) cubic-bezier(0.2,0.9,0.3,1) both}
 @keyframes ep-slide-fade{from{opacity:0}to{opacity:1}}
@@ -2189,6 +2246,12 @@ var I = {
   eye:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
   laser:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.93" y1="4.93" x2="7.05" y2="7.05"/><line x1="16.95" y1="16.95" x2="19.07" y2="19.07"/><line x1="4.93" y1="19.07" x2="7.05" y2="16.95"/><line x1="16.95" y1="7.05" x2="19.07" y2="4.93"/></svg>',
   webcam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor" fill-opacity="0.3"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>',
+  chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="20" x2="21" y2="20"/><rect x="5" y="11" width="3" height="9"/><rect x="10.5" y="6" width="3" height="14"/><rect x="16" y="14" width="3" height="6"/></svg>',
+  chartLine:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="20" x2="21" y2="20"/><polyline points="4,15 8,11 12,13 16,7 20,9"/><circle cx="4" cy="15" r="1.5" fill="currentColor"/><circle cx="8" cy="11" r="1.5" fill="currentColor"/><circle cx="12" cy="13" r="1.5" fill="currentColor"/><circle cx="16" cy="7" r="1.5" fill="currentColor"/><circle cx="20" cy="9" r="1.5" fill="currentColor"/></svg>',
+  chartArea:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="20" x2="21" y2="20"/><path d="M 3 20 L 4 15 L 8 11 L 12 13 L 16 7 L 20 9 L 21 20 Z" fill="currentColor" fill-opacity="0.35" stroke="none"/><polyline points="4,15 8,11 12,13 16,7 20,9"/></svg>',
+  chartScatter:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="20" x2="21" y2="20"/><line x1="3" y1="20" x2="3" y2="4"/><circle cx="6" cy="14" r="1.6" fill="currentColor"/><circle cx="9" cy="9" r="1.6" fill="currentColor"/><circle cx="11" cy="16" r="1.6" fill="currentColor"/><circle cx="14" cy="6" r="1.6" fill="currentColor"/><circle cx="17" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="8" r="1.6" fill="currentColor"/></svg>',
+  chartPie:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M 12 12 L 12 3 A 9 9 0 0 1 20.4 16.5 Z" fill="currentColor" stroke="none"/></svg>',
+  chartDonut:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M 12 12 L 12 3 A 9 9 0 0 1 20.4 16.5 L 14.6 14.4 A 4 4 0 0 0 12 8 Z" fill="currentColor" stroke="none"/></svg>',
   record:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>',
   monitor:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
   chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="3" y1="20" x2="21" y2="20"/></svg>',
@@ -2712,6 +2775,7 @@ var S = {
   showPanel:true,
   showNotes:false,     // speaker notes panel visible in editor
   pop:null, popPos:null,
+  chartCsvPaste:null,  // {chartId, text} when CSV paste modal is open
   fontPickerOpen:null,  // when non-null, stores the note id whose font picker is open
   _subbarShown:false,   // transient: true when the lasso/draw subbar has been rendered already, used to suppress the pop-in animation on re-renders
   ctxMenu:null,
@@ -2769,6 +2833,76 @@ function mkNote(x,y){return{id:uid(),type:'note',x:x,y:y,w:200,h:160,text:'Note.
 // animations) AND via canvas rasterization during recording.
 function mkSticker(kind, x, y){return{id:uid(),type:'sticker',kind:kind,x:x,y:y,w:120,h:120,t:Math.floor(Math.random()*1000),lk:false}}
 function mkScreenShare(x,y){return{id:uid(),type:'screenshare',x:x,y:y,w:640,h:360,label:'Screen Share',bc:'#7ed957',bc2:'#9b59ff',bw:2,br:10,borderStyle:'solid',badgeStyle:'full',badgePos:'tl',lk:false}}
+
+// Chart element. chartType can be 'bar' (Ship 1), 'line', 'pie', etc. (future ships).
+// Data is an array of {label, value} pairs — same shape works for all chart types
+// so future types slot in without breaking existing data.
+//
+// Cap modes:
+//   'auto'  — Y-axis grows to fit largest value; no validation on input
+//   'total' — values can't sum past capValue (budgets, percentages)
+//   'max'   — each value can't exceed capValue (per-bar cap, e.g. win-rate %)
+//
+// Color modes:
+//   'single'   — all bars in colorPrimary
+//   'palette'  — bars cycle through palette
+//   'threshold'— bars colored by value vs colorThresholdLow/High
+function mkChart(x, y){
+  return {
+    id: uid(), type:'chart', x:x, y:y, w:560, h:340, lk:false,
+    chartType: 'bar',
+    data: [
+      {label:'Q1', value:32},
+      {label:'Q2', value:48},
+      {label:'Q3', value:25},
+      {label:'Q4', value:58}
+    ],
+    // Visuals
+    colorMode: 'single',
+    colorPrimary: '#7ed957',                // single mode + palette/threshold base
+    palette: ['#7ed957','#9b59ff','#3da9fc','#ff8c42','#ffd23f','#ff5757','#3dd6c0','#ec4899'],
+    colorThresholdLow: -0.0001,             // values below → "low" color (default: any negative)
+    colorThresholdHigh: 0,                  // values above → "high" color (default: any positive)
+    colorLow: '#ff5757',                    // red for losses (threshold mode)
+    colorHigh: '#7ed957',                   // green for gains (threshold mode)
+    // Axes & labels
+    showValues: true,
+    showAxisX: true,
+    showAxisY: true,
+    showGridlines: true,
+    // Axis & gridline styling — applies to bar/line/area (charts with axes).
+    axisColor: 'rgba(255,255,255,0.25)',
+    axisWidth: 1,
+    axisLabelColor: 'rgba(240,240,245,0.6)',
+    gridColor: 'rgba(255,255,255,0.06)',
+    gridWidth: 1,
+    title: '',                              // optional chart title shown above
+    titlePosition: 'top',                   // 'top' | 'bottom' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+    titleColor: '#f0f0f5',
+    titleSize: 13,
+    titleWeight: 600,                       // 400/500/600/700/800
+    // Cap behaviour
+    capMode: 'auto',                        // 'auto' | 'total' | 'max'
+    capValue: 100,                          // only used when capMode != 'auto'
+    // Reveal behaviour
+    revealMode: 'all',                      // 'all' | 'sequential' | 'manual'
+    // Animation
+    animDuration: 800,                      // ms for the grow-in animation
+    animEasing: 'smooth',                   // 'smooth' | 'bounce' | 'snap' | 'linear' | 'slow-start' | 'slow-end'
+    animStagger: false,                     // when true, items animate in sequence with delay
+    animStaggerDelay: 100,                  // ms between item starts when stagger is on
+    // Line-chart-specific (ignored for bar)
+    yFromZero: true,                        // bar charts always use zero baseline; lines optional
+    barDirection: 'vertical',               // 'vertical' (default) | 'horizontal' — bars rise up vs extend right
+    lineSmooth: true,                       // smooth curve through points
+    linePoints: true,                       // show dots at each data point
+    lineWidth: 3,                           // stroke width
+    bg: 'transparent',                      // chart background; transparent so slide bg shows
+    bc: 'transparent',                      // border around the chart element
+    bw: 0,
+    br: 8
+  };
+}
 // Webcam element: a placeholder on the slide that fills with live camera feed.
 // Unlike the floating webcam overlay (toggled via W key), this is per-slide,
 // positionable, resizable, with its own shape/border/mirror settings.
@@ -3024,6 +3158,10 @@ window.startPresent = function(){
   S.pop = null;
   S.sel = null;
   if(window._resetSlideTransitionTracker) window._resetSlideTransitionTracker();
+  // Reset chart animation tracking so charts animate fresh on entry
+  _chartBarAnimated = {};
+  _chartLineLastLen = {};
+  _chartLastSlideIdx = null;
   renderPres();
   syncPresenterView();
 };
@@ -3838,13 +3976,28 @@ function slideHasConnectedWebcam(slide){
   return false;
 }
 
+// Charts currently playing their grow-in animation need cache-skip — otherwise
+// the bitmap cache would freeze the bars at whatever scale was captured first.
+// Once the animation completes (managed by triggerChartAnimations), the chart
+// returns to a static state and caching resumes normally.
+function slideHasAnimatingChart(slide){
+  if(!slide || !slide.els) return false;
+  for(var i=0; i<slide.els.length; i++){
+    var el = slide.els[i];
+    if(el.type === 'chart' && _chartAnimating[el.id]) return true;
+  }
+  return false;
+}
+
 async function getSlideBitmap(slide){
-  // If slide has live content (screen share, animated sticker, connected webcam),
-  // never use cache — all have frame-by-frame state that the cache would freeze.
+  // If slide has live content (screen share, animated sticker, connected webcam,
+  // or animating chart), never use cache — all have frame-by-frame state that
+  // the cache would freeze.
   var liveSS = slideHasLiveScreenShare(slide);
   var hasSticker = slideHasAnimatedSticker(slide);
   var liveWC = slideHasConnectedWebcam(slide);
-  var skipCache = liveSS || hasSticker || liveWC;
+  var animChart = slideHasAnimatingChart(slide);
+  var skipCache = liveSS || hasSticker || liveWC || animChart;
 
   // Cache is valid only if: not skipping AND all identity checks match
   if(!skipCache &&
@@ -4519,11 +4672,21 @@ function maxRevealStep(slide){
   var max = 0;
   slide.els.forEach(function(el){
     if(el.reveal && el.reveal > max) max = el.reveal;
-    // Also count per-item reveals on list elements
+    // Per-item reveals on list elements
     if(el.type === 'list' && el.items){
       el.items.forEach(function(it){
         if(it.reveal && it.reveal > max) max = it.reveal;
       });
+    }
+    // Per-bar reveals on chart elements (sequential/manual modes assign per-bar steps).
+    // Without this, charts in sequential mode can't advance past the chart's own
+    // reveal step — presNext stops because it doesn't see the per-bar steps as
+    // part of the slide's reveal range.
+    if(el.type === 'chart' && el.data && (el.revealMode === 'sequential' || el.revealMode === 'manual')){
+      var steps = chartBarRevealSteps(el);
+      for(var i=0; i<steps.length; i++){
+        if(steps[i] > max) max = steps[i];
+      }
     }
   });
   return max;
@@ -5974,6 +6137,243 @@ window.switchWebcamDevice = async function(id, deviceId){
 };
 
 // Re-attach active webcam streams to their video elements after re-render
+// Track which (chart, bar) combinations have already played their grow
+// animation. Reset on slide change. Format: "chartId:barIdx" → true.
+var _chartBarAnimated = {};
+var _chartLastSlideIdx = null;
+// Per-chart line-chart length tracking. Maps "line:chartId" → last animated
+// total path length (px), used to compute the delta for the next reveal so
+// we animate only the new portion of the line, not the whole thing.
+var _chartLineLastLen = {};
+// Charts CURRENTLY in their grow animation. Used by recording to skip
+// bitmap cache while bars are scaling.
+// Maps chartId → { startTime: number (ms), duration: number (ms) }
+var _chartAnimating = {};
+
+// Compute current animation progress (0..1) for a chart's CURRENTLY-animating
+// bars (the ones triggered most recently). Returns 1 if not animating.
+// Used by canvas render during recording.
+function getChartAnimProgress(chartId){
+  var info = _chartAnimating[chartId];
+  if(!info) return 1;
+  var elapsed = performance.now() - info.startTime;
+  return Math.max(0, Math.min(1, elapsed / info.duration));
+}
+
+function triggerChartAnimations(){
+  // Reset per-bar tracking when slide changes (new slide = re-animate all bars).
+  if(S.presSlide !== _chartLastSlideIdx){
+    _chartBarAnimated = {};
+    _chartLineLastLen = {};
+    _chartLastSlideIdx = S.presSlide;
+  }
+
+  // BAR CHARTS: per-bar animation class
+  var bars = document.querySelectorAll('.ep-chart-bar[data-bar-idx]');
+  bars.forEach(function(bar){
+    var chartEl = bar.closest('.chart-el[data-chart-id]');
+    if(!chartEl) return;
+    var chartId = chartEl.getAttribute('data-chart-id');
+    var barIdx = bar.getAttribute('data-bar-idx');
+    var barReveal = parseInt(bar.getAttribute('data-bar-reveal') || '0', 10);
+    var key = chartId + ':bar:' + barIdx;
+
+    if(_chartBarAnimated[key]) return;
+    if(barReveal !== S.revealStep) return;
+
+    var outer = bar.closest('.el');
+    if(outer && outer.classList.contains('is-hidden-reveal')) return;
+
+    var dur = parseInt(chartEl.getAttribute('data-chart-anim-duration') || '800', 10);
+    if(dur <= 0){
+      _chartBarAnimated[key] = true;
+      return;
+    }
+    bar.style.setProperty('--ep-chart-anim-dur', dur + 'ms');
+    var barChartEl = gEl(chartId);
+    if(barChartEl && barChartEl.animStagger && (barChartEl.revealMode||'all') === 'all'){
+      var sd = parseInt(barChartEl.animStaggerDelay, 10);
+      if(isNaN(sd) || sd < 0) sd = 100;
+      bar.style.setProperty('--ep-chart-anim-delay', (parseInt(barIdx, 10) * sd) + 'ms');
+    } else {
+      bar.style.setProperty('--ep-chart-anim-delay', '0ms');
+    }
+    void bar.offsetHeight;
+    // Pick the right grow class based on chart direction.
+    var growClass = (barChartEl && barChartEl.barDirection === 'horizontal') ? 'bar-growing-h' : 'bar-growing';
+    bar.classList.add(growClass);
+    _chartBarAnimated[key] = true;
+    _chartAnimating[chartId] = { startTime: performance.now(), duration: dur };
+    setTimeout(function(){
+      bar.classList.remove('bar-growing');
+      bar.classList.remove('bar-growing-h');
+      delete _chartAnimating[chartId];
+    }, dur + 60);
+  });
+
+  // PIE / DONUT SLICES: per-slice animation class (same pattern as bars)
+  var slices = document.querySelectorAll('.ep-pie-slice[data-slice-idx]');
+  slices.forEach(function(slice){
+    var chartEl = slice.closest('.chart-el[data-chart-id]');
+    if(!chartEl) return;
+    var chartId = chartEl.getAttribute('data-chart-id');
+    var sliceIdx = slice.getAttribute('data-slice-idx');
+    var sliceReveal = parseInt(slice.getAttribute('data-slice-reveal') || '0', 10);
+    var key = chartId + ':slice:' + sliceIdx;
+
+    if(_chartBarAnimated[key]) return;
+    if(sliceReveal !== S.revealStep) return;
+
+    var outer = slice.closest('.el');
+    if(outer && outer.classList.contains('is-hidden-reveal')) return;
+
+    var dur = parseInt(chartEl.getAttribute('data-chart-anim-duration') || '800', 10);
+    if(dur <= 0){
+      _chartBarAnimated[key] = true;
+      return;
+    }
+    slice.style.setProperty('--ep-chart-anim-dur', dur + 'ms');
+    var sliceChartEl = gEl(chartId);
+    if(sliceChartEl && sliceChartEl.animStagger && (sliceChartEl.revealMode||'all') === 'all'){
+      var ssd = parseInt(sliceChartEl.animStaggerDelay, 10);
+      if(isNaN(ssd) || ssd < 0) ssd = 100;
+      slice.style.setProperty('--ep-chart-anim-delay', (parseInt(sliceIdx, 10) * ssd) + 'ms');
+    } else {
+      slice.style.setProperty('--ep-chart-anim-delay', '0ms');
+    }
+    void slice.offsetHeight;
+    slice.classList.add('slice-growing');
+    _chartBarAnimated[key] = true;
+    _chartAnimating[chartId] = { startTime: performance.now(), duration: dur };
+    setTimeout(function(){
+      slice.classList.remove('slice-growing');
+      delete _chartAnimating[chartId];
+    }, dur + 60);
+  });
+
+  // SCATTER POINTS: per-point animation class (same pattern as bars/slices)
+  var points = document.querySelectorAll('.ep-scatter-point[data-point-idx]');
+  points.forEach(function(point){
+    var chartEl = point.closest('.chart-el[data-chart-id]');
+    if(!chartEl) return;
+    var chartId = chartEl.getAttribute('data-chart-id');
+    var pointIdx = point.getAttribute('data-point-idx');
+    var pointReveal = parseInt(point.getAttribute('data-point-reveal') || '0', 10);
+    var key = chartId + ':point:' + pointIdx;
+
+    if(_chartBarAnimated[key]) return;
+    if(pointReveal !== S.revealStep) return;
+
+    var outer = point.closest('.el');
+    if(outer && outer.classList.contains('is-hidden-reveal')) return;
+
+    var dur = parseInt(chartEl.getAttribute('data-chart-anim-duration') || '800', 10);
+    if(dur <= 0){
+      _chartBarAnimated[key] = true;
+      return;
+    }
+    point.style.setProperty('--ep-chart-anim-dur', dur + 'ms');
+    var ptChartEl = gEl(chartId);
+    if(ptChartEl && ptChartEl.animStagger && (ptChartEl.revealMode||'all') === 'all'){
+      var psd = parseInt(ptChartEl.animStaggerDelay, 10);
+      if(isNaN(psd) || psd < 0) psd = 100;
+      point.style.setProperty('--ep-chart-anim-delay', (parseInt(pointIdx, 10) * psd) + 'ms');
+    } else {
+      point.style.setProperty('--ep-chart-anim-delay', '0ms');
+    }
+    void point.offsetHeight;
+    point.classList.add('point-growing');
+    _chartBarAnimated[key] = true;
+    _chartAnimating[chartId] = { startTime: performance.now(), duration: dur };
+    setTimeout(function(){
+      point.classList.remove('point-growing');
+      delete _chartAnimating[chartId];
+    }, dur + 60);
+  });
+
+  // LINE CHARTS: animate using JS-measured path length so we can extend the
+  // line smoothly when new points reveal. Each chart's previously-drawn
+  // length is tracked so we know which portion is new and only animate that.
+  var lineCharts = document.querySelectorAll('.chart-el[data-chart-id]');
+  lineCharts.forEach(function(chartEl){
+    var chartId = chartEl.getAttribute('data-chart-id');
+    var path = chartEl.querySelector('path[data-anim-line]');
+    if(!path) return;
+    var dur = parseInt(chartEl.getAttribute('data-chart-anim-duration') || '800', 10);
+    if(dur <= 0) return;
+    // Total length of the current path
+    var totalLen;
+    try { totalLen = path.getTotalLength(); } catch(e){ return; }
+    if(!totalLen || totalLen < 1) return;
+
+    var stateKey = 'line:' + chartId;
+    var prevLen = (S.pres && _chartLineLastLen && _chartLineLastLen[stateKey]) || 0;
+
+    // If we're not in pres mode (editor view) — just show full path, no animation.
+    // This is needed because triggerChartAnimations runs on every render including
+    // editor renders, but we only animate during presentation mode reveals.
+    if(!S.pres){
+      path.style.strokeDasharray = '';
+      path.style.strokeDashoffset = '';
+      return;
+    }
+
+    // If revealStep didn't change for this chart's data since last animation,
+    // skip — already animated to this length.
+    var animatedKey = chartId + ':line:' + S.revealStep;
+    if(_chartBarAnimated[animatedKey]){
+      // Path is already at its final length — no animation. Make sure dasharray
+      // reset so future renders show the full path.
+      path.style.strokeDasharray = '';
+      path.style.strokeDashoffset = '';
+      return;
+    }
+
+    // Animate from prevLen to totalLen.
+    // Setup: dash pattern is the full length, offset = (totalLen - prevLen)
+    // means the (totalLen - prevLen) portion at the END is hidden initially.
+    // Wait — that's backwards. The hidden portion needs to be at the END (far),
+    // shown portion at the START. To do that with a single dash:
+    //   dasharray = totalLen
+    //   dashoffset = totalLen - prevLen
+    // makes the path show its first prevLen pixels and hide the rest.
+    // Then animate dashoffset to 0 to reveal the rest.
+    path.style.strokeDasharray = totalLen + 'px';
+    path.style.strokeDashoffset = (totalLen - prevLen) + 'px';
+    // Force reflow before setting transition+target
+    void path.getBoundingClientRect();
+    path.style.transition = 'stroke-dashoffset ' + dur + 'ms cubic-bezier(0.4, 0, 0.2, 1)';
+    path.style.strokeDashoffset = '0px';
+
+    // If this is an area chart, fade in the area fill alongside the line draw.
+    var areaFill = chartEl.querySelector('.ep-area-fill[data-area-id="'+chartId+'"]');
+    if(areaFill){
+      areaFill.style.setProperty('--ep-chart-anim-dur', dur + 'ms');
+      void areaFill.offsetHeight;
+      areaFill.classList.add('area-fading');
+      setTimeout(function(){ areaFill.classList.remove('area-fading'); }, dur + 80);
+    }
+
+    // After transition completes, clear the inline styles so the path renders
+    // normally on subsequent re-renders (in case the user moves it, etc.)
+    setTimeout(function(){
+      path.style.transition = '';
+      // Don't clear dasharray/offset here — we want them to stick at their
+      // final state (offset=0, dasharray=totalLen) which keeps the path
+      // looking right. Clear is fine because at offset=0 the entire path shows.
+      path.style.strokeDasharray = '';
+      path.style.strokeDashoffset = '';
+    }, dur + 80);
+
+    _chartBarAnimated[animatedKey] = true;
+    _chartLineLastLen[stateKey] = totalLen;
+    _chartAnimating[chartId] = { startTime: performance.now(), duration: dur };
+    setTimeout(function(){
+      delete _chartAnimating[chartId];
+    }, dur + 60);
+  });
+}
+
 function reattachWebcamStreams(){
   // Position-sync approach: each pooled video lives in document.body permanently
   // (never detached, never re-appended). After every render, we walk the DOM
@@ -6847,8 +7247,228 @@ window.addNote = function(){
   S.tool = 'select';
 };
 
+// Drop a fresh chart with default sample data into the slide.
+// type: 'bar' | 'line' | 'pie' | 'donut' | 'area' | 'scatter'
+// User edits data and styling via the properties panel.
+window.addChart = function(type){
+  type = type || 'bar';
+  var p = getNextSpawnPos(560, 340);
+  var el = mkChart(p.x, p.y);
+  el.chartType = type;
+  // Type-specific defaults
+  if(type === 'line' || type === 'area'){
+    el.yFromZero = (type === 'area'); // area grounded at zero looks better
+    el.lineSmooth = true;
+    el.linePoints = (type === 'line'); // area: no points by default; line: yes
+    el.lineWidth = 3;
+    if(type === 'area'){
+      el.areaFillOpacity = 0.35;
+      el.areaFillStyle = 'gradient';  // 'solid' | 'gradient'
+    }
+  } else if(type === 'scatter'){
+    el.yFromZero = false;
+    el.scatterPointSize = 7;
+    el.scatterPointShape = 'circle'; // 'circle' | 'square' | 'diamond'
+    el.colorMode = 'single';
+    el.showAxisX = true;
+    el.showAxisY = true;
+    el.showGridlines = true;
+    el.showValues = false;
+    el.scatterShowLabels = false; // labels next to points off by default (clutter)
+    // Sample data: trading-style scatter (hold time vs PnL)
+    el.data = [
+      { x: 5,  y: 28,  label: 'Trade 1' },
+      { x: 12, y: -15, label: 'Trade 2' },
+      { x: 24, y: 45,  label: 'Trade 3' },
+      { x: 8,  y: 12,  label: 'Trade 4' },
+      { x: 35, y: -8,  label: 'Trade 5' },
+      { x: 18, y: 32,  label: 'Trade 6' },
+      { x: 3,  y: -12, label: 'Trade 7' },
+      { x: 22, y: 18,  label: 'Trade 8' }
+    ];
+  } else if(type === 'pie' || type === 'donut'){
+    // Pie/donut don't use axes; each slice gets a unique color (palette mode).
+    // The data table starts with sensible category labels rather than "Bar 1".
+    el.colorMode = 'palette';
+    el.showAxisX = false;
+    el.showAxisY = false;
+    el.showGridlines = false;
+    el.showValues = true;          // show % on each slice by default
+    el.pieValueDisplay = 'percent'; // 'percent' | 'absolute' | 'both' | 'none'
+    el.pieShowLabels = true;        // show category label next to slice
+    el.donutInnerRadius = 0.55;     // donut: 55% of outer radius; pie ignores
+    // Slice divider styling (the line BETWEEN slices)
+    el.pieDividerColor = '#0a0a0c'; // dark by default — matches typical bg
+    el.pieDividerWidth = 2;
+    // Label/value text styling (applies to both inside and outside slice text)
+    el.pieLabelColor = 'auto';      // 'auto' = white outside / black inside; or hex/rgba
+    el.pieLabelSize = 11;
+    el.pieLabelWeight = 600;        // 400 = normal, 600 = semi, 700 = bold
+    // 3D effect (faux 2.5D — elliptical squash + extruded sides)
+    el.pie3D = false;               // when true, render with depth and tilt
+    el.pie3DTilt = 0.6;             // 0.4-0.95: vertical squash factor (1=flat, 0=fully tilted)
+    el.pie3DDepth = 24;             // px: how far slices extrude downward
+    // Replace the bar-style sample data with category-style data
+    el.data = [
+      { label: 'Category A', value: 35 },
+      { label: 'Category B', value: 25 },
+      { label: 'Category C', value: 20 },
+      { label: 'Category D', value: 20 }
+    ];
+    // Smaller default size — pies look better squarer
+    el.w = 420;
+    el.h = 360;
+  }
+  updateSlide(function(s){s.els.push(el); return s;});
+  S.sel = el.id;
+  S.tool = 'select';
+};
+
 window.setNoteColor = function(id, c){ window.updateEl(id, {bg:c}); };
 window.setNoteStyle = function(id, style){ window.updateEl(id, {style:style}); };
+
+// =========================================================
+// CHART DATA HELPERS
+// =========================================================
+// Modify chart bars while honoring the cap mode validation rules.
+// Each helper updates immutably via updateEl so history & rendering stay clean.
+
+window.updateChartBarLabel = function(id, idx, label){
+  var el = gEl(id);
+  if(!el || !el.data) return;
+  var newData = el.data.map(function(d, i){
+    return i === idx ? Object.assign({}, d, {label: label}) : d;
+  });
+  window.updateEl(id, {data: newData});
+};
+
+window.updateChartBarValue = function(id, idx, rawValue){
+  var el = gEl(id);
+  if(!el || !el.data) return;
+  var v = Number(rawValue);
+  if(isNaN(v)) v = 0;
+
+  // Cap validation
+  var capMode = el.capMode || 'auto';
+  var capValue = Number(el.capValue) || 0;
+  if(capMode === 'max' && capValue > 0){
+    // Per-bar cap — clamp this bar
+    if(v > capValue) { v = capValue; showToast('Capped at ' + capValue); }
+    if(v < -capValue) { v = -capValue; showToast('Capped at -' + capValue); }
+  } else if(capMode === 'total' && capValue > 0){
+    // Total cap — sum of OTHER bars + new value can't exceed cap
+    var otherSum = 0;
+    el.data.forEach(function(d, i){
+      if(i !== idx) otherSum += Math.max(0, Number(d.value) || 0);
+    });
+    var available = capValue - otherSum;
+    if(v > available) { v = Math.max(0, available); showToast('Total capped at ' + capValue); }
+  }
+
+  var newData = el.data.map(function(d, i){
+    return i === idx ? Object.assign({}, d, {value: v}) : d;
+  });
+  window.updateEl(id, {data: newData});
+};
+
+// Set the per-bar reveal step (only meaningful when revealMode === 'manual').
+// 0 means always visible; 1+ means revealed on the Nth click.
+window.updateChartBarReveal = function(id, idx, rawValue){
+  var el = gEl(id);
+  if(!el || !el.data) return;
+  var r = Math.max(0, parseInt(rawValue, 10) || 0);
+  var newData = el.data.map(function(d, i){
+    return i === idx ? Object.assign({}, d, {reveal: r}) : d;
+  });
+  window.updateEl(id, {data: newData});
+};
+
+// Per-bar color override: sets data[idx].color so chartBarColor uses it
+// instead of the palette/single/threshold default. Pass empty string to clear.
+window.updateChartBarColor = function(id, idx, rawValue){
+  var el = gEl(id);
+  if(!el || !el.data) return;
+  var newData = el.data.map(function(d, i){
+    if(i !== idx) return d;
+    var copy = Object.assign({}, d);
+    if(!rawValue || rawValue === '' || rawValue === 'auto'){
+      delete copy.color;
+    } else {
+      copy.color = rawValue;
+    }
+    return copy;
+  });
+  window.updateEl(id, {data: newData});
+};
+
+// Scatter chart: update the x coordinate of a point.
+window.updateChartScatterX = function(id, idx, rawValue){
+  var el = gEl(id);
+  if(!el || !el.data) return;
+  var v = Number(rawValue);
+  if(isNaN(v)) v = 0;
+  var newData = el.data.map(function(d, i){
+    return i === idx ? Object.assign({}, d, {x: v}) : d;
+  });
+  window.updateEl(id, {data: newData});
+};
+
+// Scatter chart: update the y coordinate of a point.
+window.updateChartScatterY = function(id, idx, rawValue){
+  var el = gEl(id);
+  if(!el || !el.data) return;
+  var v = Number(rawValue);
+  if(isNaN(v)) v = 0;
+  var newData = el.data.map(function(d, i){
+    return i === idx ? Object.assign({}, d, {y: v}) : d;
+  });
+  window.updateEl(id, {data: newData});
+};
+
+window.addChartBar = function(id){
+  var el = gEl(id);
+  if(!el || !el.data) return;
+  var noun;
+  if(el.chartType === 'line' || el.chartType === 'area' || el.chartType === 'scatter') noun = 'Point';
+  else if(el.chartType === 'pie' || el.chartType === 'donut') noun = 'Slice';
+  else noun = 'Bar';
+  var nextLabel = noun + ' ' + (el.data.length + 1);
+
+  if(el.chartType === 'scatter'){
+    // Scatter: pick median x and y from existing points
+    var xs = el.data.map(function(d){ return Number(d.x)||0; }).sort(function(a,b){return a-b;});
+    var ys = el.data.map(function(d){ return Number(d.y)||0; }).sort(function(a,b){return a-b;});
+    var nx = xs.length ? xs[Math.floor(xs.length/2)] : 10;
+    var ny = ys.length ? ys[Math.floor(ys.length/2)] : 10;
+    var newData = el.data.concat([{label: nextLabel, x: nx, y: ny}]);
+    window.updateEl(id, {data: newData});
+    return;
+  }
+
+  var nextValue = 0;
+  // If cap mode is total, remaining cap defines the default value
+  if(el.capMode === 'total' && el.capValue > 0){
+    var sum = el.data.reduce(function(s, d){ return s + Math.max(0, Number(d.value)||0); }, 0);
+    nextValue = Math.max(0, Math.min(20, el.capValue - sum));
+  } else {
+    // Use median of existing values as a sensible starting point
+    var vals = el.data.map(function(d){ return Number(d.value)||0; }).sort(function(a,b){return a-b;});
+    nextValue = vals.length ? Math.round(vals[Math.floor(vals.length/2)] || 20) : 20;
+  }
+  var newData = el.data.concat([{label: nextLabel, value: nextValue}]);
+  window.updateEl(id, {data: newData});
+};
+
+window.removeChartBar = function(id, idx){
+  var el = gEl(id);
+  if(!el || !el.data) return;
+  if(el.data.length <= 1){
+    showToast('Chart needs at least 1 bar');
+    return;
+  }
+  var newData = el.data.filter(function(d, i){ return i !== idx; });
+  window.updateEl(id, {data: newData});
+};
 
 // =========================================================
 // NOTE EDIT HANDLERS (Phase B+C — contenteditable replaces textarea)
@@ -9154,6 +9774,9 @@ async function renderSlideToCanvas(s, scale){
         x.stroke();
       }
     }
+    if(el.type === 'chart'){
+      drawChartToCanvas(x, el);
+    }
   }
   // Pen annotations
   var draws = s.draws || [];
@@ -9750,6 +10373,9 @@ function renderElInner(el, isPres, slideCtx){
   if(el.type === 'webcam'){
     h += renderWebcam(el, isPres);
   }
+  if(el.type === 'chart'){
+    h += renderChart(el, isPres);
+  }
   // TradingView elements are no longer supported — silently skip in legacy decks.
   // The element data stays in saved files but produces no visible output. Users
   // can delete them from the slide (selection still works on bbox-only).
@@ -9879,8 +10505,2283 @@ function renderWebcam(el, isPres){
 }
 
 // =========================================================
-// LIST RENDERERS - one function per style
+// CHART RENDERER
 // =========================================================
+// Renders a chart element as inline SVG. For Ship 1: bar charts only.
+// Future ships add line, pie, donut, area, scatter — all sharing this same
+// data shape and entry point.
+//
+// Animation: bars grow from baseline (zero) to their full value over
+// el.animDuration ms. The current progress (0..1) is stored on the element's
+// DOM node as data-chart-anim-progress and re-read by the renderer. In the
+// editor, progress is 1 (chart shown fully formed). In presentation:
+//   - If the element has a reveal step, animation starts when revealed.
+//   - Otherwise, animation runs once on slide-show.
+function renderChart(el, isPres){
+  if(el.chartType === 'bar') return renderBarChart(el, isPres);
+  if(el.chartType === 'line' || el.chartType === 'area') return renderLineChart(el, isPres);
+  if(el.chartType === 'pie' || el.chartType === 'donut') return renderPieChart(el, isPres);
+  if(el.chartType === 'scatter') return renderScatterChart(el, isPres);
+  return '<div style="position:absolute;left:'+el.x+'px;top:'+el.y+'px;width:'+el.w+'px;height:'+el.h+'px;background:rgba(255,0,0,0.1);color:#ff6666;display:flex;align-items:center;justify-content:center;font-size:12px">Unsupported chart type: '+esc(el.chartType||'')+'</div>';
+}
+
+// Pick a color for a bar based on its value and the chart's colorMode.
+// =========================================================
+// CSV PARSING (for chart data import)
+// =========================================================
+// Parse a pasted CSV/TSV/whitespace-delimited string into chart data.
+// Delimiter detection priority: TAB → comma → semicolon → whitespace.
+// Tabs win whenever present (spreadsheets always paste with tabs), so labels
+// with spaces inside them ("Year 1") survive correctly.
+// chartType determines target shape:
+//   - 'scatter': returns [{label, x, y}] with 3 cols, or [{x, y, label}] with 2 cols
+//   - else:      returns [{label, value}] with 2 cols, or [{value}] with 1 col
+// Returns { ok: bool, data: [...], skipped: int, message: string }
+function parseCSVForChart(text, chartType){
+  if(!text || !text.trim()) return { ok: false, data: [], skipped: 0, message: 'No data pasted.' };
+
+  // Strip BOM if present
+  text = text.replace(/^\uFEFF/, '');
+  // Normalize line endings
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  var rawLines = text.split('\n').filter(function(l){ return l.trim().length > 0; });
+  if(rawLines.length === 0) return { ok: false, data: [], skipped: 0, message: 'No non-empty rows.' };
+
+  // Try delimiters in priority order. The FIRST one that produces ≥2 columns
+  // on most rows wins. This means tabs always beat whitespace when both are
+  // present (which happens when spreadsheets paste labels containing spaces).
+  function tryDelim(splitFn, requiredMin){
+    var counts = rawLines.map(function(l){ return splitFn(l).length; });
+    var max = Math.max.apply(null, counts);
+    if(max < requiredMin) return null;
+    // Most rows should have the max column count for the delimiter to be reliable.
+    var consistency = counts.filter(function(n){ return n === max; }).length / counts.length;
+    if(consistency < 0.7) return null;
+    return { maxCols: max, consistency: consistency };
+  }
+
+  var chosen = null;
+  // 1. TAB — preferred whenever the text contains any tab character at all.
+  if(text.indexOf('\t') >= 0){
+    var tabResult = tryDelim(function(l){ return l.split('\t'); }, 2);
+    if(tabResult){
+      chosen = { name: 'tab', split: function(l){ return l.split('\t'); }, info: tabResult };
+    }
+  }
+  // 2. Comma — works for CSV exports
+  if(!chosen){
+    var commaResult = tryDelim(function(l){ return splitCSVLine(l, ','); }, 2);
+    if(commaResult){
+      chosen = { name: 'comma', split: function(l){ return splitCSVLine(l, ','); }, info: commaResult };
+    }
+  }
+  // 3. Semicolon — European CSVs
+  if(!chosen){
+    var semiResult = tryDelim(function(l){ return splitCSVLine(l, ';'); }, 2);
+    if(semiResult){
+      chosen = { name: 'semicolon', split: function(l){ return splitCSVLine(l, ';'); }, info: semiResult };
+    }
+  }
+  // 4. Whitespace — last resort. Only acceptable when column count is EXACTLY
+  // the minimum (no excess tokens to interpret) AND the trailing column is numeric.
+  // For more tokens we can't tell label-with-spaces from extra columns reliably,
+  // so we refuse rather than misinterpret.
+  if(!chosen){
+    var wsSplit = function(l){ return l.split(/\s+/).filter(function(s){ return s.length > 0; }); };
+    var minCols = (chartType === 'scatter') ? 3 : 2;
+    var wsCounts = rawLines.map(function(l){ return wsSplit(l).length; });
+    var wsMax = Math.max.apply(null, wsCounts);
+    // Strict: every row must have EXACTLY minCols tokens. No more.
+    var wsExactlyMin = wsCounts.every(function(n){ return n === minCols; });
+    var lastColNumeric = rawLines.every(function(l){
+      var tokens = wsSplit(l);
+      return tokens.length > 0 && !isNaN(parseFloat(tokens[tokens.length - 1]));
+    });
+    if(wsExactlyMin && lastColNumeric){
+      chosen = { name: 'whitespace', split: wsSplit, info: { maxCols: wsMax, consistency: 1 } };
+    }
+  }
+
+  // If nothing matched, fall back to single-column (just numeric values one per line)
+  if(!chosen){
+    var singleColData = rawLines.map(function(l, i){
+      var v = parseFloat(l.trim());
+      return isNaN(v) ? null : { label: 'Item ' + (i+1), value: v };
+    }).filter(function(d){ return d; });
+    if(singleColData.length === 0){
+      return { ok: false, data: [], skipped: rawLines.length,
+               message: 'Could not detect column structure. Try Tab-separated (copy from Excel) or comma-separated values.' };
+    }
+    return { ok: true, data: singleColData, skipped: rawLines.length - singleColData.length,
+             message: 'Parsed ' + singleColData.length + ' values (single column, labels auto-generated).' };
+  }
+
+  // Split each row using chosen delimiter
+  var rows = rawLines.map(function(l){ return chosen.split(l).map(function(c){ return c.trim().replace(/^"|"$/g, ''); }); });
+
+  // Detect & skip header row: if first row's "value" column(s) aren't numeric,
+  // assume it's a header.
+  var startIdx = 0;
+  if(rows.length > 1){
+    var firstRow = rows[0];
+    var hasNonNumericValue;
+    if(chartType === 'scatter'){
+      var checkCols = firstRow.length >= 3 ? [1, 2] : [0, 1];
+      hasNonNumericValue = checkCols.some(function(idx){
+        var n = parseFloat(firstRow[idx]);
+        return isNaN(n);
+      });
+    } else {
+      var valIdx = firstRow.length >= 2 ? 1 : 0;
+      hasNonNumericValue = isNaN(parseFloat(firstRow[valIdx]));
+    }
+    if(hasNonNumericValue) startIdx = 1;
+  }
+
+  var data = [];
+  var skipped = 0;
+  for(var i = startIdx; i < rows.length; i++){
+    var row = rows[i];
+    if(chartType === 'scatter'){
+      if(row.length >= 3){
+        var x = parseFloat(row[1]);
+        var y = parseFloat(row[2]);
+        if(!isNaN(x) && !isNaN(y)){
+          data.push({ label: row[0] || ('Point ' + (i+1)), x: x, y: y });
+        } else { skipped++; }
+      } else if(row.length >= 2){
+        var x2 = parseFloat(row[0]);
+        var y2 = parseFloat(row[1]);
+        if(!isNaN(x2) && !isNaN(y2)){
+          data.push({ label: 'Point ' + (i - startIdx + 1), x: x2, y: y2 });
+        } else { skipped++; }
+      } else { skipped++; }
+    } else {
+      // Bar/line/area/pie/donut shape: { label, value }.
+      // For rows with >2 columns (e.g. tab-separated with multiple data columns),
+      // the FIRST column is label and the LAST column is value. Middle columns ignored.
+      if(row.length >= 2){
+        var v = parseFloat(row[row.length - 1]);
+        if(!isNaN(v)){
+          data.push({ label: row[0] || ('Item ' + (i+1)), value: v });
+        } else { skipped++; }
+      } else if(row.length === 1){
+        var v1 = parseFloat(row[0]);
+        if(!isNaN(v1)){
+          data.push({ label: 'Item ' + (i - startIdx + 1), value: v1 });
+        } else { skipped++; }
+      } else { skipped++; }
+    }
+  }
+
+  if(data.length === 0){
+    return { ok: false, data: [], skipped: skipped, message: 'No valid rows found. Each row needs a numeric value.' };
+  }
+  var msg = 'Parsed ' + data.length + ' rows';
+  if(chosen.name !== 'tab' && chosen.name !== 'comma') msg += ' (' + chosen.name + ' delimited)';
+  if(startIdx > 0) msg += ', skipped header row';
+  if(skipped > 0) msg += ', ' + skipped + ' rows skipped';
+  msg += '.';
+  return { ok: true, data: data, skipped: skipped, message: msg };
+}
+
+// Split a CSV line on a single character delimiter, respecting quoted strings.
+// Handles "value with, comma" and embedded quotes (""escaped"").
+function splitCSVLine(line, delim){
+  var result = [];
+  var current = '';
+  var inQuotes = false;
+  for(var i = 0; i < line.length; i++){
+    var ch = line[i];
+    if(inQuotes){
+      if(ch === '"'){
+        if(line[i+1] === '"'){ current += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        current += ch;
+      }
+    } else {
+      if(ch === '"'){ inQuotes = true; }
+      else if(ch === delim){ result.push(current); current = ''; }
+      else { current += ch; }
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+
+// Map a user-facing easing name to a CSS timing function.
+// Default 'smooth' matches the standard ease-out curve we used originally.
+function chartEasingValue(name){
+  switch(name){
+    case 'bounce':     return 'cubic-bezier(0.34, 1.56, 0.64, 1)';
+    case 'snap':       return 'cubic-bezier(0.7, 0, 0.3, 1)';
+    case 'linear':     return 'linear';
+    case 'slow-start': return 'cubic-bezier(0.7, 0, 0.7, 0.7)';
+    case 'slow-end':   return 'cubic-bezier(0.3, 0.3, 0.3, 1)';
+    case 'smooth':
+    default:           return 'cubic-bezier(0.4, 0, 0.2, 1)';
+  }
+}
+
+// =========================================================
+// CSV PASTE MODAL — open/close/apply handlers
+// =========================================================
+
+window.openChartCsvPaste = function(chartId){
+  S.chartCsvPaste = { chartId: chartId, text: '' };
+  render();
+  setTimeout(function(){
+    var ta = document.getElementById('csv-paste-textarea');
+    if(ta) ta.focus();
+  }, 0);
+};
+
+window.closeChartCsvPaste = function(){
+  S.chartCsvPaste = null;
+  render();
+};
+
+// Update the modal's text + re-render only the preview pane (not whole app —
+// that would lose textarea focus mid-paste).
+window.updateChartCsvPasteText = function(text){
+  if(!S.chartCsvPaste) return;
+  S.chartCsvPaste.text = text;
+  var preview = document.getElementById('csv-paste-preview');
+  if(preview && S.chartCsvPaste){
+    var el = gEl(S.chartCsvPaste.chartId);
+    if(el){
+      var result = parseCSVForChart(text, el.chartType || 'bar');
+      preview.innerHTML = renderCsvPreview(result, el.chartType);
+    }
+  }
+};
+
+window.applyChartCsvPaste = function(){
+  if(!S.chartCsvPaste) return;
+  var el = gEl(S.chartCsvPaste.chartId);
+  if(!el){ closeChartCsvPaste(); return; }
+  var result = parseCSVForChart(S.chartCsvPaste.text, el.chartType || 'bar');
+  if(!result.ok){
+    showToast(result.message);
+    return;
+  }
+  window.updateEl(el.id, { data: result.data });
+  showToast(result.message);
+  closeChartCsvPaste();
+};
+
+// Render a small preview of the parsed rows (table format).
+function renderCsvPreview(result, chartType){
+  if(!result || (!result.ok && result.data.length === 0)){
+    return '<div style="color:var(--muted);font-size:11px;padding:8px;text-align:center">'+(result ? esc(result.message) : 'Paste data above to preview.')+'</div>';
+  }
+  var data = result.data;
+  var h = '<div style="font-size:10px;color:'+(result.ok?'var(--g)':'var(--muted)')+';margin-bottom:6px">'+esc(result.message)+'</div>';
+  h += '<div style="max-height:160px;overflow-y:auto;border:1px solid var(--brd);border-radius:4px">';
+  h += '<table style="width:100%;border-collapse:collapse;font-size:11px;font-family:inherit">';
+  if(chartType === 'scatter'){
+    h += '<thead style="position:sticky;top:0;background:var(--d2);z-index:1"><tr><th style="text-align:left;padding:5px 8px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--brd)">Label</th><th style="text-align:right;padding:5px 8px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--brd)">X</th><th style="text-align:right;padding:5px 8px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--brd)">Y</th></tr></thead>';
+    h += '<tbody>';
+    data.slice(0, 50).forEach(function(d){
+      h += '<tr><td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.04)">'+esc(d.label||'')+'</td><td style="padding:4px 8px;text-align:right;border-bottom:1px solid rgba(255,255,255,0.04);font-variant-numeric:tabular-nums">'+d.x+'</td><td style="padding:4px 8px;text-align:right;border-bottom:1px solid rgba(255,255,255,0.04);font-variant-numeric:tabular-nums">'+d.y+'</td></tr>';
+    });
+  } else {
+    h += '<thead style="position:sticky;top:0;background:var(--d2);z-index:1"><tr><th style="text-align:left;padding:5px 8px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--brd)">Label</th><th style="text-align:right;padding:5px 8px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--brd)">Value</th></tr></thead>';
+    h += '<tbody>';
+    data.slice(0, 50).forEach(function(d){
+      h += '<tr><td style="padding:4px 8px;border-bottom:1px solid rgba(255,255,255,0.04)">'+esc(d.label||'')+'</td><td style="padding:4px 8px;text-align:right;border-bottom:1px solid rgba(255,255,255,0.04);font-variant-numeric:tabular-nums">'+d.value+'</td></tr>';
+    });
+  }
+  h += '</tbody></table>';
+  h += '</div>';
+  if(data.length > 50){
+    h += '<div style="font-size:10px;color:var(--muted);margin-top:4px;text-align:center">Preview showing 50 of '+data.length+' rows</div>';
+  }
+  return h;
+}
+
+// Render the modal overlay (called from render() when S.chartCsvPaste is set).
+function renderChartCsvPasteModal(){
+  if(!S.chartCsvPaste) return '';
+  var el = gEl(S.chartCsvPaste.chartId);
+  var ctName = 'Chart';
+  if(el){
+    if(el.chartType === 'line') ctName = 'Line Chart';
+    else if(el.chartType === 'area') ctName = 'Area Chart';
+    else if(el.chartType === 'pie') ctName = 'Pie Chart';
+    else if(el.chartType === 'donut') ctName = 'Donut Chart';
+    else if(el.chartType === 'scatter') ctName = 'Scatter Chart';
+    else ctName = 'Bar Chart';
+  }
+  var hint = (el && el.chartType === 'scatter')
+    ? 'Three columns: Label, X, Y. Or two columns: X, Y (labels auto-generated).'
+    : 'Two columns: Label, Value. Or one column of values (labels auto-generated).';
+
+  var initialResult = parseCSVForChart(S.chartCsvPaste.text, el ? el.chartType : 'bar');
+
+  var h = '<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)closeChartCsvPaste()">';
+  h += '<div style="background:var(--d1);border:1px solid var(--brd);border-radius:10px;padding:18px;width:520px;max-width:92vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.5)" onclick="event.stopPropagation()">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+  h += '<div style="font-size:14px;font-weight:600;color:#f0f0f5">Paste data into '+ctName+'</div>';
+  h += '<button style="background:transparent;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0;width:24px;height:24px;line-height:1" onclick="closeChartCsvPaste()" title="Close (Esc)">×</button>';
+  h += '</div>';
+  h += '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">'+hint+' Tab, comma, or semicolon delimiters auto-detected. Header row auto-skipped if non-numeric.</div>';
+  h += '<textarea id="csv-paste-textarea" placeholder="Paste data here from Excel, Google Sheets, etc." '+
+       'style="width:100%;min-height:120px;background:rgba(255,255,255,0.04);border:1px solid var(--brd);color:#f0f0f5;font-size:12px;padding:8px 10px;border-radius:6px;font-family:Outfit,Consolas,monospace;resize:vertical;box-sizing:border-box" '+
+       'oninput="updateChartCsvPasteText(this.value)" '+
+       'onkeydown="if(event.key===\'Escape\')closeChartCsvPaste()">'+esc(S.chartCsvPaste.text||'')+'</textarea>';
+  h += '<div style="margin-top:10px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">Preview</div>';
+  h += '<div id="csv-paste-preview" style="margin-top:6px;min-height:80px">'+renderCsvPreview(initialResult, el ? el.chartType : 'bar')+'</div>';
+  h += '<div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">';
+  h += '<button class="sp-btn" onclick="closeChartCsvPaste()">Cancel</button>';
+  h += '<button class="sp-btn" style="border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)" onclick="applyChartCsvPaste()">Apply data</button>';
+  h += '</div>';
+  h += '</div></div>';
+  return h;
+}
+
+
+// Helper: render a compact color picker control — hex/rgba text input + a
+// native color picker swatch. Uses onchange (not oninput) on the native picker
+// so the props panel doesn't re-render mid-scrub, which would close the dialog.
+function renderColorPickerControl(elId, fieldName, currentValue, opts){
+  opts = opts || {};
+  var current = currentValue || '';
+  var hexValue = rgbaToHex(currentValue);
+  var h = '<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">';
+  h += '<input id="chart-color-'+elId+'-'+fieldName+'" type="text" value="'+esc(current)+'" placeholder="#hex or rgba()" '+
+       'style="flex:1;background:rgba(255,255,255,0.04);border:1px solid var(--brd);color:#f0f0f5;font-size:11px;padding:5px 8px;border-radius:4px;font-family:inherit" '+
+       'oninput="updateEl(\''+elId+'\',{'+fieldName+':this.value})">';
+  // Native picker swatch — bigger, clickable. Uses onchange (commit on close)
+  // so the panel doesn't re-render during scrubbing. The visible square is
+  // also the picker — the input fills its container.
+  h += '<input type="color" value="'+hexValue+'" '+
+       'style="width:36px;height:28px;padding:0;border:1px solid var(--brd);border-radius:4px;background:transparent;cursor:pointer;flex-shrink:0" '+
+       'onchange="updateEl(\''+elId+'\',{'+fieldName+':this.value})" '+
+       'title="Click to open color picker">';
+  h += '</div>';
+  return h;
+}
+
+// Convert an rgba/rgb/hex color string to a 6-char hex (#rrggbb).
+// Browser color inputs only accept #rrggbb format, but chart defaults use
+// rgba(255,255,255,0.25) etc. Returns the input unchanged if it's already hex.
+function rgbaToHex(c){
+  if(!c) return '#888888';
+  c = String(c).trim();
+  if(c.charAt(0) === '#'){
+    if(c.length === 4) return '#'+c.charAt(1)+c.charAt(1)+c.charAt(2)+c.charAt(2)+c.charAt(3)+c.charAt(3);
+    if(c.length === 7) return c;
+    if(c.length === 9) return c.substring(0, 7); // strip alpha from #rrggbbaa
+    return '#888888';
+  }
+  var m = c.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if(!m) return '#888888';
+  var r = Math.min(255, parseInt(m[1], 10)).toString(16).padStart(2, '0');
+  var g = Math.min(255, parseInt(m[2], 10)).toString(16).padStart(2, '0');
+  var b = Math.min(255, parseInt(m[3], 10)).toString(16).padStart(2, '0');
+  return '#'+r+g+b;
+}
+
+// Take a color (hex or rgb/rgba) and produce an rgba string with the given
+// alpha. Used by canvas renderers (canvas gradients have no stop-opacity).
+function hexWithAlpha(c, alpha){
+  if(!c) return 'rgba(136,136,136,'+alpha+')';
+  c = String(c).trim();
+  if(c.charAt(0) === '#'){
+    var h = c.length === 4
+      ? '#'+c.charAt(1)+c.charAt(1)+c.charAt(2)+c.charAt(2)+c.charAt(3)+c.charAt(3)
+      : c;
+    var r = parseInt(h.substring(1, 3), 16);
+    var g = parseInt(h.substring(3, 5), 16);
+    var b = parseInt(h.substring(5, 7), 16);
+    return 'rgba('+r+','+g+','+b+','+alpha+')';
+  }
+  var m = c.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if(!m) return c;
+  return 'rgba('+m[1]+','+m[2]+','+m[3]+','+alpha+')';
+}
+
+// Render the chart title as SVG text with styling and positioning.
+// Returns { svg: string, padTop: number, padBot: number } — the renderer
+// uses padTop/padBot to reserve vertical space for the title.
+function renderChartTitle(el){
+  if(!el.title) return { svg: '', padTop: 0, padBot: 0 };
+  var W = el.w, H = el.h;
+  var pos = el.titlePosition || 'top';
+  var color = el.titleColor || '#f0f0f5';
+  var size = el.titleSize || 13;
+  var weight = el.titleWeight || 600;
+  var space = size + 14;
+
+  var x, y, anchor, padTop = 0, padBot = 0;
+  switch(pos){
+    case 'bottom':       x = W/2;    y = H - 8;    anchor = 'middle'; padBot = space; break;
+    case 'top-left':     x = 14;     y = size + 6; anchor = 'start';  padTop = space; break;
+    case 'top-right':    x = W - 14; y = size + 6; anchor = 'end';    padTop = space; break;
+    case 'bottom-left':  x = 14;     y = H - 8;    anchor = 'start';  padBot = space; break;
+    case 'bottom-right': x = W - 14; y = H - 8;    anchor = 'end';    padBot = space; break;
+    case 'top':
+    default:             x = W/2;    y = size + 6; anchor = 'middle'; padTop = space; break;
+  }
+  var svg = '<text x="'+x+'" y="'+y+'" text-anchor="'+anchor+'" font-family="Outfit,sans-serif" font-size="'+size+'" font-weight="'+weight+'" fill="'+color+'">'+esc(el.title)+'</text>';
+  return { svg: svg, padTop: padTop, padBot: padBot };
+}
+
+// Canvas equivalent — draws the title on the given canvas context using
+// the same position/style logic. Returns padTop/padBot like the SVG version.
+function drawChartTitleToCanvas(ctx, el){
+  if(!el.title) return { padTop: 0, padBot: 0 };
+  var W = el.w, H = el.h;
+  var pos = el.titlePosition || 'top';
+  var color = el.titleColor || '#f0f0f5';
+  var size = el.titleSize || 13;
+  var weight = el.titleWeight || 600;
+  var space = size + 14;
+
+  var x, y, align, padTop = 0, padBot = 0;
+  switch(pos){
+    case 'bottom':       x = W/2;    y = H - 8;    align = 'center'; padBot = space; break;
+    case 'top-left':     x = 14;     y = size + 6; align = 'left';   padTop = space; break;
+    case 'top-right':    x = W - 14; y = size + 6; align = 'right';  padTop = space; break;
+    case 'bottom-left':  x = 14;     y = H - 8;    align = 'left';   padBot = space; break;
+    case 'bottom-right': x = W - 14; y = H - 8;    align = 'right';  padBot = space; break;
+    case 'top':
+    default:             x = W/2;    y = size + 6; align = 'center'; padTop = space; break;
+  }
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.font = weight + ' ' + size + 'px Outfit, sans-serif';
+  ctx.textAlign = align;
+  ctx.textBaseline = (pos.indexOf('bottom') === 0) ? 'alphabetic' : 'top';
+  // Adjust y for top to be above the text baseline appropriately
+  var drawY = (pos.indexOf('bottom') === 0) ? y : (y - size + 4);
+  ctx.fillText(el.title, el.x + x, el.y + drawY);
+  ctx.restore();
+  return { padTop: padTop, padBot: padBot };
+}
+
+function chartBarColor(el, value, idx){
+  // Per-item color override always wins (set via data table swatch)
+  if(el.data && el.data[idx] && el.data[idx].color){
+    return el.data[idx].color;
+  }
+  if(el.colorMode === 'palette'){
+    var pal = (el.palette && el.palette.length > 0)
+      ? el.palette
+      : ['#7ed957','#9b59ff','#3da9fc','#ff8c42','#ffd23f','#ff5757','#3dd6c0','#ec4899'];
+    return pal[idx % pal.length];
+  }
+  if(el.colorMode === 'threshold'){
+    if(value < el.colorThresholdLow)  return el.colorLow;
+    if(value > el.colorThresholdHigh) return el.colorHigh;
+    return el.colorPrimary;
+  }
+  // 'single' or anything else
+  return el.colorPrimary;
+}
+
+// Compute the chart's value range, honoring cap modes and the yFromZero option.
+// Returns { min, max } where both are used to compute Y positions. For bars,
+// 0 must always be in the range (bars rise from zero baseline). For lines,
+// yFromZero=false lets the axis auto-fit the data range with padding.
+function chartValueRange(el){
+  var data = el.data || [];
+  if(data.length === 0) return { min: 0, max: 1 };
+  var values = data.map(function(d){ return Number(d.value) || 0; });
+  var vmin = Math.min.apply(null, values);
+  var vmax = Math.max.apply(null, values);
+  // Most charts force zero baseline. Lines opt out via yFromZero=false.
+  var forceZero = el.chartType === 'bar' || el.yFromZero !== false;
+  var rawMin = forceZero ? Math.min(0, vmin) : vmin;
+  var rawMax = forceZero ? Math.max(0, vmax) : vmax;
+  // Cap modes override the auto-fit max (and skip padding — user set it explicitly)
+  var capActive = (el.capMode === 'total' || el.capMode === 'max');
+  if(el.capMode === 'total'){
+    rawMax = Math.max(rawMax, Number(el.capValue) || rawMax);
+  } else if(el.capMode === 'max'){
+    rawMax = Number(el.capValue) || rawMax;
+  }
+  // Padding strategy:
+  //   - Non-zero-baselined charts (lines): pad both ends 8% (already worked).
+  //   - Zero-baselined charts (bars/areas): pad only the OUTER ends, never push
+  //     zero off-zero. So if min is -25 and max is 100, range becomes ~-30 to ~108.
+  //     If only positives, only the top end pads. Skip when cap is set explicitly.
+  if(!forceZero){
+    var pad = (rawMax - rawMin) * 0.08;
+    if(pad === 0) pad = Math.max(1, Math.abs(rawMax) * 0.1);
+    rawMin -= pad;
+    rawMax += pad;
+  } else if(!capActive){
+    var span = rawMax - rawMin;
+    var bpad = span * 0.08;
+    if(bpad === 0) bpad = Math.max(1, Math.abs(rawMax || rawMin || 1) * 0.1);
+    // Only extend outward, never cross zero
+    if(rawMin < 0) rawMin -= bpad;
+    if(rawMax > 0) rawMax += bpad;
+  }
+  if(rawMax === rawMin) rawMax = rawMin + 1;
+  return { min: rawMin, max: rawMax };
+}
+
+// Compute the effective reveal step per bar based on the chart's revealMode.
+// Returns array of integers same length as data.
+//   - 'all'        → all bars 0 (always visible whenever chart is visible)
+//   - 'sequential' → bar i = i+1 (1-based, click N reveals bar N)
+//   - 'manual'     → use each bar's own .reveal field (default 0)
+function chartBarRevealSteps(el){
+  var data = el.data || [];
+  var mode = el.revealMode || 'all';
+  return data.map(function(d, i){
+    if(mode === 'sequential') return i + 1;
+    if(mode === 'manual') return Math.max(0, parseInt(d.reveal, 10) || 0);
+    return 0;
+  });
+}
+
+function renderBarChart(el, isPres){
+  if(el.barDirection === 'horizontal') return renderHorizontalBarChart(el, isPres);
+  var data = el.data || [];
+  var W = el.w, H = el.h;
+  // Padding for axes and labels (computed from element size for resize-aware rendering)
+  var titleInfo = renderChartTitle(el);
+  var padTop    = 14 + titleInfo.padTop;
+  var padBot    = (el.showAxisX ? 28 : 12) + titleInfo.padBot;
+  var padLeft   = (el.showAxisY ? 44 : 12);
+  var padRight  = 12;
+  var chartW = Math.max(20, W - padLeft - padRight);
+  var chartH = Math.max(20, H - padTop - padBot);
+
+  var range = chartValueRange(el);
+  // Y position of the zero line within the chart area (top=0, bottom=chartH)
+  var zeroY = padTop + chartH * (range.max / (range.max - range.min));
+
+  // Bar layout
+  var n = data.length || 1;
+  var slot = chartW / n;
+  var barWidth = slot * 0.65;     // 65% of slot, gives breathing room
+  var barGap   = (slot - barWidth) / 2;
+
+  // SVG accumulator
+  var svg = '';
+
+  // Title
+  if(el.title){
+    svg += titleInfo.svg;
+  }
+
+  // Gridlines (4 horizontal divisions across the chart area)
+  if(el.showGridlines){
+    for(var g = 0; g <= 4; g++){
+      var gy = padTop + (chartH * g / 4);
+      svg += '<line x1="'+padLeft+'" y1="'+gy+'" x2="'+(padLeft+chartW)+'" y2="'+gy+'" stroke="'+(el.gridColor||'rgba(255,255,255,0.06)')+'" stroke-width="'+(el.gridWidth||1)+'"/>';
+    }
+  }
+
+  // Y-axis (line + tick labels)
+  if(el.showAxisY){
+    svg += '<line x1="'+padLeft+'" y1="'+padTop+'" x2="'+padLeft+'" y2="'+(padTop+chartH)+'" stroke="'+(el.axisColor||'rgba(255,255,255,0.25)')+'" stroke-width="'+(el.axisWidth||1)+'"/>';
+    // 3 tick labels: max, mid, min (or 0)
+    var ticks = [range.max, (range.max+range.min)/2, range.min];
+    ticks.forEach(function(tv, ti){
+      var ty = padTop + (chartH * ti / 2);
+      svg += '<text x="'+(padLeft-6)+'" y="'+(ty+4)+'" text-anchor="end" font-family="Outfit,sans-serif" font-size="10" fill="'+(el.axisLabelColor||'rgba(240,240,245,0.6)')+'">'+formatChartValue(tv)+'</text>';
+    });
+  }
+
+  // Zero baseline (drawn slightly more visibly than gridlines if there are negative values)
+  if(range.min < 0){
+    svg += '<line x1="'+padLeft+'" y1="'+zeroY+'" x2="'+(padLeft+chartW)+'" y2="'+zeroY+'" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>';
+  }
+
+  // Bars — filter by reveal step in pres mode (each bar can have its own step
+  // based on revealMode). Hidden bars are skipped entirely from rendering.
+  var revealSteps = chartBarRevealSteps(el);
+  data.forEach(function(d, i){
+    // Skip bars whose reveal step hasn't been reached
+    if(isPres && S.pres && revealSteps[i] > S.revealStep) return;
+    var v = Number(d.value) || 0;
+    var color = chartBarColor(el, v, i);
+    var x = padLeft + (i * slot) + barGap;
+    var pxPerUnit = chartH / (range.max - range.min);
+    var fullH = Math.abs(v) * pxPerUnit;
+    var y = (v >= 0) ? (zeroY - fullH) : zeroY;
+    // Transform-origin at zero baseline so bar grows from there.
+    // The bar idx is set as a data-attribute so the animation system can
+    // selectively animate newly-revealed bars (vs. ones that were already shown).
+    svg += '<g class="ep-chart-bar" data-bar-idx="'+i+'" data-bar-reveal="'+revealSteps[i]+'" style="transform-origin:0px '+zeroY+'px">';
+    svg += '<rect x="'+x+'" y="'+y+'" width="'+barWidth+'" height="'+fullH+'" fill="'+color+'" rx="3" ry="3"/>';
+    svg += '</g>';
+
+    // Value label on the bar.
+    // Positive bars: label sits above the bar (4px above top).
+    // Negative bars: label sits INSIDE the bar at the top (just below zero line)
+    // — keeps it from colliding with X-axis category labels at the chart bottom.
+    if(el.showValues){
+      var labelY = (v >= 0) ? (y - 4) : (zeroY + 12);
+      svg += '<text x="'+(x + barWidth/2)+'" y="'+labelY+'" text-anchor="middle" font-family="Outfit,sans-serif" font-size="10" font-weight="600" fill="#f0f0f5">'+formatChartValue(v)+'</text>';
+    }
+  });
+
+  // X-axis (line + category labels)
+  if(el.showAxisX){
+    var axisY = padTop + chartH;
+    svg += '<line x1="'+padLeft+'" y1="'+axisY+'" x2="'+(padLeft+chartW)+'" y2="'+axisY+'" stroke="'+(el.axisColor||'rgba(255,255,255,0.25)')+'" stroke-width="'+(el.axisWidth||1)+'"/>';
+    data.forEach(function(d, i){
+      var x = padLeft + (i * slot) + slot/2;
+      svg += '<text x="'+x+'" y="'+(axisY+18)+'" text-anchor="middle" font-family="Outfit,sans-serif" font-size="10" fill="'+(el.axisLabelColor||'rgba(240,240,245,0.7)')+'">'+esc(String(d.label||''))+'</text>';
+    });
+  }
+
+  // The outer wrapper is provided by renderElsHtml (positions el at el.x/el.y).
+  // We render INNER content here: a chart-el div sized to el.w × el.h with
+  // SVG content. The chart-el class lets triggerChartAnimations() find us;
+  // data-id is set on the outer .el wrapper from renderElsHtml.
+  var inner = '<div class="chart-el" data-chart-id="'+el.id+'" data-chart-anim-duration="'+(el.animDuration||800)+'" style="position:relative;width:'+W+'px;height:'+H+'px;background:'+(el.bg||'transparent')+';border:'+(el.bw||0)+'px solid '+(el.bc||'transparent')+';border-radius:'+(el.br||0)+'px;overflow:visible;pointer-events:none">';
+  inner += '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" style="position:absolute;left:0;top:0;display:block;pointer-events:none">';
+  inner += svg;
+  inner += '</svg>';
+  inner += '</div>';
+  return inner;
+}
+
+// =========================================================
+// HORIZONTAL BAR CHART RENDERER
+// =========================================================
+// Same data shape as vertical bars but rendered with categories on the Y axis
+// and values along the X axis. Bars extend rightward from a vertical zero line;
+// negatives extend leftward. Useful for long category labels or many categories.
+function renderHorizontalBarChart(el, isPres){
+  var data = el.data || [];
+  var W = el.w, H = el.h;
+  // Y-axis (left side) holds category labels — needs more width than vertical's
+  // top axis. X-axis (bottom) shows numeric values.
+  var titleInfo = renderChartTitle(el);
+  var padTop    = 14 + titleInfo.padTop;
+  var padBot    = (el.showAxisX ? 28 : 12) + titleInfo.padBot;
+  var padLeft   = 12;
+  // Reserve space for category labels on the left if Y axis is shown
+  var catLabelW = el.showAxisY ? 80 : 12;
+  var padRight  = 16;
+  var chartX = padLeft + catLabelW;
+  var chartW = Math.max(20, W - chartX - padRight);
+  var chartH = Math.max(20, H - padTop - padBot);
+
+  var range = chartValueRange(el);
+  // X position of the zero line within the chart area
+  var zeroX = chartX + chartW * (-range.min / (range.max - range.min));
+
+  var n = data.length || 1;
+  var slot = chartH / n;
+  var barHeight = slot * 0.65;
+  var barGap = (slot - barHeight) / 2;
+
+  var revealSteps = chartBarRevealSteps(el);
+  var svg = '';
+
+  // Title
+  if(el.title){
+    svg += titleInfo.svg;
+  }
+
+  // Vertical gridlines (5 ticks across the value range)
+  if(el.showGridlines){
+    var gridColor = el.gridColor || 'rgba(255,255,255,0.06)';
+    var gridWidth = el.gridWidth || 1;
+    for(var g = 0; g <= 4; g++){
+      var gx = chartX + (chartW * g / 4);
+      svg += '<line x1="'+gx+'" y1="'+padTop+'" x2="'+gx+'" y2="'+(padTop+chartH)+'" stroke="'+gridColor+'" stroke-width="'+gridWidth+'"/>';
+    }
+  }
+
+  // Y-axis (vertical line on the left at zero position) — for horizontal,
+  // the Y axis is at zeroX (where bars start from). Cat labels render to its left.
+  var axisColor = el.axisColor || 'rgba(255,255,255,0.25)';
+  var axisWidth = el.axisWidth || 1;
+  var axisLabelColor = el.axisLabelColor || 'rgba(240,240,245,0.6)';
+  if(el.showAxisY){
+    svg += '<line x1="'+zeroX+'" y1="'+padTop+'" x2="'+zeroX+'" y2="'+(padTop+chartH)+'" stroke="'+axisColor+'" stroke-width="'+axisWidth+'"/>';
+  }
+
+  // X-axis (horizontal line at chart bottom) with value tick labels
+  if(el.showAxisX){
+    var axisY = padTop + chartH;
+    svg += '<line x1="'+chartX+'" y1="'+axisY+'" x2="'+(chartX+chartW)+'" y2="'+axisY+'" stroke="'+axisColor+'" stroke-width="'+axisWidth+'"/>';
+    var xTicks = [range.min, (range.min+range.max)/2, range.max];
+    xTicks.forEach(function(tv, ti){
+      var tx = chartX + (chartW * ti / 2);
+      svg += '<text x="'+tx+'" y="'+(axisY+18)+'" text-anchor="middle" font-family="Outfit,sans-serif" font-size="10" fill="'+axisLabelColor+'">'+formatChartValue(tv)+'</text>';
+    });
+  }
+
+  // Render each bar
+  data.forEach(function(d, i){
+    var v = Number(d.value) || 0;
+    var revealStep = revealSteps[i];
+    var hidden = isPres && S.pres && revealStep > S.revealStep;
+    var y = padTop + i * slot + barGap;
+    // Bar X start and width based on sign
+    var barX, barW;
+    if(v >= 0){
+      barX = zeroX;
+      barW = chartW * v / (range.max - range.min);
+    } else {
+      barW = chartW * Math.abs(v) / (range.max - range.min);
+      barX = zeroX - barW;
+    }
+    var color = chartBarColor(el, v, i);
+
+    // Category label on the left (or above the bar if no Y axis shown)
+    if(el.showAxisY){
+      var labelColor = hidden ? 'rgba(240,240,245,0.25)' : (el.axisLabelColor || 'rgba(240,240,245,0.7)');
+      svg += '<text x="'+(chartX - 6)+'" y="'+(y + barHeight/2 + 3)+'" text-anchor="end" font-family="Outfit,sans-serif" font-size="11" fill="'+labelColor+'">'+esc(d.label || '')+'</text>';
+    }
+
+    if(hidden) return;
+
+    // The bar — animate scaleX from zero (transform-origin set to zeroX).
+    // Use scaleX origin via inline style. Each bar gets its own animation key.
+    svg += '<rect class="ep-chart-bar" data-bar-idx="'+i+'" data-bar-reveal="'+revealStep+'" '+
+           'style="transform-origin:'+zeroX+'px '+(y + barHeight/2)+'px;transform-box:fill-box" '+
+           'x="'+barX+'" y="'+y+'" width="'+Math.max(0.1, barW)+'" height="'+barHeight+'" rx="2" '+
+           'fill="'+color+'"/>';
+
+    // Value label at the END of the bar (right end for positive, left end for negative)
+    if(el.showValues){
+      var labelX = (v >= 0) ? (barX + barW + 4) : (barX - 4);
+      var anchor = (v >= 0) ? 'start' : 'end';
+      svg += '<text x="'+labelX+'" y="'+(y + barHeight/2 + 3)+'" text-anchor="'+anchor+'" font-family="Outfit,sans-serif" font-size="10" font-weight="600" fill="#f0f0f5">'+formatChartValue(v)+'</text>';
+    }
+  });
+
+  var inner = '<div class="chart-el" data-chart-id="'+el.id+'" data-chart-anim-duration="'+(el.animDuration||800)+'" style="--ep-chart-anim-dur:'+(el.animDuration||800)+'ms;--ep-chart-anim-ease:'+chartEasingValue(el.animEasing||'smooth')+';position:relative;width:'+W+'px;height:'+H+'px;background:'+(el.bg||'transparent')+';border:'+(el.bw||0)+'px solid '+(el.bc||'transparent')+';border-radius:'+(el.br||0)+'px;overflow:visible;pointer-events:none">';
+  inner += '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" style="position:absolute;left:0;top:0;display:block;pointer-events:none">';
+  inner += svg;
+  inner += '</svg>';
+  inner += '</div>';
+  return inner;
+}
+
+// =========================================================
+// LINE CHART RENDERER
+// =========================================================
+// A single line through data points. Supports:
+//   - Smooth (catmull-rom curve) or straight segments
+//   - Auto-fit Y axis (yFromZero=false) or zero-baseline (yFromZero=true)
+//   - Per-point reveal (one point appears per reveal step in sequential/manual)
+//   - Optional points (dots) at each value
+// Animation: as a new point reveals, the segment leading to it draws via
+// stroke-dasharray. Already-drawn segments remain static (no flicker).
+function renderLineChart(el, isPres){
+  var data = el.data || [];
+  var W = el.w, H = el.h;
+  var titleInfo = renderChartTitle(el);
+  var padTop    = 14 + titleInfo.padTop;
+  var padBot    = (el.showAxisX ? 28 : 12) + titleInfo.padBot;
+  var padLeft   = (el.showAxisY ? 44 : 12);
+  var padRight  = 12;
+  var chartW = Math.max(20, W - padLeft - padRight);
+  var chartH = Math.max(20, H - padTop - padBot);
+
+  var range = chartValueRange(el);
+  function valueToY(v){
+    return padTop + chartH * (range.max - v) / (range.max - range.min);
+  }
+  var n = data.length;
+  function indexToX(i){
+    if(n <= 1) return padLeft + chartW / 2;
+    return padLeft + (i / (n - 1)) * chartW;
+  }
+
+  var revealSteps = chartBarRevealSteps(el);
+  // All visible points (filtered by reveal step in pres mode).
+  // Always smooth path through these — no splitting, no per-segment rendering.
+  var visible = data.map(function(d, i){
+    if(isPres && S.pres && revealSteps[i] > S.revealStep) return null;
+    return { idx: i, x: indexToX(i), y: valueToY(Number(d.value)||0), v: Number(d.value)||0, label: d.label, reveal: revealSteps[i] };
+  }).filter(function(p){ return p; });
+
+  var color = el.colorPrimary || '#7ed957';
+  var lineWidth = el.lineWidth || 3;
+  var smooth = el.lineSmooth !== false;
+  var showPoints = el.linePoints !== false;
+
+  var svg = '';
+
+  // Title
+  if(el.title){
+    svg += titleInfo.svg;
+  }
+
+  // Gridlines
+  if(el.showGridlines){
+    for(var g = 0; g <= 4; g++){
+      var gy = padTop + (chartH * g / 4);
+      svg += '<line x1="'+padLeft+'" y1="'+gy+'" x2="'+(padLeft+chartW)+'" y2="'+gy+'" stroke="'+(el.gridColor||'rgba(255,255,255,0.06)')+'" stroke-width="'+(el.gridWidth||1)+'"/>';
+    }
+  }
+
+  // Y-axis line + labels
+  if(el.showAxisY){
+    svg += '<line x1="'+padLeft+'" y1="'+padTop+'" x2="'+padLeft+'" y2="'+(padTop+chartH)+'" stroke="'+(el.axisColor||'rgba(255,255,255,0.25)')+'" stroke-width="'+(el.axisWidth||1)+'"/>';
+    var ticks = [range.max, (range.max+range.min)/2, range.min];
+    ticks.forEach(function(tv, ti){
+      var ty = padTop + (chartH * ti / 2);
+      svg += '<text x="'+(padLeft-6)+'" y="'+(ty+4)+'" text-anchor="end" font-family="Outfit,sans-serif" font-size="10" fill="'+(el.axisLabelColor||'rgba(240,240,245,0.6)')+'">'+formatChartValue(tv)+'</text>';
+    });
+  }
+
+  // Zero baseline (when range crosses zero)
+  if(range.min < 0 && range.max > 0){
+    var zeroY = valueToY(0);
+    svg += '<line x1="'+padLeft+'" y1="'+zeroY+'" x2="'+(padLeft+chartW)+'" y2="'+zeroY+'" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>';
+  }
+
+  // Single smooth path through all currently-visible points.
+  // Animation is applied AFTER render via animateLineDraw() which measures
+  // the path's total length and sets dasharray correctly. We tag the path
+  // with data-anim-line so that function can find it. The data-prev-reveal
+  // attribute tells it which reveal-step the path was at PREVIOUSLY (so it
+  // can animate only the new portion).
+  var isArea = el.chartType === 'area';
+  if(visible.length >= 1){
+    var pathD = (visible.length === 1)
+      ? 'M '+visible[0].x+' '+visible[0].y+' L '+visible[0].x+' '+visible[0].y
+      : buildLinePath(visible, smooth);
+
+    // Area fill — render BEFORE the line so the line draws on top.
+    // The area path = line path + line down to baseline + line back to start,
+    // forming a closed polygon. Baseline = zero line if range crosses zero,
+    // else bottom of chart area.
+    if(isArea && visible.length >= 2){
+      var baselineY = (range.min < 0 && range.max > 0) ? valueToY(0) : (padTop + chartH);
+      var areaD = pathD +
+        ' L '+visible[visible.length - 1].x+' '+baselineY +
+        ' L '+visible[0].x+' '+baselineY +
+        ' Z';
+      var fillStyle = el.areaFillStyle || 'gradient';
+      var fillOpacity = el.areaFillOpacity != null ? el.areaFillOpacity : 0.35;
+      var fillRef;
+      if(fillStyle === 'gradient'){
+        // Add a linearGradient defining color → transparent (top → bottom)
+        var gradId = 'epAreaGrad_' + el.id;
+        svg += '<defs><linearGradient id="'+gradId+'" x1="0" y1="0" x2="0" y2="1">'+
+               '<stop offset="0%" stop-color="'+color+'" stop-opacity="'+fillOpacity+'"/>'+
+               '<stop offset="100%" stop-color="'+color+'" stop-opacity="0"/>'+
+               '</linearGradient></defs>';
+        fillRef = 'url(#'+gradId+')';
+      } else {
+        fillRef = color;
+      }
+      var areaOpacity = (fillStyle === 'gradient') ? 1 : fillOpacity;
+      svg += '<path class="ep-area-fill" data-area-id="'+el.id+'" d="'+areaD+'" fill="'+fillRef+'" fill-opacity="'+areaOpacity+'" stroke="none"/>';
+    }
+
+    var prevRevealForPath = (isPres && S.pres) ? Math.max(0, S.revealStep - 1) : 0;
+    svg += '<path data-anim-line="1" data-chart-id="'+el.id+'" data-current-reveal="'+S.revealStep+'" d="'+pathD+'" fill="none" stroke="'+color+'" stroke-width="'+lineWidth+'" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+
+  // Points (dots) — at every visible data point. The just-revealed ones fade in.
+  if(showPoints){
+    visible.forEach(function(p){
+      var animClass = (isPres && S.pres && p.reveal === S.revealStep) ? ' class="ep-line-point-anim"' : '';
+      svg += '<circle'+animClass+' cx="'+p.x+'" cy="'+p.y+'" r="'+(lineWidth+1.5)+'" fill="'+color+'" stroke="#0a0a0c" stroke-width="2"/>';
+    });
+  }
+
+  // Value labels
+  if(el.showValues){
+    visible.forEach(function(p){
+      var animClass = (isPres && S.pres && p.reveal === S.revealStep) ? ' class="ep-line-value-anim"' : '';
+      svg += '<text'+animClass+' x="'+p.x+'" y="'+(p.y - 10)+'" text-anchor="middle" font-family="Outfit,sans-serif" font-size="10" font-weight="600" fill="#f0f0f5">'+formatChartValue(p.v)+'</text>';
+    });
+  }
+
+  // X-axis (always shows all category labels, dimmed for unrevealed)
+  if(el.showAxisX){
+    var axisY = padTop + chartH;
+    svg += '<line x1="'+padLeft+'" y1="'+axisY+'" x2="'+(padLeft+chartW)+'" y2="'+axisY+'" stroke="'+(el.axisColor||'rgba(255,255,255,0.25)')+'" stroke-width="'+(el.axisWidth||1)+'"/>';
+    data.forEach(function(d, i){
+      var hidden = (isPres && S.pres && revealSteps[i] > S.revealStep);
+      var labelColor = hidden ? 'rgba(240,240,245,0.25)' : (el.axisLabelColor||'rgba(240,240,245,0.7)');
+      var lx = indexToX(i);
+      svg += '<text x="'+lx+'" y="'+(axisY+18)+'" text-anchor="middle" font-family="Outfit,sans-serif" font-size="10" fill="'+labelColor+'">'+esc(String(d.label||''))+'</text>';
+    });
+  }
+
+  // Wrapper
+  var inner = '<div class="chart-el" data-chart-id="'+el.id+'" data-chart-anim-duration="'+(el.animDuration||800)+'" style="--ep-chart-anim-dur:'+(el.animDuration||800)+'ms;--ep-chart-anim-ease:'+chartEasingValue(el.animEasing||'smooth')+';position:relative;width:'+W+'px;height:'+H+'px;background:'+(el.bg||'transparent')+';border:'+(el.bw||0)+'px solid '+(el.bc||'transparent')+';border-radius:'+(el.br||0)+'px;overflow:visible;pointer-events:none">';
+  inner += '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" style="position:absolute;left:0;top:0;display:block;pointer-events:none">';
+  inner += svg;
+  inner += '</svg>';
+  inner += '</div>';
+  return inner;
+}
+
+// =========================================================
+// PIE / DONUT CHART RENDERER
+// =========================================================
+// Pie and donut share rendering — donut just sets innerRadius > 0.
+// Each slice is a separate SVG path (filled wedge with optional inner cut).
+// Slices animate via per-slice scaleY-style transform — newly-revealed slices
+// scale up from their centroid. Existing slices stay put. Same per-element
+// approach as bar charts so reveals don't flicker prior slices.
+function renderPieChart(el, isPres){
+  var data = el.data || [];
+  var W = el.w, H = el.h;
+  var titleInfo = renderChartTitle(el);
+  var padTop    = 14 + titleInfo.padTop;
+  var padBot    = 14 + titleInfo.padBot;
+  var padX      = 14;
+  var availW = Math.max(40, W - padX * 2);
+  var availH = Math.max(40, H - padTop - padBot);
+
+  // Compute label text widths to size the pie correctly.
+  // Each label is something like "Category Name — 25 (30%)" — width depends
+  // on actual text length. Without DOM measurement, estimate via
+  // chars * fontSize * 0.55 (good enough for sans-serif).
+  var labelSizeEst = el.pieLabelSize || 11;
+  var maxLabelChars = 0;
+  if(el.pieShowLabels){
+    var totalForPct = (data || []).reduce(function(s, d){ return s + Math.abs(Number(d.value)||0); }, 0);
+    (data || []).forEach(function(d){
+      var v = Math.abs(Number(d.value)||0);
+      var pct = totalForPct > 0 ? v / totalForPct : 0;
+      var pctStr = (pct * 100).toFixed(pct >= 0.1 ? 0 : 1) + '%';
+      var parts = [];
+      if(d.label) parts.push(d.label);
+      var vd = el.pieValueDisplay || 'percent';
+      if(vd === 'percent') parts.push(pctStr);
+      else if(vd === 'absolute') parts.push(formatChartValue(v));
+      else if(vd === 'both') parts.push(formatChartValue(v) + ' (' + pctStr + ')');
+      var labelText = parts.join(' — ');
+      if(labelText.length > maxLabelChars) maxLabelChars = labelText.length;
+    });
+  }
+  var estLabelWidth = maxLabelChars * labelSizeEst * 0.55;
+
+  // Reserve enough horizontal margin for labels at the LEFT and RIGHT sides.
+  // For top/bottom labels, just need labelSize * ~2 vertical space.
+  // labelMargin is the radial offset between pie edge and label text START.
+  // We need: (radius + 10 + estLabelWidth) <= availW/2 (so labels fit).
+  // Solve for radius: radius <= availW/2 - 10 - estLabelWidth.
+  // But also clamp to 30% min so chart isn't TOO small.
+  var labelMargin;
+  if(el.pieShowLabels){
+    // Reserve enough side space for the longest label, but cap at 45% of width
+    labelMargin = Math.min(availW * 0.45, Math.max(20, estLabelWidth + 12));
+  } else {
+    labelMargin = 8;
+  }
+  var diameter = Math.max(40, Math.min(availW - labelMargin * 2, availH - labelSizeEst * 2));
+  var radius = diameter / 2;
+  var cx = W / 2;
+  var cy = padTop + (availH / 2);
+
+  var isDonut = el.chartType === 'donut';
+  var innerRadius = isDonut ? radius * (el.donutInnerRadius || 0.55) : 0;
+
+  // Sum all (absolute) values for percentage calculation.
+  // Negative values are treated as their absolute value silently.
+  var values = data.map(function(d){ return Math.abs(Number(d.value) || 0); });
+  var total = values.reduce(function(a, b){ return a + b; }, 0);
+
+  var revealSteps = chartBarRevealSteps(el);
+
+  var svg = '';
+
+  // Title
+  if(el.title){
+    svg += titleInfo.svg;
+  }
+
+  // Empty state
+  if(total === 0 || data.length === 0){
+    svg += '<text x="'+cx+'" y="'+cy+'" text-anchor="middle" dominant-baseline="middle" font-family="Outfit,sans-serif" font-size="12" fill="rgba(240,240,245,0.4)">No data</text>';
+    var inner1 = '<div class="chart-el" data-chart-id="'+el.id+'" data-chart-anim-duration="'+(el.animDuration||800)+'" style="--ep-chart-anim-dur:'+(el.animDuration||800)+'ms;--ep-chart-anim-ease:'+chartEasingValue(el.animEasing||'smooth')+';position:relative;width:'+W+'px;height:'+H+'px;background:'+(el.bg||'transparent')+';border:'+(el.bw||0)+'px solid '+(el.bc||'transparent')+';border-radius:'+(el.br||0)+'px;overflow:visible;pointer-events:none">';
+    inner1 += '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" style="position:absolute;left:0;top:0;display:block;pointer-events:none">'+svg+'</svg>';
+    inner1 += '</div>';
+    return inner1;
+  }
+
+  // Build slices. Each slice has start angle, end angle, centroid (for label
+  // positioning + animation origin), and color. Angles are in radians,
+  // starting from -PI/2 (12 o'clock) and going clockwise.
+  var slices = [];
+  var startAngle = -Math.PI / 2;
+  data.forEach(function(d, i){
+    var v = Math.abs(Number(d.value) || 0);
+    var pct = total > 0 ? v / total : 0;
+    var endAngle = startAngle + pct * Math.PI * 2;
+    var midAngle = (startAngle + endAngle) / 2;
+    var color = chartBarColor(el, v, i);
+    slices.push({
+      idx: i,
+      startAngle: startAngle,
+      endAngle: endAngle,
+      midAngle: midAngle,
+      pct: pct,
+      value: v,
+      label: d.label || '',
+      color: color,
+      reveal: revealSteps[i]
+    });
+    startAngle = endAngle;
+  });
+
+  var is3D = !!el.pie3D;
+  var tilt3D = Math.max(0.4, Math.min(0.95, Number(el.pie3DTilt) || 0.6));
+  var depth3D = Math.max(0, Math.min(60, Number(el.pie3DDepth) || 24));
+  // For 3D: use elliptical radii (rx = radius, ry = radius * tilt). Also lift
+  // the center upward slightly to keep the bottom of the 3D pie inside the
+  // chart bounds (otherwise the depth overflows).
+  var rx = radius;
+  var ry = is3D ? radius * tilt3D : radius;
+  var innerRx = innerRadius;
+  var innerRy = is3D ? innerRadius * tilt3D : innerRadius;
+  if(is3D){
+    // Re-center so the depth fits: shift cy up by half the depth.
+    cy = cy - depth3D / 2;
+  }
+
+  // Render each slice. Skip slices not yet revealed in pres mode.
+  // For 3D: render all side walls FIRST (back to front), then all top faces.
+  // This way top faces always overlay walls below them.
+  if(is3D){
+    // First pass: render side walls. Sort by midAngle so back walls draw first
+    // (back = midAngle near -π/2, top of pie in screen coords). Walls visible
+    // on the FRONT half (sin(mid) > 0, i.e., bottom half of pie) need to be
+    // drawn AFTER the back walls so they cover them properly.
+    var sortedForWalls = slices.slice().sort(function(a, b){
+      return Math.sin(a.midAngle) - Math.sin(b.midAngle);
+    });
+    sortedForWalls.forEach(function(s){
+      if(isPres && S.pres && s.reveal > S.revealStep) return;
+      if(s.pct <= 0) return;
+      var wallD = buildEllipticalSideWall(cx, cy, rx, ry, s.startAngle, s.endAngle, depth3D);
+      var wallColor = darkenColor(s.color, 0.6);
+      // Wall is part of the slice for animation purposes — same data attrs
+      var midR = (innerRadius + radius) / 2;
+      var centX = cx + Math.cos(s.midAngle) * midR;
+      var centY = cy + Math.sin(s.midAngle) * (midR * tilt3D);
+      svg += '<path class="ep-pie-slice ep-pie-wall" data-slice-idx="'+s.idx+'" data-slice-reveal="'+s.reveal+'" style="transform-origin:'+centX+'px '+centY+'px" d="'+wallD+'" fill="'+wallColor+'" stroke="'+(el.pieDividerColor||'#0a0a0c')+'" stroke-width="'+(el.pieDividerWidth||2)*0.5+'"/>';
+    });
+    // Donut: also render the inner-hole walls (going DOWN from the inner edge)
+    if(isDonut && innerRadius > 0){
+      sortedForWalls.forEach(function(s){
+        if(isPres && S.pres && s.reveal > S.revealStep) return;
+        if(s.pct <= 0) return;
+        var innerWallD = buildEllipticalSideWall(cx, cy, innerRx, innerRy, s.startAngle, s.endAngle, depth3D);
+        var innerWallColor = darkenColor(s.color, 0.5);
+        var midR = (innerRadius + radius) / 2;
+        var centX = cx + Math.cos(s.midAngle) * midR;
+        var centY = cy + Math.sin(s.midAngle) * (midR * tilt3D);
+        svg += '<path class="ep-pie-slice ep-pie-wall-inner" data-slice-idx="'+s.idx+'" data-slice-reveal="'+s.reveal+'" style="transform-origin:'+centX+'px '+centY+'px" d="'+innerWallD+'" fill="'+innerWallColor+'" stroke="'+(el.pieDividerColor||'#0a0a0c')+'" stroke-width="'+(el.pieDividerWidth||2)*0.5+'"/>';
+      });
+    }
+    // Second pass: render top faces (elliptical wedges)
+    slices.forEach(function(s){
+      if(isPres && S.pres && s.reveal > S.revealStep) return;
+      if(s.pct <= 0) return;
+      var pathD = buildEllipticalArcPath(cx, cy, rx, ry, innerRx, innerRy, s.startAngle, s.endAngle);
+      var midR = (innerRadius + radius) / 2;
+      var centX = cx + Math.cos(s.midAngle) * midR;
+      var centY = cy + Math.sin(s.midAngle) * (midR * tilt3D);
+      svg += '<path class="ep-pie-slice ep-pie-top" data-slice-idx="'+s.idx+'" data-slice-reveal="'+s.reveal+'" style="transform-origin:'+centX+'px '+centY+'px" d="'+pathD+'" fill="'+s.color+'" stroke="'+(el.pieDividerColor||'#0a0a0c')+'" stroke-width="'+(el.pieDividerWidth||2)+'"/>';
+    });
+  } else {
+    // FLAT (non-3D) rendering — original behavior
+    slices.forEach(function(s){
+      if(isPres && S.pres && s.reveal > S.revealStep) return;
+      if(s.pct <= 0) return; // zero slices have no path
+
+      var pathD = buildArcPath(cx, cy, radius, innerRadius, s.startAngle, s.endAngle);
+      // Centroid for animation origin (where the slice "grows from")
+      var midR = (innerRadius + radius) / 2;
+      var centX = cx + Math.cos(s.midAngle) * midR;
+      var centY = cy + Math.sin(s.midAngle) * midR;
+      svg += '<path class="ep-pie-slice" data-slice-idx="'+s.idx+'" data-slice-reveal="'+s.reveal+'" style="transform-origin:'+centX+'px '+centY+'px" d="'+pathD+'" fill="'+s.color+'" stroke="'+(el.pieDividerColor||'#0a0a0c')+'" stroke-width="'+(el.pieDividerWidth||2)+'"/>';
+    });
+  }
+
+  // Render labels and values OUTSIDE the pie (with leader lines)
+  if(el.pieShowLabels || el.pieValueDisplay !== 'none'){
+    slices.forEach(function(s){
+      if(isPres && S.pres && s.reveal > S.revealStep) return;
+      if(s.pct <= 0) return;
+      // Label position: just outside the pie, in the direction of slice midpoint.
+      // For 3D mode, the y-component uses the squashed radius. Bottom-half
+      // labels (sin(midAngle) > 0) also push DOWN by the 3D depth so they
+      // clear the side wall that extrudes from the pie.
+      var labelR = radius + 10;
+      var lyMul = is3D ? tilt3D : 1;
+      var lx = cx + Math.cos(s.midAngle) * labelR;
+      var ly = cy + Math.sin(s.midAngle) * labelR * lyMul;
+      if(is3D && Math.sin(s.midAngle) > 0){
+        ly += depth3D + 4;
+      }
+      // Anchor right or left depending on which half of the pie
+      var anchor = (Math.cos(s.midAngle) >= 0) ? 'start' : 'end';
+      // Label text: combine category + value per pieValueDisplay setting
+      var parts = [];
+      if(el.pieShowLabels && s.label) parts.push(esc(s.label));
+      var vd = el.pieValueDisplay || 'percent';
+      if(vd !== 'none'){
+        var pctStr = (s.pct * 100).toFixed(s.pct >= 0.1 ? 0 : 1) + '%';
+        if(vd === 'percent') parts.push(pctStr);
+        else if(vd === 'absolute') parts.push(formatChartValue(s.value));
+        else if(vd === 'both') parts.push(formatChartValue(s.value) + ' (' + pctStr + ')');
+      }
+      var labelText = parts.join(' — ');
+      if(!labelText) return;
+      var animClass = (isPres && S.pres && s.reveal === S.revealStep) ? ' class="ep-pie-label-anim"' : '';
+      var outsideColor = (el.pieLabelColor && el.pieLabelColor !== 'auto') ? el.pieLabelColor : '#f0f0f5';
+      var labelSize = el.pieLabelSize || 11;
+      var labelWeight = el.pieLabelWeight || 500;
+      svg += '<text'+animClass+' x="'+lx+'" y="'+ly+'" text-anchor="'+anchor+'" dominant-baseline="middle" font-family="Outfit,sans-serif" font-size="'+labelSize+'" font-weight="'+labelWeight+'" fill="'+outsideColor+'">'+labelText+'</text>';
+    });
+  }
+
+  // Inline percentage text inside slice (only if showValues is on AND
+  // pieValueDisplay isn't already showing the value outside)
+  // Actually — to keep things clean, only render inside-slice values if labels
+  // are off (so labels-on uses outside-only). That avoids double labeling.
+  if(el.showValues && !el.pieShowLabels){
+    slices.forEach(function(s){
+      if(isPres && S.pres && s.reveal > S.revealStep) return;
+      if(s.pct < 0.05) return; // skip tiny slices — no room for text
+      var labelR = (innerRadius + radius) / 2;
+      var lyMul2 = is3D ? tilt3D : 1;
+      var lx = cx + Math.cos(s.midAngle) * labelR;
+      var ly = cy + Math.sin(s.midAngle) * labelR * lyMul2;
+      var pctStr = (s.pct * 100).toFixed(s.pct >= 0.1 ? 0 : 1) + '%';
+      var insideColor = (el.pieLabelColor && el.pieLabelColor !== 'auto') ? el.pieLabelColor : '#0a0a0c';
+      var insideSize = el.pieLabelSize || 11;
+      var insideWeight = el.pieLabelWeight || 700;
+      svg += '<text x="'+lx+'" y="'+ly+'" text-anchor="middle" dominant-baseline="middle" font-family="Outfit,sans-serif" font-size="'+insideSize+'" font-weight="'+insideWeight+'" fill="'+insideColor+'">'+pctStr+'</text>';
+    });
+  }
+
+  // Wrapper
+  var inner = '<div class="chart-el" data-chart-id="'+el.id+'" data-chart-anim-duration="'+(el.animDuration||800)+'" style="--ep-chart-anim-dur:'+(el.animDuration||800)+'ms;--ep-chart-anim-ease:'+chartEasingValue(el.animEasing||'smooth')+';position:relative;width:'+W+'px;height:'+H+'px;background:'+(el.bg||'transparent')+';border:'+(el.bw||0)+'px solid '+(el.bc||'transparent')+';border-radius:'+(el.br||0)+'px;overflow:visible;pointer-events:none">';
+  inner += '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" style="position:absolute;left:0;top:0;display:block;pointer-events:none">';
+  inner += svg;
+  inner += '</svg>';
+  inner += '</div>';
+  return inner;
+}
+
+// =========================================================
+// SCATTER CHART RENDERER
+// =========================================================
+// Scatter charts have TWO numeric axes (X and Y are both data values, not
+// categories). Each data point has an x and y. No line connects them.
+// Data shape: { x: number, y: number, label: string }
+function renderScatterChart(el, isPres){
+  var data = el.data || [];
+  var W = el.w, H = el.h;
+  var titleInfo = renderChartTitle(el);
+  var padTop    = 14 + titleInfo.padTop;
+  var padBot    = (el.showAxisX ? 28 : 12) + titleInfo.padBot;
+  var padLeft   = (el.showAxisY ? 44 : 12);
+  var padRight  = 14;
+  var chartW = Math.max(20, W - padLeft - padRight);
+  var chartH = Math.max(20, H - padTop - padBot);
+
+  // Both axes use auto-fit ranges based on actual x and y values.
+  // yFromZero option still applies if user wants Y to start at zero.
+  var xs = data.map(function(d){ return Number(d.x) || 0; });
+  var ys = data.map(function(d){ return Number(d.y) || 0; });
+  var xRange = computeNumericRange(xs, false); // X always auto-fit
+  var yRange = computeNumericRange(ys, el.yFromZero === true);
+
+  function valueToY(v){
+    return padTop + chartH * (yRange.max - v) / (yRange.max - yRange.min);
+  }
+  function valueToX(v){
+    return padLeft + chartW * (v - xRange.min) / (xRange.max - xRange.min);
+  }
+
+  var revealSteps = chartBarRevealSteps(el);
+  var pointSize = el.scatterPointSize || 7;
+  var pointShape = el.scatterPointShape || 'circle';
+  var color = el.colorPrimary || '#7ed957';
+
+  var svg = '';
+
+  // Title
+  if(el.title){
+    svg += titleInfo.svg;
+  }
+
+  // Gridlines
+  if(el.showGridlines){
+    var gridColor = el.gridColor || 'rgba(255,255,255,0.06)';
+    var gridWidth = el.gridWidth || 1;
+    for(var g = 0; g <= 4; g++){
+      var gy = padTop + (chartH * g / 4);
+      svg += '<line x1="'+padLeft+'" y1="'+gy+'" x2="'+(padLeft+chartW)+'" y2="'+gy+'" stroke="'+gridColor+'" stroke-width="'+gridWidth+'"/>';
+      var gx = padLeft + (chartW * g / 4);
+      svg += '<line x1="'+gx+'" y1="'+padTop+'" x2="'+gx+'" y2="'+(padTop+chartH)+'" stroke="'+gridColor+'" stroke-width="'+gridWidth+'"/>';
+    }
+  }
+
+  // Y-axis line + tick labels
+  var axisColor = el.axisColor || 'rgba(255,255,255,0.25)';
+  var axisWidth = el.axisWidth || 1;
+  var axisLabelColor = el.axisLabelColor || 'rgba(240,240,245,0.6)';
+  if(el.showAxisY){
+    svg += '<line x1="'+padLeft+'" y1="'+padTop+'" x2="'+padLeft+'" y2="'+(padTop+chartH)+'" stroke="'+axisColor+'" stroke-width="'+axisWidth+'"/>';
+    var yTicks = [yRange.max, (yRange.max+yRange.min)/2, yRange.min];
+    yTicks.forEach(function(tv, ti){
+      var ty = padTop + (chartH * ti / 2);
+      svg += '<text x="'+(padLeft-6)+'" y="'+(ty+4)+'" text-anchor="end" font-family="Outfit,sans-serif" font-size="10" fill="'+axisLabelColor+'">'+formatChartValue(tv)+'</text>';
+    });
+  }
+
+  // X-axis line + tick labels
+  if(el.showAxisX){
+    var axisY = padTop + chartH;
+    svg += '<line x1="'+padLeft+'" y1="'+axisY+'" x2="'+(padLeft+chartW)+'" y2="'+axisY+'" stroke="'+axisColor+'" stroke-width="'+axisWidth+'"/>';
+    var xTicks = [xRange.min, (xRange.min+xRange.max)/2, xRange.max];
+    xTicks.forEach(function(tv, ti){
+      var tx = padLeft + (chartW * ti / 2);
+      svg += '<text x="'+tx+'" y="'+(axisY+18)+'" text-anchor="middle" font-family="Outfit,sans-serif" font-size="10" fill="'+axisLabelColor+'">'+formatChartValue(tv)+'</text>';
+    });
+  }
+
+  // Zero baseline (when y range crosses zero)
+  if(yRange.min < 0 && yRange.max > 0){
+    var zeroY = valueToY(0);
+    svg += '<line x1="'+padLeft+'" y1="'+zeroY+'" x2="'+(padLeft+chartW)+'" y2="'+zeroY+'" stroke="rgba(255,255,255,0.35)" stroke-width="1" stroke-dasharray="4,3"/>';
+  }
+
+  // Render each point. In sequential/manual reveal, hidden points are skipped.
+  data.forEach(function(d, i){
+    if(isPres && S.pres && revealSteps[i] > S.revealStep) return;
+    var px = valueToX(Number(d.x) || 0);
+    var py = valueToY(Number(d.y) || 0);
+    var revealStep = revealSteps[i];
+    // Each point gets a marker class so animation system can target newly-revealed points.
+    var pointEl;
+    if(pointShape === 'square'){
+      var sz = pointSize * 1.6;
+      pointEl = '<rect class="ep-scatter-point" data-point-idx="'+i+'" data-point-reveal="'+revealStep+'" style="transform-origin:'+px+'px '+py+'px" x="'+(px - sz/2)+'" y="'+(py - sz/2)+'" width="'+sz+'" height="'+sz+'" rx="2" fill="'+color+'" stroke="#0a0a0c" stroke-width="1.5"/>';
+    } else if(pointShape === 'diamond'){
+      var dz = pointSize * 1.2;
+      pointEl = '<polygon class="ep-scatter-point" data-point-idx="'+i+'" data-point-reveal="'+revealStep+'" style="transform-origin:'+px+'px '+py+'px" points="'+px+','+(py-dz)+' '+(px+dz)+','+py+' '+px+','+(py+dz)+' '+(px-dz)+','+py+'" fill="'+color+'" stroke="#0a0a0c" stroke-width="1.5"/>';
+    } else {
+      pointEl = '<circle class="ep-scatter-point" data-point-idx="'+i+'" data-point-reveal="'+revealStep+'" style="transform-origin:'+px+'px '+py+'px" cx="'+px+'" cy="'+py+'" r="'+pointSize+'" fill="'+color+'" stroke="#0a0a0c" stroke-width="1.5"/>';
+    }
+    svg += pointEl;
+  });
+
+  // Optional point labels next to each point
+  if(el.scatterShowLabels){
+    data.forEach(function(d, i){
+      if(isPres && S.pres && revealSteps[i] > S.revealStep) return;
+      if(!d.label) return;
+      var px = valueToX(Number(d.x) || 0);
+      var py = valueToY(Number(d.y) || 0);
+      var animClass = (isPres && S.pres && revealSteps[i] === S.revealStep) ? ' class="ep-line-value-anim"' : '';
+      svg += '<text'+animClass+' x="'+(px + pointSize + 4)+'" y="'+(py + 4)+'" font-family="Outfit,sans-serif" font-size="10" font-weight="500" fill="#f0f0f5">'+esc(d.label)+'</text>';
+    });
+  }
+
+  // Wrapper
+  var inner = '<div class="chart-el" data-chart-id="'+el.id+'" data-chart-anim-duration="'+(el.animDuration||800)+'" style="--ep-chart-anim-dur:'+(el.animDuration||800)+'ms;--ep-chart-anim-ease:'+chartEasingValue(el.animEasing||'smooth')+';position:relative;width:'+W+'px;height:'+H+'px;background:'+(el.bg||'transparent')+';border:'+(el.bw||0)+'px solid '+(el.bc||'transparent')+';border-radius:'+(el.br||0)+'px;overflow:visible;pointer-events:none">';
+  inner += '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" style="position:absolute;left:0;top:0;display:block;pointer-events:none">';
+  inner += svg;
+  inner += '</svg>';
+  inner += '</div>';
+  return inner;
+}
+
+// Compute numeric range with optional padding. If forceZero is true, includes
+// 0 in the range. Used by scatter for both axes and lines for Y.
+function computeNumericRange(values, forceZero){
+  if(values.length === 0) return { min: 0, max: 1 };
+  var vmin = Math.min.apply(null, values);
+  var vmax = Math.max.apply(null, values);
+  if(forceZero){
+    vmin = Math.min(0, vmin);
+    vmax = Math.max(0, vmax);
+  }
+  // Add 8% padding so points don't sit on the edge
+  var pad = (vmax - vmin) * 0.08;
+  if(pad === 0) pad = Math.max(1, Math.abs(vmax) * 0.1);
+  vmin -= pad;
+  vmax += pad;
+  if(vmax === vmin) vmax = vmin + 1;
+  return { min: vmin, max: vmax };
+}
+
+
+// Build an elliptical pie/donut wedge path. Same as buildArcPath but with
+// separate rx/ry radii — produces a tilted (perspective) wedge when ry < rx.
+// Used for 3D pie/donut top faces.
+function buildEllipticalArcPath(cx, cy, rx, ry, innerRx, innerRy, startAngle, endAngle){
+  var sweep = endAngle - startAngle;
+  if(sweep >= Math.PI * 2 - 0.001) sweep = Math.PI * 2 - 0.001;
+  var actualEnd = startAngle + sweep;
+
+  var x1 = cx + Math.cos(startAngle) * rx;
+  var y1 = cy + Math.sin(startAngle) * ry;
+  var x2 = cx + Math.cos(actualEnd) * rx;
+  var y2 = cy + Math.sin(actualEnd) * ry;
+  var largeArc = sweep > Math.PI ? 1 : 0;
+
+  if(innerRx > 0){
+    var x3 = cx + Math.cos(actualEnd) * innerRx;
+    var y3 = cy + Math.sin(actualEnd) * innerRy;
+    var x4 = cx + Math.cos(startAngle) * innerRx;
+    var y4 = cy + Math.sin(startAngle) * innerRy;
+    return 'M '+x1+' '+y1+
+           ' A '+rx+' '+ry+' 0 '+largeArc+' 1 '+x2+' '+y2+
+           ' L '+x3+' '+y3+
+           ' A '+innerRx+' '+innerRy+' 0 '+largeArc+' 0 '+x4+' '+y4+
+           ' Z';
+  }
+  return 'M '+cx+' '+cy+
+         ' L '+x1+' '+y1+
+         ' A '+rx+' '+ry+' 0 '+largeArc+' 1 '+x2+' '+y2+
+         ' Z';
+}
+
+// Build the 3D side wall (ribbon) for a slice — outer arc + drop + return arc.
+function buildEllipticalSideWall(cx, cy, rx, ry, startAngle, endAngle, depth){
+  var sweep = endAngle - startAngle;
+  if(sweep >= Math.PI * 2 - 0.001) sweep = Math.PI * 2 - 0.001;
+  var actualEnd = startAngle + sweep;
+
+  var x1 = cx + Math.cos(startAngle) * rx;
+  var y1 = cy + Math.sin(startAngle) * ry;
+  var x2 = cx + Math.cos(actualEnd) * rx;
+  var y2 = cy + Math.sin(actualEnd) * ry;
+  var largeArc = sweep > Math.PI ? 1 : 0;
+
+  return 'M '+x1+' '+y1+
+         ' A '+rx+' '+ry+' 0 '+largeArc+' 1 '+x2+' '+y2+
+         ' L '+x2+' '+(y2 + depth)+
+         ' A '+rx+' '+ry+' 0 '+largeArc+' 0 '+x1+' '+(y1 + depth)+
+         ' Z';
+}
+
+// Darken a color by a factor (0-1) for shading 3D pie side walls.
+function darkenColor(color, factor){
+  if(!color) return '#666666';
+  factor = factor != null ? factor : 0.7;
+  var c = String(color).trim();
+  var r, g, b, a = 1;
+  if(c.charAt(0) === '#'){
+    var h = c.length === 4
+      ? '#'+c.charAt(1)+c.charAt(1)+c.charAt(2)+c.charAt(2)+c.charAt(3)+c.charAt(3)
+      : c;
+    r = parseInt(h.substring(1, 3), 16);
+    g = parseInt(h.substring(3, 5), 16);
+    b = parseInt(h.substring(5, 7), 16);
+  } else {
+    var m = c.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?/);
+    if(!m) return color;
+    r = parseInt(m[1], 10);
+    g = parseInt(m[2], 10);
+    b = parseInt(m[3], 10);
+    if(m[4]) a = parseFloat(m[4]);
+  }
+  r = Math.max(0, Math.round(r * factor));
+  g = Math.max(0, Math.round(g * factor));
+  b = Math.max(0, Math.round(b * factor));
+  return a < 1 ? 'rgba('+r+','+g+','+b+','+a+')' : 'rgb('+r+','+g+','+b+')';
+}
+
+// If innerRadius > 0, builds a donut wedge (annular sector). Otherwise pie wedge.
+// Angles are in radians. Returns a closed path.
+function buildArcPath(cx, cy, outerR, innerR, startAngle, endAngle){
+  // Handle full circle case (single 100% slice) — SVG arcs can't do exactly 360°
+  // because start == end. Use 359.99° workaround.
+  var sweep = endAngle - startAngle;
+  if(sweep >= Math.PI * 2 - 0.001) sweep = Math.PI * 2 - 0.001;
+  var actualEnd = startAngle + sweep;
+
+  var x1 = cx + Math.cos(startAngle) * outerR;
+  var y1 = cy + Math.sin(startAngle) * outerR;
+  var x2 = cx + Math.cos(actualEnd) * outerR;
+  var y2 = cy + Math.sin(actualEnd) * outerR;
+  var largeArc = sweep > Math.PI ? 1 : 0;
+
+  if(innerR > 0){
+    var x3 = cx + Math.cos(actualEnd) * innerR;
+    var y3 = cy + Math.sin(actualEnd) * innerR;
+    var x4 = cx + Math.cos(startAngle) * innerR;
+    var y4 = cy + Math.sin(startAngle) * innerR;
+    return 'M '+x1+' '+y1+
+           ' A '+outerR+' '+outerR+' 0 '+largeArc+' 1 '+x2+' '+y2+
+           ' L '+x3+' '+y3+
+           ' A '+innerR+' '+innerR+' 0 '+largeArc+' 0 '+x4+' '+y4+
+           ' Z';
+  }
+  return 'M '+cx+' '+cy+
+         ' L '+x1+' '+y1+
+         ' A '+outerR+' '+outerR+' 0 '+largeArc+' 1 '+x2+' '+y2+
+         ' Z';
+}
+
+// Build an SVG path 'd' string through a list of points {x, y}.
+// If smooth=true, uses catmull-rom-style cubic bezier. Else straight segments.
+function buildLinePath(points, smooth){
+  if(points.length === 0) return '';
+  if(points.length === 1) return 'M '+points[0].x+' '+points[0].y;
+  if(!smooth){
+    var d = 'M '+points[0].x+' '+points[0].y;
+    for(var i=1; i<points.length; i++){
+      d += ' L '+points[i].x+' '+points[i].y;
+    }
+    return d;
+  }
+  // Smooth path using cubic Bézier between consecutive pairs.
+  // Tangent at point i is along the chord between i-1 and i+1.
+  var d = 'M '+points[0].x+' '+points[0].y;
+  for(var i=0; i<points.length-1; i++){
+    var p0 = points[Math.max(0, i-1)];
+    var p1 = points[i];
+    var p2 = points[i+1];
+    var p3 = points[Math.min(points.length-1, i+2)];
+    var tension = 0.2; // lower = tighter curves; higher = wider
+    var c1x = p1.x + (p2.x - p0.x) * tension;
+    var c1y = p1.y + (p2.y - p0.y) * tension;
+    var c2x = p2.x - (p3.x - p1.x) * tension;
+    var c2y = p2.y - (p3.y - p1.y) * tension;
+    d += ' C '+c1x+' '+c1y+' '+c2x+' '+c2y+' '+p2.x+' '+p2.y;
+  }
+  return d;
+}
+
+// Format a chart value compactly. Adds k/M suffixes for large numbers, keeps
+// at most 1 decimal place for clean display.
+function formatChartValue(v){
+  if(v === null || v === undefined || isNaN(v)) return '';
+  v = Number(v);
+  var abs = Math.abs(v);
+  var sign = v < 0 ? '-' : '';
+  if(abs >= 1000000) return sign + (abs/1000000).toFixed(abs >= 10000000 ? 0 : 1) + 'M';
+  if(abs >= 1000)    return sign + (abs/1000).toFixed(abs >= 10000 ? 0 : 1) + 'k';
+  if(Number.isInteger(v)) return String(v);
+  return v.toFixed(1);
+}
+
+// Canvas-render counterpart of renderBarChart. Draws a chart element to the
+// recording context. Honors the chart's current animation progress so recorded
+// videos show bars growing in over time (matching what's on screen).
+//
+// Animation progress is eased with the same cubic-bezier-ish curve as CSS
+// (out-quint approximation) so the canvas matches the on-screen feel.
+function drawChartToCanvas(ctx, el){
+  if(el.chartType === 'line' || el.chartType === 'area') return drawLineChartToCanvas(ctx, el);
+  if(el.chartType === 'pie' || el.chartType === 'donut') return drawPieChartToCanvas(ctx, el);
+  if(el.chartType === 'scatter') return drawScatterChartToCanvas(ctx, el);
+  if(el.chartType !== 'bar') return;
+  // Horizontal bar charts don't yet have canvas equivalent. Recordings show
+  // the SVG via the editor capture pipeline; returning early here is safe.
+  if(el.barDirection === 'horizontal') return;
+
+  var data = el.data || [];
+  var W = el.w, H = el.h;
+  var titleInfo = renderChartTitle(el);
+  var padTop    = 14 + titleInfo.padTop;
+  var padBot    = (el.showAxisX ? 28 : 12) + titleInfo.padBot;
+  var padLeft   = (el.showAxisY ? 44 : 12);
+  var padRight  = 12;
+  var chartW = Math.max(20, W - padLeft - padRight);
+  var chartH = Math.max(20, H - padTop - padBot);
+
+  var range = chartValueRange(el);
+  var zeroY = el.y + padTop + chartH * (range.max / (range.max - range.min));
+
+  var n = data.length || 1;
+  var slot = chartW / n;
+  var barWidth = slot * 0.65;
+  var barGap   = (slot - barWidth) / 2;
+
+  // Animation progress (0..1). Use eased curve matching CSS bezier feel.
+  var rawProg = getChartAnimProgress(el.id);
+  // Ease-out cubic: 1 - (1-t)^3
+  var prog = 1 - Math.pow(1 - rawProg, 3);
+
+  ctx.save();
+
+  // Background (if non-transparent)
+  if(el.bg && el.bg !== 'transparent'){
+    ctx.fillStyle = el.bg;
+    ctx.fillRect(el.x, el.y, W, H);
+  }
+
+  // Title
+  drawChartTitleToCanvas(ctx, el);
+
+  // Gridlines
+  if(el.showGridlines){
+    ctx.strokeStyle = el.gridColor || 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    for(var g = 0; g <= 4; g++){
+      var gy = el.y + padTop + (chartH * g / 4);
+      ctx.beginPath();
+      ctx.moveTo(el.x + padLeft, gy);
+      ctx.lineTo(el.x + padLeft + chartW, gy);
+      ctx.stroke();
+    }
+  }
+
+  // Y-axis line + labels
+  if(el.showAxisY){
+    ctx.strokeStyle = el.axisColor || 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(el.x + padLeft, el.y + padTop);
+    ctx.lineTo(el.x + padLeft, el.y + padTop + chartH);
+    ctx.stroke();
+    ctx.fillStyle = el.axisLabelColor || 'rgba(240,240,245,0.6)';
+    ctx.font = '500 10px Outfit, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    var ticks = [range.max, (range.max+range.min)/2, range.min];
+    ticks.forEach(function(tv, ti){
+      var ty = el.y + padTop + (chartH * ti / 2);
+      ctx.fillText(formatChartValue(tv), el.x + padLeft - 6, ty);
+    });
+  }
+
+  // Zero baseline (bolder if there are negatives)
+  if(range.min < 0){
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(el.x + padLeft, zeroY);
+    ctx.lineTo(el.x + padLeft + chartW, zeroY);
+    ctx.stroke();
+  }
+
+  // Bars — filter by reveal step (same logic as renderBarChart for consistency)
+  var canvasRevealSteps = chartBarRevealSteps(el);
+  var pxPerUnit = chartH / (range.max - range.min);
+  data.forEach(function(d, i){
+    if(S.pres && canvasRevealSteps[i] > S.revealStep) return;
+    var v = Number(d.value) || 0;
+    var color = chartBarColor(el, v, i);
+    var bx = el.x + padLeft + (i * slot) + barGap;
+    var fullH = Math.abs(v) * pxPerUnit;
+    var animH = fullH * prog;  // scaled by current progress
+    var by = (v >= 0) ? (zeroY - animH) : zeroY;
+
+    // Fill bar (rounded corners — small radius to match SVG)
+    var radius = 3;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    if(animH > radius * 2 && barWidth > radius * 2){
+      // Rounded rect path
+      ctx.moveTo(bx + radius, by);
+      ctx.lineTo(bx + barWidth - radius, by);
+      ctx.quadraticCurveTo(bx + barWidth, by, bx + barWidth, by + radius);
+      ctx.lineTo(bx + barWidth, by + animH - radius);
+      ctx.quadraticCurveTo(bx + barWidth, by + animH, bx + barWidth - radius, by + animH);
+      ctx.lineTo(bx + radius, by + animH);
+      ctx.quadraticCurveTo(bx, by + animH, bx, by + animH - radius);
+      ctx.lineTo(bx, by + radius);
+      ctx.quadraticCurveTo(bx, by, bx + radius, by);
+      ctx.closePath();
+    } else {
+      // Bar too short for rounding — plain rect
+      ctx.rect(bx, by, barWidth, animH);
+    }
+    ctx.fill();
+
+    // Value label on bar (only after most of the animation completes,
+    // so labels don't "fly in" from below the bars)
+    if(el.showValues && rawProg > 0.6){
+      var labelOpacity = Math.min(1, (rawProg - 0.6) / 0.3);
+      ctx.globalAlpha = labelOpacity;
+      ctx.fillStyle = '#f0f0f5';
+      ctx.font = '600 10px Outfit, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      // Negative bars: label inside bar at top (just below zero); positive: above bar
+      var labelY = (v >= 0) ? (by - 4) : (zeroY + 12);
+      ctx.fillText(formatChartValue(v), bx + barWidth/2, labelY);
+      ctx.globalAlpha = 1;
+    }
+  });
+
+  // X-axis line + category labels
+  if(el.showAxisX){
+    var axisY = el.y + padTop + chartH;
+    ctx.strokeStyle = el.axisColor || 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(el.x + padLeft, axisY);
+    ctx.lineTo(el.x + padLeft + chartW, axisY);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(240,240,245,0.7)';
+    ctx.font = '500 10px Outfit, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    data.forEach(function(d, i){
+      var lx = el.x + padLeft + (i * slot) + slot/2;
+      ctx.fillText(String(d.label||''), lx, axisY + 14);
+    });
+  }
+
+  ctx.restore();
+}
+
+// Canvas-render for line charts. Replicates renderLineChart logic in canvas
+// API form. Honors animation progress: during the line-draw animation, the
+// path is drawn partially (proportional to progress).
+function drawLineChartToCanvas(ctx, el){
+  var data = el.data || [];
+  var W = el.w, H = el.h;
+  var titleInfo = renderChartTitle(el);
+  var padTop    = 14 + titleInfo.padTop;
+  var padBot    = (el.showAxisX ? 28 : 12) + titleInfo.padBot;
+  var padLeft   = (el.showAxisY ? 44 : 12);
+  var padRight  = 12;
+  var chartW = Math.max(20, W - padLeft - padRight);
+  var chartH = Math.max(20, H - padTop - padBot);
+
+  var range = chartValueRange(el);
+  function valueToY(v){
+    return el.y + padTop + chartH * (range.max - v) / (range.max - range.min);
+  }
+  var n = data.length;
+  function indexToX(i){
+    if(n <= 1) return el.x + padLeft + chartW / 2;
+    return el.x + padLeft + (i / (n - 1)) * chartW;
+  }
+
+  var revealSteps = chartBarRevealSteps(el);
+  var visible = data.map(function(d, i){
+    if(S.pres && revealSteps[i] > S.revealStep) return null;
+    return { idx: i, x: indexToX(i), y: valueToY(Number(d.value)||0), v: Number(d.value)||0, label: d.label, reveal: revealSteps[i] };
+  }).filter(function(p){ return p; });
+
+  var color = el.colorPrimary || '#7ed957';
+  var lineWidth = el.lineWidth || 3;
+  var smooth = el.lineSmooth !== false;
+  var showPoints = el.linePoints !== false;
+
+  var rawProg = getChartAnimProgress(el.id);
+  var prog = 1 - Math.pow(1 - rawProg, 3); // ease-out cubic
+
+  ctx.save();
+
+  // Background
+  if(el.bg && el.bg !== 'transparent'){
+    ctx.fillStyle = el.bg;
+    ctx.fillRect(el.x, el.y, W, H);
+  }
+
+  // Title
+  drawChartTitleToCanvas(ctx, el);
+
+  // Gridlines
+  if(el.showGridlines){
+    ctx.strokeStyle = el.gridColor || 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    for(var g = 0; g <= 4; g++){
+      var gy = el.y + padTop + (chartH * g / 4);
+      ctx.beginPath();
+      ctx.moveTo(el.x + padLeft, gy);
+      ctx.lineTo(el.x + padLeft + chartW, gy);
+      ctx.stroke();
+    }
+  }
+
+  // Y-axis line + labels
+  if(el.showAxisY){
+    ctx.strokeStyle = el.axisColor || 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(el.x + padLeft, el.y + padTop);
+    ctx.lineTo(el.x + padLeft, el.y + padTop + chartH);
+    ctx.stroke();
+    ctx.fillStyle = el.axisLabelColor || 'rgba(240,240,245,0.6)';
+    ctx.font = '500 10px Outfit, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    var ticks = [range.max, (range.max+range.min)/2, range.min];
+    ticks.forEach(function(tv, ti){
+      var ty = el.y + padTop + (chartH * ti / 2);
+      ctx.fillText(formatChartValue(tv), el.x + padLeft - 6, ty);
+    });
+  }
+
+  // Zero baseline
+  if(range.min < 0 && range.max > 0){
+    var zeroY = valueToY(0);
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(el.x + padLeft, zeroY);
+    ctx.lineTo(el.x + padLeft + chartW, zeroY);
+    ctx.stroke();
+  }
+
+  // Draw the line path
+  if(visible.length >= 2){
+    // For canvas, we draw the entire visible path but cut it off at progress%.
+    // Approach: draw first (visible.length - 1) - 1 segments fully (the static
+    // segments), then the LAST segment partially to (prog) of its length.
+    // For simplicity in canvas: when animating (prog < 1), interpolate the
+    // last point along its segment. When not animating (prog >= 1), draw the
+    // whole visible path.
+    var drawPts;
+    if(prog >= 1 || visible.length < 2){
+      drawPts = visible.slice();
+    } else {
+      // Find which point is the most recently revealed (animating one)
+      var animatingIdx = -1;
+      for(var i=visible.length-1; i>=0; i--){
+        if(visible[i].reveal === S.revealStep){ animatingIdx = i; break; }
+      }
+      if(animatingIdx <= 0){
+        drawPts = visible.slice();
+      } else {
+        // Static segments through visible[animatingIdx-1]
+        // Then partial segment from animatingIdx-1 to animatingIdx scaled by prog
+        drawPts = visible.slice(0, animatingIdx);
+        var prev = visible[animatingIdx - 1];
+        var curr = visible[animatingIdx];
+        drawPts.push({
+          x: prev.x + (curr.x - prev.x) * prog,
+          y: prev.y + (curr.y - prev.y) * prog,
+          v: curr.v, label: curr.label, reveal: curr.reveal,
+          isPartial: true
+        });
+      }
+    }
+
+    if(drawPts.length >= 2){
+      // For area charts, fill the region below the line first.
+      if(el.chartType === 'area'){
+        var baselineY = (range.min < 0 && range.max > 0) ? valueToY(0) : (el.y + padTop + chartH);
+        var fillStyle = el.areaFillStyle || 'gradient';
+        var fillOpacity = el.areaFillOpacity != null ? el.areaFillOpacity : 0.35;
+        var fillStyleObj;
+        if(fillStyle === 'gradient'){
+          var grad = ctx.createLinearGradient(0, el.y + padTop, 0, el.y + padTop + chartH);
+          grad.addColorStop(0, hexWithAlpha(color, fillOpacity));
+          grad.addColorStop(1, hexWithAlpha(color, 0));
+          fillStyleObj = grad;
+        } else {
+          fillStyleObj = hexWithAlpha(color, fillOpacity);
+        }
+        ctx.fillStyle = fillStyleObj;
+        ctx.beginPath();
+        ctx.moveTo(drawPts[0].x, baselineY);
+        ctx.lineTo(drawPts[0].x, drawPts[0].y);
+        if(smooth && drawPts.length > 2){
+          var tension2 = 0.2;
+          for(var i=0; i<drawPts.length-1; i++){
+            var p0 = drawPts[Math.max(0, i-1)];
+            var p1 = drawPts[i];
+            var p2 = drawPts[i+1];
+            var p3 = drawPts[Math.min(drawPts.length-1, i+2)];
+            var c1x = p1.x + (p2.x - p0.x) * tension2;
+            var c1y = p1.y + (p2.y - p0.y) * tension2;
+            var c2x = p2.x - (p3.x - p1.x) * tension2;
+            var c2y = p2.y - (p3.y - p1.y) * tension2;
+            ctx.bezierCurveTo(c1x, c1y, c2x, c2y, p2.x, p2.y);
+          }
+        } else {
+          for(var i=1; i<drawPts.length; i++){
+            ctx.lineTo(drawPts[i].x, drawPts[i].y);
+          }
+        }
+        ctx.lineTo(drawPts[drawPts.length-1].x, baselineY);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(drawPts[0].x, drawPts[0].y);
+      if(smooth && drawPts.length > 2){
+        // Catmull-rom-style smoothing using cubic bezier (same as buildLinePath)
+        var tension = 0.2;
+        for(var i=0; i<drawPts.length-1; i++){
+          var p0 = drawPts[Math.max(0, i-1)];
+          var p1 = drawPts[i];
+          var p2 = drawPts[i+1];
+          var p3 = drawPts[Math.min(drawPts.length-1, i+2)];
+          var c1x = p1.x + (p2.x - p0.x) * tension;
+          var c1y = p1.y + (p2.y - p0.y) * tension;
+          var c2x = p2.x - (p3.x - p1.x) * tension;
+          var c2y = p2.y - (p3.y - p1.y) * tension;
+          ctx.bezierCurveTo(c1x, c1y, c2x, c2y, p2.x, p2.y);
+        }
+      } else {
+        for(var i=1; i<drawPts.length; i++){
+          ctx.lineTo(drawPts[i].x, drawPts[i].y);
+        }
+      }
+      ctx.stroke();
+    }
+
+    // Points (dots) — only at fully-revealed (non-partial) points
+    if(showPoints){
+      drawPts.forEach(function(p){
+        if(p.isPartial) return; // don't show dot at the moving tip
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#0a0a0c';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, lineWidth + 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      });
+    }
+
+    // Value labels
+    if(el.showValues){
+      ctx.fillStyle = '#f0f0f5';
+      ctx.font = '600 10px Outfit, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      drawPts.forEach(function(p){
+        if(p.isPartial) return;
+        ctx.fillText(formatChartValue(p.v), p.x, p.y - 10);
+      });
+    }
+  } else if(visible.length === 1 && showPoints){
+    // Single visible point — just draw the dot
+    var p = visible[0];
+    ctx.fillStyle = color;
+    ctx.strokeStyle = '#0a0a0c';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, lineWidth + 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // X-axis
+  if(el.showAxisX){
+    var axisY = el.y + padTop + chartH;
+    ctx.strokeStyle = el.axisColor || 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(el.x + padLeft, axisY);
+    ctx.lineTo(el.x + padLeft + chartW, axisY);
+    ctx.stroke();
+    ctx.font = '500 10px Outfit, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    data.forEach(function(d, i){
+      var hidden = (S.pres && revealSteps[i] > S.revealStep);
+      ctx.fillStyle = hidden ? 'rgba(240,240,245,0.25)' : 'rgba(240,240,245,0.7)';
+      var lx = indexToX(i);
+      ctx.fillText(String(d.label||''), lx, axisY + 14);
+    });
+  }
+
+  ctx.restore();
+}
+
+// Canvas-render for pie/donut charts. Mirrors renderPieChart logic in canvas
+// API form. Honors per-slice animation: slices currently growing are drawn
+// at progress * full size (scaled from centroid).
+function drawPieChartToCanvas(ctx, el){
+  var data = el.data || [];
+  var W = el.w, H = el.h;
+  var titleInfoCanvas = renderChartTitle(el);
+  var padTop = 14 + titleInfoCanvas.padTop;
+  var padBot = 14 + titleInfoCanvas.padBot;
+  var padX = 14;
+  var availW = Math.max(40, W - padX * 2);
+  var availH = Math.max(40, H - padTop - padBot);
+
+  // Dynamic label margin based on actual label text widths
+  var labelSizeEst = el.pieLabelSize || 11;
+  var maxLabelChars = 0;
+  if(el.pieShowLabels){
+    var totalForPct = (data || []).reduce(function(s, d){ return s + Math.abs(Number(d.value)||0); }, 0);
+    (data || []).forEach(function(d){
+      var v = Math.abs(Number(d.value)||0);
+      var pct = totalForPct > 0 ? v / totalForPct : 0;
+      var pctStr = (pct * 100).toFixed(pct >= 0.1 ? 0 : 1) + '%';
+      var parts = [];
+      if(d.label) parts.push(d.label);
+      var vd = el.pieValueDisplay || 'percent';
+      if(vd === 'percent') parts.push(pctStr);
+      else if(vd === 'absolute') parts.push(formatChartValue(v));
+      else if(vd === 'both') parts.push(formatChartValue(v) + ' (' + pctStr + ')');
+      var labelText = parts.join(' — ');
+      if(labelText.length > maxLabelChars) maxLabelChars = labelText.length;
+    });
+  }
+  var estLabelWidth = maxLabelChars * labelSizeEst * 0.55;
+  var labelMargin = el.pieShowLabels
+    ? Math.min(availW * 0.45, Math.max(20, estLabelWidth + 12))
+    : 8;
+  var diameter = Math.max(40, Math.min(availW - labelMargin * 2, availH - labelSizeEst * 2));
+  var radius = diameter / 2;
+  var cx = el.x + W / 2;
+  var cy = el.y + padTop + (availH / 2);
+  var isDonut = el.chartType === 'donut';
+  var innerRadius = isDonut ? radius * (el.donutInnerRadius || 0.55) : 0;
+
+  var values = data.map(function(d){ return Math.abs(Number(d.value) || 0); });
+  var total = values.reduce(function(a, b){ return a + b; }, 0);
+  var revealSteps = chartBarRevealSteps(el);
+
+  var rawProg = getChartAnimProgress(el.id);
+  var prog = 1 - Math.pow(1 - rawProg, 3); // ease-out cubic
+
+  ctx.save();
+
+  // Background
+  if(el.bg && el.bg !== 'transparent'){
+    ctx.fillStyle = el.bg;
+    ctx.fillRect(el.x, el.y, W, H);
+  }
+
+  // Title
+  drawChartTitleToCanvas(ctx, el);
+
+  // Empty state
+  if(total === 0 || data.length === 0){
+    ctx.fillStyle = 'rgba(240,240,245,0.4)';
+    ctx.font = '500 12px Outfit, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('No data', cx, cy);
+    ctx.restore();
+    return;
+  }
+
+  // Build slice geometry
+  var slices = [];
+  var startAngle = -Math.PI / 2;
+  data.forEach(function(d, i){
+    var v = Math.abs(Number(d.value) || 0);
+    var pct = total > 0 ? v / total : 0;
+    var endAngle = startAngle + pct * Math.PI * 2;
+    var midAngle = (startAngle + endAngle) / 2;
+    slices.push({
+      idx: i, startAngle: startAngle, endAngle: endAngle, midAngle: midAngle,
+      pct: pct, value: v, label: d.label || '',
+      color: chartBarColor(el, v, i),
+      reveal: revealSteps[i]
+    });
+    startAngle = endAngle;
+  });
+
+  // Draw each slice
+  slices.forEach(function(s){
+    if(S.pres && s.reveal > S.revealStep) return;
+    if(s.pct <= 0) return;
+
+    // Apply per-slice scale if currently animating. Only the slice with
+    // reveal === current revealStep is scaling — others are at full size.
+    var sliceScale = (S.pres && s.reveal === S.revealStep) ? prog : 1;
+    if(sliceScale <= 0) return;
+
+    var midR = (innerRadius + radius) / 2;
+    var centX = cx + Math.cos(s.midAngle) * midR;
+    var centY = cy + Math.sin(s.midAngle) * midR;
+
+    ctx.save();
+    if(sliceScale < 1){
+      // Scale from centroid
+      ctx.translate(centX, centY);
+      ctx.scale(sliceScale, sliceScale);
+      ctx.translate(-centX, -centY);
+    }
+
+    ctx.fillStyle = s.color;
+    ctx.strokeStyle = el.pieDividerColor || '#0a0a0c';
+    ctx.lineWidth = el.pieDividerWidth || 2;
+    var sweep = s.endAngle - s.startAngle;
+    if(sweep >= Math.PI * 2 - 0.001) sweep = Math.PI * 2 - 0.001;
+    var actualEnd = s.startAngle + sweep;
+
+    ctx.beginPath();
+    if(innerRadius > 0){
+      // Donut wedge — outer arc forward, inner arc backward
+      var x1 = cx + Math.cos(s.startAngle) * radius;
+      var y1 = cy + Math.sin(s.startAngle) * radius;
+      ctx.moveTo(x1, y1);
+      ctx.arc(cx, cy, radius, s.startAngle, actualEnd, false);
+      var x3 = cx + Math.cos(actualEnd) * innerRadius;
+      var y3 = cy + Math.sin(actualEnd) * innerRadius;
+      ctx.lineTo(x3, y3);
+      ctx.arc(cx, cy, innerRadius, actualEnd, s.startAngle, true);
+      ctx.closePath();
+    } else {
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, radius, s.startAngle, actualEnd, false);
+      ctx.closePath();
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.restore();
+  });
+
+  // Labels (outside)
+  if(el.pieShowLabels || (el.pieValueDisplay && el.pieValueDisplay !== 'none')){
+    var canvasLabelColor = (el.pieLabelColor && el.pieLabelColor !== 'auto') ? el.pieLabelColor : '#f0f0f5';
+    var canvasLabelSize = el.pieLabelSize || 11;
+    var canvasLabelWeight = el.pieLabelWeight || 500;
+    ctx.font = canvasLabelWeight + ' ' + canvasLabelSize + 'px Outfit, sans-serif';
+    ctx.textBaseline = 'middle';
+    slices.forEach(function(s){
+      if(S.pres && s.reveal > S.revealStep) return;
+      if(s.pct <= 0) return;
+      // Skip if currently scaling (label fades in later via CSS in DOM; for
+      // canvas record, we do a similar fade based on rawProg for the just-
+      // revealed slice)
+      var labelOpacity = 1;
+      if(S.pres && s.reveal === S.revealStep){
+        // Match the CSS fade-in: opacity 0 until 50% progress, then linear to 1
+        labelOpacity = rawProg < 0.5 ? 0 : Math.min(1, (rawProg - 0.5) * 2);
+      }
+      if(labelOpacity <= 0) return;
+      var labelR = radius + 10;
+      var lx = cx + Math.cos(s.midAngle) * labelR;
+      var ly = cy + Math.sin(s.midAngle) * labelR;
+      var anchor = (Math.cos(s.midAngle) >= 0) ? 'left' : 'right';
+      ctx.textAlign = anchor;
+      var parts = [];
+      if(el.pieShowLabels && s.label) parts.push(s.label);
+      var vd = el.pieValueDisplay || 'percent';
+      if(vd !== 'none'){
+        var pctStr = (s.pct * 100).toFixed(s.pct >= 0.1 ? 0 : 1) + '%';
+        if(vd === 'percent') parts.push(pctStr);
+        else if(vd === 'absolute') parts.push(formatChartValue(s.value));
+        else if(vd === 'both') parts.push(formatChartValue(s.value) + ' (' + pctStr + ')');
+      }
+      var labelText = parts.join(' — ');
+      if(!labelText) return;
+      ctx.globalAlpha = labelOpacity;
+      ctx.fillStyle = canvasLabelColor;
+      ctx.fillText(labelText, lx, ly);
+      ctx.globalAlpha = 1;
+    });
+  }
+
+  // Inline percentages (only when labels are off)
+  if(el.showValues && !el.pieShowLabels){
+    var canvasInsideColor = (el.pieLabelColor && el.pieLabelColor !== 'auto') ? el.pieLabelColor : '#0a0a0c';
+    var canvasInsideSize = el.pieLabelSize || 11;
+    var canvasInsideWeight = el.pieLabelWeight || 700;
+    ctx.font = canvasInsideWeight + ' ' + canvasInsideSize + 'px Outfit, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = canvasInsideColor;
+    slices.forEach(function(s){
+      if(S.pres && s.reveal > S.revealStep) return;
+      if(s.pct < 0.05) return;
+      var sliceScale = (S.pres && s.reveal === S.revealStep) ? prog : 1;
+      if(sliceScale < 0.5) return; // hide text until slice is mostly grown
+      var labelR = (innerRadius + radius) / 2;
+      var lx = cx + Math.cos(s.midAngle) * labelR;
+      var ly = cy + Math.sin(s.midAngle) * labelR;
+      var pctStr = (s.pct * 100).toFixed(s.pct >= 0.1 ? 0 : 1) + '%';
+      ctx.fillText(pctStr, lx, ly);
+    });
+  }
+
+  ctx.restore();
+}
+
+// Canvas-render for scatter charts. Mirrors renderScatterChart logic.
+// Points scale-in for the just-revealed point during animation.
+function drawScatterChartToCanvas(ctx, el){
+  var data = el.data || [];
+  var W = el.w, H = el.h;
+  var titleInfo = renderChartTitle(el);
+  var padTop    = 14 + titleInfo.padTop;
+  var padBot    = (el.showAxisX ? 28 : 12) + titleInfo.padBot;
+  var padLeft   = (el.showAxisY ? 44 : 12);
+  var padRight  = 14;
+  var chartW = Math.max(20, W - padLeft - padRight);
+  var chartH = Math.max(20, H - padTop - padBot);
+
+  var xs = data.map(function(d){ return Number(d.x) || 0; });
+  var ys = data.map(function(d){ return Number(d.y) || 0; });
+  var xRange = computeNumericRange(xs, false);
+  var yRange = computeNumericRange(ys, el.yFromZero === true);
+
+  function valueToY(v){
+    return el.y + padTop + chartH * (yRange.max - v) / (yRange.max - yRange.min);
+  }
+  function valueToX(v){
+    return el.x + padLeft + chartW * (v - xRange.min) / (xRange.max - xRange.min);
+  }
+
+  var revealSteps = chartBarRevealSteps(el);
+  var pointSize = el.scatterPointSize || 7;
+  var pointShape = el.scatterPointShape || 'circle';
+  var color = el.colorPrimary || '#7ed957';
+
+  var rawProg = getChartAnimProgress(el.id);
+  var prog = 1 - Math.pow(1 - rawProg, 3); // ease-out cubic
+
+  ctx.save();
+
+  // Background
+  if(el.bg && el.bg !== 'transparent'){
+    ctx.fillStyle = el.bg;
+    ctx.fillRect(el.x, el.y, W, H);
+  }
+
+  // Title
+  drawChartTitleToCanvas(ctx, el);
+
+  // Gridlines
+  if(el.showGridlines){
+    ctx.strokeStyle = el.gridColor || 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = el.gridWidth || 1;
+    for(var g = 0; g <= 4; g++){
+      var gy = el.y + padTop + (chartH * g / 4);
+      ctx.beginPath();
+      ctx.moveTo(el.x + padLeft, gy);
+      ctx.lineTo(el.x + padLeft + chartW, gy);
+      ctx.stroke();
+      var gx = el.x + padLeft + (chartW * g / 4);
+      ctx.beginPath();
+      ctx.moveTo(gx, el.y + padTop);
+      ctx.lineTo(gx, el.y + padTop + chartH);
+      ctx.stroke();
+    }
+  }
+
+  // Y-axis line + labels
+  if(el.showAxisY){
+    ctx.strokeStyle = el.axisColor || 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = el.axisWidth || 1;
+    ctx.beginPath();
+    ctx.moveTo(el.x + padLeft, el.y + padTop);
+    ctx.lineTo(el.x + padLeft, el.y + padTop + chartH);
+    ctx.stroke();
+    ctx.fillStyle = el.axisLabelColor || 'rgba(240,240,245,0.6)';
+    ctx.font = '500 10px Outfit, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    var yTicks = [yRange.max, (yRange.max+yRange.min)/2, yRange.min];
+    yTicks.forEach(function(tv, ti){
+      var ty = el.y + padTop + (chartH * ti / 2);
+      ctx.fillText(formatChartValue(tv), el.x + padLeft - 6, ty);
+    });
+  }
+
+  // X-axis line + labels
+  if(el.showAxisX){
+    var axisY = el.y + padTop + chartH;
+    ctx.strokeStyle = el.axisColor || 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = el.axisWidth || 1;
+    ctx.beginPath();
+    ctx.moveTo(el.x + padLeft, axisY);
+    ctx.lineTo(el.x + padLeft + chartW, axisY);
+    ctx.stroke();
+    ctx.fillStyle = el.axisLabelColor || 'rgba(240,240,245,0.6)';
+    ctx.font = '500 10px Outfit, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    var xTicks = [xRange.min, (xRange.min+xRange.max)/2, xRange.max];
+    xTicks.forEach(function(tv, ti){
+      var tx = el.x + padLeft + (chartW * ti / 2);
+      ctx.fillText(formatChartValue(tv), tx, axisY + 14);
+    });
+  }
+
+  // Zero baseline (when y range crosses zero)
+  if(yRange.min < 0 && yRange.max > 0){
+    var zeroY = valueToY(0);
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(el.x + padLeft, zeroY);
+    ctx.lineTo(el.x + padLeft + chartW, zeroY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Render points
+  data.forEach(function(d, i){
+    if(S.pres && revealSteps[i] > S.revealStep) return;
+    var px = valueToX(Number(d.x) || 0);
+    var py = valueToY(Number(d.y) || 0);
+    // Per-point scale animation: only the just-revealed point scales
+    var ptScale = (S.pres && revealSteps[i] === S.revealStep) ? prog : 1;
+    if(ptScale <= 0) return;
+
+    ctx.save();
+    if(ptScale < 1){
+      ctx.translate(px, py);
+      ctx.scale(ptScale, ptScale);
+      ctx.translate(-px, -py);
+    }
+    ctx.fillStyle = color;
+    ctx.strokeStyle = '#0a0a0c';
+    ctx.lineWidth = 1.5;
+
+    if(pointShape === 'square'){
+      var sz = pointSize * 1.6;
+      ctx.beginPath();
+      ctx.rect(px - sz/2, py - sz/2, sz, sz);
+      ctx.fill();
+      ctx.stroke();
+    } else if(pointShape === 'diamond'){
+      var dz = pointSize * 1.2;
+      ctx.beginPath();
+      ctx.moveTo(px, py - dz);
+      ctx.lineTo(px + dz, py);
+      ctx.lineTo(px, py + dz);
+      ctx.lineTo(px - dz, py);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(px, py, pointSize, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  });
+
+  // Point labels
+  if(el.scatterShowLabels){
+    ctx.font = '500 10px Outfit, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    data.forEach(function(d, i){
+      if(S.pres && revealSteps[i] > S.revealStep) return;
+      if(!d.label) return;
+      var labelOpacity = 1;
+      if(S.pres && revealSteps[i] === S.revealStep){
+        labelOpacity = rawProg < 0.5 ? 0 : Math.min(1, (rawProg - 0.5) * 2);
+      }
+      if(labelOpacity <= 0) return;
+      var px = valueToX(Number(d.x) || 0);
+      var py = valueToY(Number(d.y) || 0);
+      ctx.globalAlpha = labelOpacity;
+      ctx.fillStyle = '#f0f0f5';
+      ctx.fillText(d.label, px + pointSize + 4, py);
+      ctx.globalAlpha = 1;
+    });
+  }
+
+  ctx.restore();
+}
+
+
 // Filter list items by reveal step in presentation mode.
 // In editor: show all items + a small number badge if a reveal value is set.
 // In presentation: hide items with reveal > current revealStep.
@@ -10433,6 +13334,22 @@ function render(){
   var existingPP = document.querySelector('.pp');
   if(existingPP) ppScrollTop = existingPP.scrollTop;
 
+  // Capture focused input identity + cursor so per-keystroke renders don't
+  // kick the user out of the field they're typing in. Only inputs with an
+  // explicit id are tracked — we can't reliably find an unidentified input
+  // after innerHTML rebuilds the DOM.
+  var focusInfo = null;
+  try {
+    var ae = document.activeElement;
+    if(ae && ae.id && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')){
+      focusInfo = {
+        id: ae.id,
+        selStart: ae.selectionStart,
+        selEnd: ae.selectionEnd
+      };
+    }
+  } catch(e){ /* selectionStart fails on some input types — fine */ }
+
   // Calculate stage scale
   var app = document.getElementById('app');
   var windowH = window.innerHeight;
@@ -10652,6 +13569,11 @@ function render(){
     h += renderAlignMenu();
   }
 
+  // CSV paste modal (always rendered last so it overlays everything)
+  if(S.chartCsvPaste){
+    h += renderChartCsvPasteModal();
+  }
+
   app.innerHTML = h;
 
   // Restore properties-panel scroll position so editing inputs deeper in the
@@ -10680,6 +13602,21 @@ function render(){
 
   // Webcam overlay lives outside the render tree to avoid flicker on every render.
   ensureWebcamOverlay();
+
+  // Restore focus to whichever input was being typed in before the render.
+  // This prevents the "lose focus per keystroke" problem for any input that
+  // has a stable id attribute (chart title, bar labels, etc.).
+  if(focusInfo){
+    var newInput = document.getElementById(focusInfo.id);
+    if(newInput && (newInput.tagName === 'INPUT' || newInput.tagName === 'TEXTAREA')){
+      newInput.focus();
+      try {
+        if(focusInfo.selStart != null && focusInfo.selEnd != null){
+          newInput.setSelectionRange(focusInfo.selStart, focusInfo.selEnd);
+        }
+      } catch(e){ /* not all input types support setSelectionRange */ }
+    }
+  }
 
   if(S.ed){
     var ta = document.getElementById('editInput');
@@ -11102,6 +14039,402 @@ function renderPropsPanel(el){
       });
       h += '</div>';
     }
+    h += '</div>';
+  }
+
+  if(el.type === 'chart'){
+    var ctName, dataNoun, addNoun;
+    if(el.chartType === 'line'){ ctName = 'Line Chart'; dataNoun = 'points'; addNoun = 'point'; }
+    else if(el.chartType === 'area'){ ctName = 'Area Chart'; dataNoun = 'points'; addNoun = 'point'; }
+    else if(el.chartType === 'pie'){ ctName = 'Pie Chart'; dataNoun = 'slices'; addNoun = 'slice'; }
+    else if(el.chartType === 'donut'){ ctName = 'Donut Chart'; dataNoun = 'slices'; addNoun = 'slice'; }
+    else if(el.chartType === 'scatter'){ ctName = 'Scatter Chart'; dataNoun = 'points'; addNoun = 'point'; }
+    else { ctName = 'Bar Chart'; dataNoun = 'bars'; addNoun = 'bar'; }
+    h += '<div class="ps"><div class="ps-t">Chart Type</div>';
+    h += '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">'+ctName+'</div>';
+    // Title section — text plus styling. Available on all chart types.
+    h += '<div class="ps"><div class="ps-t">Title</div>';
+    h += '<input id="chart-title-'+el.id+'" type="text" class="pr-i" style="width:100%;margin-bottom:8px" value="'+esc(el.title||'')+'" placeholder="Optional title" oninput="updateEl(\''+el.id+'\',{title:this.value})">';
+    if(el.title){
+      // Position picker (3x2 grid)
+      h += '<div style="font-size:10px;color:var(--muted);margin-top:4px;margin-bottom:4px">Position</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-bottom:8px">';
+      [
+        ['top-left','↖ TL'], ['top','↑ Top'], ['top-right','↗ TR'],
+        ['bottom-left','↙ BL'], ['bottom','↓ Bot'], ['bottom-right','↘ BR']
+      ].forEach(function(pair){
+        var active = (el.titlePosition||'top') === pair[0];
+        h += '<button class="sp-btn" style="padding:5px 2px;font-size:10px'+(active?';border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)':'')+'" onclick="updateEl(\''+el.id+'\',{titlePosition:\''+pair[0]+'\'})">'+pair[1]+'</button>';
+      });
+      h += '</div>';
+      // Color picker
+      h += '<div style="font-size:10px;color:var(--muted);margin-bottom:3px">Title color</div>';
+      h += renderColorPickerControl(el.id, 'titleColor', el.titleColor||'#f0f0f5');
+      // Size
+      h += '<div class="pr"><span class="pr-l">Title size</span><input type="number" class="pr-i" min="8" max="40" step="1" value="'+(el.titleSize||13)+'" oninput="updateEl(\''+el.id+'\',{titleSize:Math.max(8,+this.value)})"></div>';
+      // Weight
+      h += '<div class="pr"><span class="pr-l">Title weight</span>';
+      h += '<select class="pr-i" style="width:auto" onchange="updateEl(\''+el.id+'\',{titleWeight:+this.value})">';
+      [[400,'Normal'],[500,'Medium'],[600,'Semi-bold'],[700,'Bold'],[800,'Extra bold']].forEach(function(pair){
+        var sel = (el.titleWeight||600) === pair[0] ? ' selected' : '';
+        h += '<option value="'+pair[0]+'"'+sel+'>'+pair[1]+'</option>';
+      });
+      h += '</select></div>';
+    }
+    h += '</div>';
+    h += '</div>';
+
+    h += '<div class="ps"><div class="ps-t">Data <span style="float:right;font-weight:400;color:var(--muted);font-size:10px">'+(el.data||[]).length+' '+dataNoun+'</span></div>';
+    // Paste-from-spreadsheet button (above the data table)
+    h += '<button class="sp-btn" style="width:100%;margin-bottom:8px;font-size:11px;padding:6px 8px" onclick="openChartCsvPaste(\''+el.id+'\')" title="Paste tabular data from Excel, Google Sheets, etc.">📋 Paste data from spreadsheet…</button>';
+    h += '<div style="font-size:10px;color:var(--muted);margin-bottom:6px">Click the small swatch to override that '+addNoun+'\'s color. Right-click to reset to auto.</div>';
+    var data = el.data || [];
+    var isScatter = el.chartType === 'scatter';
+    if(isScatter){
+      // Header row labels for scatter columns
+      h += '<div style="display:flex;gap:4px;margin-bottom:3px;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">';
+      h += '<span style="width:18px"></span>';
+      h += '<span style="flex:1;padding-left:2px">Label</span>';
+      h += '<span style="width:44px;text-align:center">X</span>';
+      h += '<span style="width:44px;text-align:center">Y</span>';
+      h += '<span style="width:24px"></span>';
+      h += '</div>';
+    }
+    data.forEach(function(d, i){
+      // The effective color for this item — either custom override or
+      // the auto-assigned palette/single/threshold color. Pass through
+      // chartBarColor so the swatch reflects what's actually rendered.
+      var effectiveColor = chartBarColor(el, Number(d.value || d.y || 0), i);
+      var hasOverride = !!d.color;
+      // Use rgbaToHex because <input type="color"> only accepts #rrggbb format.
+      var swatchHex = rgbaToHex(effectiveColor);
+      h += '<div style="display:flex;gap:4px;margin-bottom:4px;align-items:center">';
+      // Per-item color swatch — wraps a hidden native color input + a visible
+      // square showing current color. Click opens the picker. Right-click
+      // (oncontextmenu) resets to auto. Border indicates override status:
+      // solid white when overridden, dotted muted when using auto color.
+      h += '<label style="position:relative;width:18px;height:18px;flex-shrink:0;cursor:pointer;border-radius:3px;background:'+effectiveColor+';border:'+(hasOverride?'2px solid #fff':'1px dashed rgba(255,255,255,0.3)')+';box-sizing:border-box" '+
+           'title="'+(hasOverride?'Custom color (right-click to reset to auto)':'Auto color (click to override)')+'" '+
+           'oncontextmenu="event.preventDefault(); updateChartBarColor(\''+el.id+'\','+i+',\'\')">';
+      h += '<input type="color" value="'+swatchHex+'" '+
+           'style="position:absolute;inset:0;opacity:0;cursor:pointer" '+
+           'onchange="updateChartBarColor(\''+el.id+'\','+i+',this.value)">';
+      h += '</label>';
+      h += '<input id="chart-label-'+el.id+'-'+i+'" type="text" style="flex:1;min-width:0;background:rgba(255,255,255,0.04);border:1px solid var(--brd);color:#f0f0f5;font-size:11px;padding:4px 6px;border-radius:4px;font-family:inherit" value="'+esc(d.label||'')+'" placeholder="Label" oninput="updateChartBarLabel(\''+el.id+'\','+i+',this.value)">';
+      if(isScatter){
+        h += '<input id="chart-x-'+el.id+'-'+i+'" type="number" style="width:44px;background:rgba(255,255,255,0.04);border:1px solid var(--brd);color:#f0f0f5;font-size:11px;padding:4px 4px;border-radius:4px;font-family:inherit;text-align:center" value="'+(Number(d.x)||0)+'" oninput="updateChartScatterX(\''+el.id+'\','+i+',this.value)">';
+        h += '<input id="chart-y-'+el.id+'-'+i+'" type="number" style="width:44px;background:rgba(255,255,255,0.04);border:1px solid var(--brd);color:#f0f0f5;font-size:11px;padding:4px 4px;border-radius:4px;font-family:inherit;text-align:center" value="'+(Number(d.y)||0)+'" oninput="updateChartScatterY(\''+el.id+'\','+i+',this.value)">';
+      } else {
+        h += '<input id="chart-value-'+el.id+'-'+i+'" type="number" style="width:54px;background:rgba(255,255,255,0.04);border:1px solid var(--brd);color:#f0f0f5;font-size:11px;padding:4px 6px;border-radius:4px;font-family:inherit" value="'+(Number(d.value)||0)+'" oninput="updateChartBarValue(\''+el.id+'\','+i+',this.value)">';
+      }
+      h += '<button style="width:24px;height:24px;padding:0;background:rgba(255,87,87,0.15);border:1px solid #ff5757;color:#ff5757;border-radius:4px;cursor:pointer;font-size:14px;font-weight:700;line-height:1;flex-shrink:0;display:flex;align-items:center;justify-content:center" onclick="removeChartBar(\''+el.id+'\','+i+')" title="Remove this '+addNoun+'" onmouseover="this.style.background=\'#ff5757\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'rgba(255,87,87,0.15)\';this.style.color=\'#ff5757\'">×</button>';
+      h += '</div>';
+    });
+    var canRemoveLast = (el.data || []).length > 1;
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">';
+    h += '<button class="sp-btn" onclick="addChartBar(\''+el.id+'\')">+ Add '+addNoun+'</button>';
+    if(canRemoveLast){
+      h += '<button class="sp-btn" style="border-color:rgba(255,87,87,0.4);color:#ff8888" onclick="removeChartBar(\''+el.id+'\','+((el.data||[]).length - 1)+')" title="Remove the last '+addNoun+'">− Remove last</button>';
+    } else {
+      h += '<button class="sp-btn" disabled style="opacity:0.4;cursor:not-allowed" title="Need at least one '+addNoun+'">− Remove last</button>';
+    }
+    h += '</div>';
+    h += '</div>';
+
+    // Line/Area-chart-specific styling section
+    if(el.chartType === 'line' || el.chartType === 'area'){
+      var sectionTitle = el.chartType === 'area' ? 'Area Style' : 'Line Style';
+      h += '<div class="ps"><div class="ps-t">'+sectionTitle+'</div>';
+      h += '<div class="pr"><span class="pr-l">Smooth</span><input type="checkbox" '+(el.lineSmooth!==false?'checked':'')+' onchange="updateEl(\''+el.id+'\',{lineSmooth:this.checked})"></div>';
+      h += '<div class="pr"><span class="pr-l">Show points</span><input type="checkbox" '+(el.linePoints!==false?'checked':'')+' onchange="updateEl(\''+el.id+'\',{linePoints:this.checked})"></div>';
+      h += '<div class="pr"><span class="pr-l">Y from zero</span><input type="checkbox" '+(el.yFromZero?'checked':'')+' onchange="updateEl(\''+el.id+'\',{yFromZero:this.checked})"></div>';
+      h += '<div class="pr"><span class="pr-l">Line width</span><input type="number" class="pr-i" min="1" max="10" value="'+(el.lineWidth||3)+'" oninput="updateEl(\''+el.id+'\',{lineWidth:Math.max(1,+this.value)})"></div>';
+      if(el.chartType === 'area'){
+        // Fill style picker
+        h += '<div style="margin-top:8px"><span class="pr-l">Fill style</span></div>';
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px;margin-bottom:6px">';
+        [['gradient','Gradient'],['solid','Solid']].forEach(function(pair){
+          var active = (el.areaFillStyle||'gradient') === pair[0];
+          h += '<button class="sp-btn" style="padding:6px 4px;font-size:10px'+(active?';border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)':'')+'" onclick="updateEl(\''+el.id+'\',{areaFillStyle:\''+pair[0]+'\'})">'+pair[1]+'</button>';
+        });
+        h += '</div>';
+        var fop = Math.round((el.areaFillOpacity != null ? el.areaFillOpacity : 0.35) * 100);
+        h += '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:8px;margin-bottom:4px">';
+        h += '<span>Fill opacity</span><span id="fop-val-'+el.id+'" style="color:#f0f0f5;font-weight:600">'+fop+'%</span>';
+        h += '</div>';
+        h += '<input type="range" min="5" max="100" step="1" value="'+fop+'" '+
+             'style="width:100%;accent-color:var(--g)" '+
+             'oninput="document.getElementById(\'fop-val-'+el.id+'\').textContent=this.value+\'%\'" '+
+             'onchange="updateEl(\''+el.id+'\',{areaFillOpacity:+this.value/100})">';
+      }
+      h += '</div>';
+    }
+
+    // Scatter-chart-specific styling section
+    if(el.chartType === 'scatter'){
+      h += '<div class="ps"><div class="ps-t">Scatter Style</div>';
+      h += '<div class="pr"><span class="pr-l">Point size</span><input type="number" class="pr-i" min="3" max="20" value="'+(el.scatterPointSize||7)+'" oninput="updateEl(\''+el.id+'\',{scatterPointSize:Math.max(3,+this.value)})"></div>';
+      h += '<div style="margin-top:8px"><span class="pr-l">Shape</span></div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:4px;margin-bottom:6px">';
+      [['circle','Circle'],['square','Square'],['diamond','Diamond']].forEach(function(pair){
+        var active = (el.scatterPointShape||'circle') === pair[0];
+        h += '<button class="sp-btn" style="padding:6px 4px;font-size:10px'+(active?';border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)':'')+'" onclick="updateEl(\''+el.id+'\',{scatterPointShape:\''+pair[0]+'\'})">'+pair[1]+'</button>';
+      });
+      h += '</div>';
+      h += '<div class="pr"><span class="pr-l">Y from zero</span><input type="checkbox" '+(el.yFromZero?'checked':'')+' onchange="updateEl(\''+el.id+'\',{yFromZero:this.checked})"></div>';
+      h += '<div class="pr"><span class="pr-l">Show labels</span><input type="checkbox" '+(el.scatterShowLabels?'checked':'')+' onchange="updateEl(\''+el.id+'\',{scatterShowLabels:this.checked})"></div>';
+      h += '</div>';
+    }
+
+    // Pie/donut-specific section: how slice values are displayed, label toggle,
+    // and donut hole size (donut only).
+    if(el.chartType === 'pie' || el.chartType === 'donut'){
+      h += '<div class="ps"><div class="ps-t">Slice Display</div>';
+      h += '<div class="pr"><span class="pr-l">Value as</span></div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px">';
+      [['percent','Percent'],['absolute','Value'],['both','Both'],['none','None']].forEach(function(pair){
+        var active = (el.pieValueDisplay||'percent') === pair[0];
+        h += '<button class="sp-btn" style="padding:6px 4px;font-size:10px'+(active?';border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)':'')+'" onclick="updateEl(\''+el.id+'\',{pieValueDisplay:\''+pair[0]+'\'})">'+pair[1]+'</button>';
+      });
+      h += '</div>';
+      h += '<div class="pr"><span class="pr-l">Show labels</span><input type="checkbox" '+(el.pieShowLabels!==false?'checked':'')+' onchange="updateEl(\''+el.id+'\',{pieShowLabels:this.checked})"></div>';
+      h += '<div style="font-size:10px;color:var(--muted);margin-top:4px;margin-bottom:6px">Labels appear outside the chart with category name + value.</div>';
+
+      // Label text styling — applies to both outside labels and inline %
+      h += '<div style="font-size:10px;color:var(--muted);margin-top:8px;margin-bottom:3px">Label color</div>';
+      // Auto/custom toggle — Auto uses white outside, black inside (smart contrast).
+      h += '<div style="display:flex;gap:6px;margin-bottom:6px">';
+      var labelIsAuto = !el.pieLabelColor || el.pieLabelColor === 'auto';
+      h += '<button class="sp-btn" style="flex:1;padding:5px 4px;font-size:10px'+(labelIsAuto?';border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)':'')+'" onclick="updateEl(\''+el.id+'\',{pieLabelColor:\'auto\'})">Auto (smart)</button>';
+      h += '<button class="sp-btn" style="flex:1;padding:5px 4px;font-size:10px'+(!labelIsAuto?';border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)':'')+'" onclick="updateEl(\''+el.id+'\',{pieLabelColor:\'#f0f0f5\'})">Custom</button>';
+      h += '</div>';
+      if(!labelIsAuto){
+        h += renderColorPickerControl(el.id, 'pieLabelColor', el.pieLabelColor||'#f0f0f5');
+      }
+      h += '<div class="pr"><span class="pr-l">Label size</span><input type="number" class="pr-i" min="8" max="32" step="1" value="'+(el.pieLabelSize||11)+'" oninput="updateEl(\''+el.id+'\',{pieLabelSize:Math.max(8,+this.value)})"></div>';
+      h += '<div class="pr"><span class="pr-l">Label weight</span>';
+      h += '<select class="pr-i" style="width:auto" onchange="updateEl(\''+el.id+'\',{pieLabelWeight:+this.value})">';
+      [[400,'Normal'],[500,'Medium'],[600,'Semi-bold'],[700,'Bold'],[800,'Extra bold']].forEach(function(pair){
+        var sel = (el.pieLabelWeight||600) === pair[0] ? ' selected' : '';
+        h += '<option value="'+pair[0]+'"'+sel+'>'+pair[1]+'</option>';
+      });
+      h += '</select></div>';
+
+      // Divider styling (slice borders)
+      h += '<div style="font-size:10px;color:var(--muted);margin-top:10px;margin-bottom:3px">Divider color (between slices)</div>';
+      h += renderColorPickerControl(el.id, 'pieDividerColor', el.pieDividerColor||'#0a0a0c');
+      h += '<div class="pr"><span class="pr-l">Divider width</span><input type="number" class="pr-i" min="0" max="6" step="0.5" value="'+(el.pieDividerWidth||2)+'" oninput="updateEl(\''+el.id+'\',{pieDividerWidth:Math.max(0,+this.value)})"></div>';
+
+      if(el.chartType === 'donut'){
+        var ir = Math.round((el.donutInnerRadius || 0.55) * 100);
+        h += '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:8px;margin-bottom:4px">';
+        h += '<span>Hole size</span><span id="hole-val-'+el.id+'" style="color:#f0f0f5;font-weight:600">'+ir+'%</span>';
+        h += '</div>';
+        h += '<input type="range" min="20" max="80" step="1" value="'+ir+'" '+
+             'style="width:100%;accent-color:var(--g)" '+
+             'oninput="document.getElementById(\'hole-val-'+el.id+'\').textContent=this.value+\'%\'" '+
+             'onchange="updateEl(\''+el.id+'\',{donutInnerRadius:+this.value/100})">';
+      }
+      h += '</div>';
+
+      // 3D effect section (separate from Slice Display for clarity)
+      h += '<div class="ps"><div class="ps-t">3D Effect</div>';
+      h += '<div class="pr"><span class="pr-l">Enable 3D</span><input type="checkbox" '+(el.pie3D?'checked':'')+' onchange="updateEl(\''+el.id+'\',{pie3D:this.checked})"></div>';
+      if(el.pie3D){
+        var tiltPct = Math.round((el.pie3DTilt || 0.6) * 100);
+        // Stacked layout: label + value on top row, slider full-width below.
+        // onchange commits the value (re-renders chart). oninput updates ONLY
+        // the inline % display while dragging (no re-render = no scrub break).
+        h += '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:8px;margin-bottom:4px">';
+        h += '<span>Perspective</span><span id="perspective-val-'+el.id+'" style="color:#f0f0f5;font-weight:600">'+tiltPct+'%</span>';
+        h += '</div>';
+        h += '<input type="range" min="40" max="95" step="1" value="'+tiltPct+'" '+
+             'style="width:100%;accent-color:var(--g)" '+
+             'oninput="document.getElementById(\'perspective-val-'+el.id+'\').textContent=this.value+\'%\'" '+
+             'onchange="updateEl(\''+el.id+'\',{pie3DTilt:+this.value/100})">';
+
+        h += '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:10px;margin-bottom:4px">';
+        h += '<span>Depth</span><span id="depth-val-'+el.id+'" style="color:#f0f0f5;font-weight:600">'+(el.pie3DDepth||24)+'px</span>';
+        h += '</div>';
+        h += '<input type="range" min="0" max="60" step="1" value="'+(el.pie3DDepth||24)+'" '+
+             'style="width:100%;accent-color:var(--g)" '+
+             'oninput="document.getElementById(\'depth-val-'+el.id+'\').textContent=this.value+\'px\'" '+
+             'onchange="updateEl(\''+el.id+'\',{pie3DDepth:Math.max(0,+this.value)})">';
+        h += '<div style="font-size:10px;color:var(--muted);margin-top:6px">Tip: 3D charts look striking but can make value comparison harder. Use for emphasis, not data clarity.</div>';
+      } else {
+        h += '<div style="font-size:10px;color:var(--muted);margin-top:4px">Renders the chart with elliptical squash and extruded depth.</div>';
+      }
+      h += '</div>';
+    }
+
+    // Value Cap is bar-chart specific. Lines/areas plot raw values; pies normalize
+    // to 100% so capping makes no sense for any of these.
+    if(el.chartType !== 'line' && el.chartType !== 'area' && el.chartType !== 'pie' && el.chartType !== 'donut' && el.chartType !== 'scatter'){
+      h += '<div class="ps"><div class="ps-t">Value Cap</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px">';
+      [['auto','Auto'],['total','Fixed Total'],['max','Per-Bar Max']].forEach(function(pair){
+        var active = (el.capMode||'auto') === pair[0];
+        h += '<button class="sp-btn" style="padding:6px 4px;font-size:10px'+(active?';border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)':'')+'" onclick="updateEl(\''+el.id+'\',{capMode:\''+pair[0]+'\'})">'+pair[1]+'</button>';
+      });
+      h += '</div>';
+      if((el.capMode||'auto') !== 'auto'){
+        h += '<div class="pr"><span class="pr-l">Cap value</span><input type="number" class="pr-i" value="'+(el.capValue||100)+'" oninput="updateEl(\''+el.id+'\',{capValue:+this.value})"></div>';
+        h += '<div style="font-size:10px;color:var(--muted);margin-top:4px">'+(el.capMode==='total'?'Sum of all bars cannot exceed this':'Each individual bar cannot exceed this')+'</div>';
+      }
+      h += '</div>';
+    }
+
+    h += '<div class="ps"><div class="ps-t">Reveal</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px">';
+    [['all','All at once'],['sequential','Sequential'],['manual','Manual']].forEach(function(pair){
+      var active = (el.revealMode||'all') === pair[0];
+      h += '<button class="sp-btn" style="padding:6px 4px;font-size:10px'+(active?';border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)':'')+'" onclick="updateEl(\''+el.id+'\',{revealMode:\''+pair[0]+'\'})">'+pair[1]+'</button>';
+    });
+    h += '</div>';
+    var rm = el.revealMode || 'all';
+    if(rm === 'all'){
+      h += '<div style="font-size:10px;color:var(--muted)">All '+dataNoun+' appear together when chart becomes visible.</div>';
+    } else if(rm === 'sequential'){
+      h += '<div style="font-size:10px;color:var(--muted)">Each click reveals the next '+addNoun+' in order.</div>';
+    } else {
+      // Manual: show a per-bar step editor right here so it's discoverable.
+      // Each row: label (read-only) and step number (editable).
+      h += '<div style="font-size:10px;color:var(--muted);margin-bottom:6px">Set the click number when each '+addNoun+' should appear. Same number = appear together. 0 = always visible.</div>';
+      data.forEach(function(d, i){
+        h += '<div style="display:flex;gap:6px;margin-bottom:4px;align-items:center">';
+        h += '<span style="flex:1;color:#f0f0f5;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(d.label||(addNoun+' '+(i+1)))+'</span>';
+        h += '<span style="font-size:10px;color:var(--muted)">step</span>';
+        h += '<input id="chart-revealstep-'+el.id+'-'+i+'" type="number" style="width:48px;background:rgba(255,165,0,0.08);border:1px solid #ffa500;color:#ffa500;font-size:11px;padding:4px 6px;border-radius:4px;font-family:inherit;text-align:center" value="'+(d.reveal||0)+'" min="0" oninput="updateChartBarReveal(\''+el.id+'\','+i+',this.value)">';
+        h += '</div>';
+      });
+    }
+    h += '</div>';
+
+    h += '<div class="ps"><div class="ps-t">Color</div>';
+    var chartPalette = ['#7ed957','#9b59ff','#3da9fc','#ff8c42','#ffd23f','#ff5757','#3dd6c0','#ec4899','#ffffff'];
+    if(el.chartType === 'line' || el.chartType === 'area' || el.chartType === 'scatter'){
+      // Lines / areas / scatter have one base color.
+      var colorLabel = el.chartType === 'area' ? 'Line + fill color' :
+                       (el.chartType === 'scatter' ? 'Point color' : 'Line color');
+      h += '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">'+colorLabel+'</div>';
+      h += '<div style="display:grid;grid-template-columns:repeat(9,1fr);gap:3px">';
+      chartPalette.forEach(function(c){
+        var active = (el.colorPrimary||'').toLowerCase() === c.toLowerCase();
+        h += '<div style="width:100%;aspect-ratio:1;background:'+c+';border-radius:4px;cursor:pointer;border:'+(active?'2px solid #fff':'2px solid transparent')+';box-sizing:border-box" onclick="updateEl(\''+el.id+'\',{colorPrimary:\''+c+'\'})"></div>';
+      });
+      h += '</div>';
+    } else if(el.chartType === 'pie' || el.chartType === 'donut'){
+      // Pie/donut auto-assign palette colors to each slice. No mode picker.
+      // Show the current palette as informational swatches.
+      h += '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Slices use these colors in order</div>';
+      h += '<div style="display:grid;grid-template-columns:repeat(8,1fr);gap:3px;margin-bottom:6px">';
+      (el.palette || chartPalette).slice(0, 8).forEach(function(c, idx){
+        h += '<div style="width:100%;aspect-ratio:1;background:'+c+';border-radius:4px;border:1px solid rgba(255,255,255,0.1);box-sizing:border-box;display:flex;align-items:center;justify-content:center;color:rgba(0,0,0,0.6);font-size:9px;font-weight:700">'+(idx+1)+'</div>';
+      });
+      h += '</div>';
+      h += '<div style="font-size:10px;color:var(--muted)">Custom slice colors coming soon.</div>';
+    } else {
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:8px">';
+      [['single','Single'],['palette','Palette'],['threshold','Threshold']].forEach(function(pair){
+        var active = (el.colorMode||'single') === pair[0];
+        h += '<button class="sp-btn" style="padding:6px 4px;font-size:10px'+(active?';border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)':'')+'" onclick="updateEl(\''+el.id+'\',{colorMode:\''+pair[0]+'\'})">'+pair[1]+'</button>';
+      });
+      h += '</div>';
+      if((el.colorMode||'single') === 'single' || (el.colorMode||'single') === 'threshold'){
+        h += '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Primary color</div>';
+        h += '<div style="display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:8px">';
+        chartPalette.forEach(function(c){
+          var active = (el.colorPrimary||'').toLowerCase() === c.toLowerCase();
+          h += '<div style="width:100%;aspect-ratio:1;background:'+c+';border-radius:4px;cursor:pointer;border:'+(active?'2px solid #fff':'2px solid transparent')+';box-sizing:border-box" onclick="updateEl(\''+el.id+'\',{colorPrimary:\''+c+'\'})"></div>';
+        });
+        h += '</div>';
+      }
+      if((el.colorMode||'single') === 'threshold'){
+        h += '<div style="font-size:10px;color:var(--muted);margin:6px 0 4px">High color (positive)</div>';
+        h += '<div style="display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:6px">';
+        chartPalette.forEach(function(c){
+          var active = (el.colorHigh||'').toLowerCase() === c.toLowerCase();
+          h += '<div style="width:100%;aspect-ratio:1;background:'+c+';border-radius:4px;cursor:pointer;border:'+(active?'2px solid #fff':'2px solid transparent')+';box-sizing:border-box" onclick="updateEl(\''+el.id+'\',{colorHigh:\''+c+'\'})"></div>';
+        });
+        h += '</div>';
+        h += '<div style="font-size:10px;color:var(--muted);margin:6px 0 4px">Low color (negative)</div>';
+        h += '<div style="display:grid;grid-template-columns:repeat(9,1fr);gap:3px">';
+        chartPalette.forEach(function(c){
+          var active = (el.colorLow||'').toLowerCase() === c.toLowerCase();
+          h += '<div style="width:100%;aspect-ratio:1;background:'+c+';border-radius:4px;cursor:pointer;border:'+(active?'2px solid #fff':'2px solid transparent')+';box-sizing:border-box" onclick="updateEl(\''+el.id+'\',{colorLow:\''+c+'\'})"></div>';
+        });
+        h += '</div>';
+      }
+    }
+    h += '</div>';
+
+    var isPie = (el.chartType === 'pie' || el.chartType === 'donut');
+    if(!isPie){
+      h += '<div class="ps"><div class="ps-t">Display</div>';
+      // Direction (bar charts only — line/area/scatter wouldn't make sense flipped)
+      if(el.chartType === 'bar'){
+        h += '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Direction</div>';
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px">';
+        [['vertical','Vertical'],['horizontal','Horizontal']].forEach(function(pair){
+          var active = (el.barDirection||'vertical') === pair[0];
+          h += '<button class="sp-btn" style="padding:6px 4px;font-size:10px'+(active?';border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)':'')+'" onclick="updateEl(\''+el.id+'\',{barDirection:\''+pair[0]+'\'})">'+pair[1]+'</button>';
+        });
+        h += '</div>';
+      }
+      h += '<div class="pr"><span class="pr-l">Show values</span><input type="checkbox" '+(el.showValues?'checked':'')+' onchange="updateEl(\''+el.id+'\',{showValues:this.checked})"></div>';
+      h += '<div class="pr"><span class="pr-l">X axis</span><input type="checkbox" '+(el.showAxisX?'checked':'')+' onchange="updateEl(\''+el.id+'\',{showAxisX:this.checked})"></div>';
+      h += '<div class="pr"><span class="pr-l">Y axis</span><input type="checkbox" '+(el.showAxisY?'checked':'')+' onchange="updateEl(\''+el.id+'\',{showAxisY:this.checked})"></div>';
+      h += '<div class="pr"><span class="pr-l">Gridlines</span><input type="checkbox" '+(el.showGridlines?'checked':'')+' onchange="updateEl(\''+el.id+'\',{showGridlines:this.checked})"></div>';
+      h += '</div>';
+
+      // Axis & gridline styling (only meaningful when at least one is shown)
+      if(el.showAxisX || el.showAxisY || el.showGridlines){
+        h += '<div class="ps"><div class="ps-t">Axis Style</div>';
+        // Axis color + width
+        if(el.showAxisX || el.showAxisY){
+          h += '<div style="font-size:10px;color:var(--muted);margin-top:4px;margin-bottom:3px">Axis line color</div>';
+          h += renderColorPickerControl(el.id, 'axisColor', el.axisColor||'rgba(255,255,255,0.25)');
+          h += '<div class="pr"><span class="pr-l">Axis width</span><input type="number" class="pr-i" min="0.5" max="6" step="0.5" value="'+(el.axisWidth||1)+'" oninput="updateEl(\''+el.id+'\',{axisWidth:Math.max(0.5,+this.value)})"></div>';
+          h += '<div style="font-size:10px;color:var(--muted);margin-top:8px;margin-bottom:3px">Axis label color</div>';
+          h += renderColorPickerControl(el.id, 'axisLabelColor', el.axisLabelColor||'rgba(240,240,245,0.6)');
+        }
+        if(el.showGridlines){
+          h += '<div style="font-size:10px;color:var(--muted);margin-top:4px;margin-bottom:3px">Gridline color</div>';
+          h += renderColorPickerControl(el.id, 'gridColor', el.gridColor||'rgba(255,255,255,0.06)');
+          h += '<div class="pr"><span class="pr-l">Grid width</span><input type="number" class="pr-i" min="0.5" max="4" step="0.5" value="'+(el.gridWidth||1)+'" oninput="updateEl(\''+el.id+'\',{gridWidth:Math.max(0.5,+this.value)})"></div>';
+        }
+        h += '<div style="font-size:10px;color:var(--muted);margin-top:4px">Tip: muted colors for subtle styling, vibrant for emphasis. Or paste any hex/rgba.</div>';
+        h += '</div>';
+      }
+    }
+
+    h += '<div class="ps"><div class="ps-t">Animation</div>';
+    h += '<div class="pr"><span class="pr-l">Duration (ms)</span><input type="number" class="pr-i" value="'+(el.animDuration||800)+'" min="0" max="5000" step="100" oninput="updateEl(\''+el.id+'\',{animDuration:+this.value})"></div>';
+    // Easing curve picker
+    h += '<div class="pr"><span class="pr-l">Easing</span>';
+    h += '<select class="pr-i" style="width:auto" onchange="updateEl(\''+el.id+'\',{animEasing:this.value})">';
+    [['smooth','Smooth'],['bounce','Bounce'],['snap','Snap'],['linear','Linear'],['slow-start','Slow start'],['slow-end','Slow end']].forEach(function(pair){
+      var sel = (el.animEasing||'smooth') === pair[0] ? ' selected' : '';
+      h += '<option value="'+pair[0]+'"'+sel+'>'+pair[1]+'</option>';
+    });
+    h += '</select></div>';
+    // Stagger toggle (only meaningful for 'all at once' reveal mode)
+    var rmForStagger = el.revealMode || 'all';
+    if(rmForStagger === 'all'){
+      h += '<div class="pr"><span class="pr-l">Stagger</span><input type="checkbox" '+(el.animStagger?'checked':'')+' onchange="updateEl(\''+el.id+'\',{animStagger:this.checked})"></div>';
+      if(el.animStagger){
+        h += '<div class="pr"><span class="pr-l">Stagger delay (ms)</span><input type="number" class="pr-i" min="0" max="500" step="25" value="'+(el.animStaggerDelay||100)+'" oninput="updateEl(\''+el.id+'\',{animStaggerDelay:Math.max(0,+this.value)})"></div>';
+        h += '<div style="font-size:10px;color:var(--muted);margin-top:4px">Each '+addNoun+' starts '+((el.animStaggerDelay||100))+'ms after the previous, creating a wave effect.</div>';
+      }
+    } else {
+      h += '<div style="font-size:10px;color:var(--muted);margin-top:4px;font-style:italic">Stagger only applies in &quot;All at once&quot; reveal mode. Currently '+rmForStagger+'.</div>';
+    }
+    var animHint = isPie ? 'Slices grow from their center on reveal.' :
+                   (el.chartType === 'line' ? 'Line draws in left-to-right on reveal.' :
+                    (el.chartType === 'area' ? 'Line draws in and area fills behind it.' :
+                     (el.chartType === 'scatter' ? 'Points scale in as revealed.' :
+                      'Bars grow from zero on reveal.')));
+    h += '<div style="font-size:10px;color:var(--muted);margin-top:6px">'+animHint+' Set duration to 0 for no animation.</div>';
     h += '</div>';
   }
 
@@ -11837,13 +15170,21 @@ function renderInsertMenu(){
   h += menuItem(I.text,           'Text',                'addText(); closePopover();',                   'T');
   h += menuItem(I.textTemplates,  'Text Templates',      'closePopover(); openTextTemplatesPopover();',  '');
   h += menuItem(I.emoji,          'Emoji',               'closePopover(); openEmojiPopover();',          '');
-  h += menuItem(I.sticker,        'Animated Stickers',   'closePopover(); openStickersPopover();',       'NEW');
+  h += menuItem(I.sticker,        'Animated Stickers',   'closePopover(); openStickersPopover();',       'NEW', 'sticker');
   h += '<div class="menu-divider"></div>';
   h += '<div class="menu-group-label">Media</div>';
   h += menuItem(I.image,          'Image',               'triggerImageInput(); closePopover();',         '');
   h += menuItem(I.note,           'Sticky Note',         'addNote(); closePopover();',                   '');
   h += menuItem(I.monitor,        'Screen Share',        'addScreenShare(); closePopover();',            '');
   h += menuItem(I.webcam,         'Webcam',              'addWebcam(); closePopover();',                 '');
+  h += '<div class="menu-divider"></div>';
+  h += '<div class="menu-group-label">Charts</div>';
+  h += menuItem(I.chart,          'Bar Chart',           'addChart(\'bar\'); closePopover();',           '');
+  h += menuItem(I.chartLine,      'Line Chart',          'addChart(\'line\'); closePopover();',          '');
+  h += menuItem(I.chartArea,      'Area Chart',          'addChart(\'area\'); closePopover();',          'NEW', 'chart-area');
+  h += menuItem(I.chartPie,       'Pie Chart',           'addChart(\'pie\'); closePopover();',           '');
+  h += menuItem(I.chartDonut,     'Donut Chart',         'addChart(\'donut\'); closePopover();',         '');
+  h += menuItem(I.chartScatter,   'Scatter Chart',       'addChart(\'scatter\'); closePopover();',       'NEW', 'chart-scatter');
   h += '<div class="menu-divider"></div>';
   h += '<div class="menu-group-label">Layout</div>';
   h += menuItem(I.list,           'Lists & Tables',      'closePopover(); openListsPopover();',          '');
@@ -11895,11 +15236,41 @@ function renderFileMenu(){
 }
 
 // Helper: build a single menu item row.
-function menuItem(iconHtml, label, onclickJs, shortcut){
+// =========================================================
+// SEEN-FEATURES TRACKING (for "NEW" menu badges that disappear after use)
+// =========================================================
+// Persistent across sessions via localStorage. Each feature has a key
+// (e.g. 'chart-area', 'sticker'). When the user uses the feature for the
+// first time, its key is added to the set and the NEW badge no longer shows.
+var _seenFeatures = (function(){
+  try {
+    var raw = localStorage.getItem('ep-seen-features');
+    if(!raw) return {};
+    var parsed = JSON.parse(raw);
+    return (parsed && typeof parsed === 'object') ? parsed : {};
+  } catch(e){ return {}; }
+})();
+
+window.isFeatureSeen = function(key){ return !!_seenFeatures[key]; };
+window.markFeatureSeen = function(key){
+  if(!key || _seenFeatures[key]) return;
+  _seenFeatures[key] = true;
+  try { localStorage.setItem('ep-seen-features', JSON.stringify(_seenFeatures)); } catch(e){}
+};
+
+function menuItem(iconHtml, label, onclickJs, shortcut, featureKey){
+  // If a featureKey is supplied AND it's already been seen, suppress the
+  // NEW badge. Also wrap the onclick so the feature is auto-marked seen
+  // when used. Other shortcuts (e.g. "T" for keyboard hint) are not affected.
+  var displayShortcut = shortcut || '';
+  if(featureKey){
+    if(_seenFeatures[featureKey]) displayShortcut = '';
+    onclickJs = 'markFeatureSeen(\''+featureKey+'\');' + onclickJs;
+  }
   return '<div class="menu-item" onclick="'+onclickJs+'">'
        + '<span class="menu-icon">'+(iconHtml||'')+'</span>'
        + '<span class="menu-label">'+label+'</span>'
-       + '<span class="menu-shortcut">'+(shortcut||'')+'</span>'
+       + '<span class="menu-shortcut">'+displayShortcut+'</span>'
        + '</div>';
 }
 
@@ -12633,6 +16004,11 @@ function renderPres(){
   // Re-attach active screen-share streams too
   reattachScreenShareStreams();
   reattachWebcamStreams();
+
+  // Trigger chart grow-in animations for charts that are visible and haven't
+  // animated yet this slide-show. We track per-(slide, revealStep) so the
+  // animation fires once when the chart first becomes visible.
+  triggerChartAnimations();
 
   // Slide transitions: only fire when the slide ACTUALLY CHANGES (not on reveal clicks).
   // _lastTransSlideIdx tracks the last slide that triggered a transition.
