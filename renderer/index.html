@@ -2899,6 +2899,11 @@ function mkChart(x, y){
     bar3DAngle: 30,                         // projection angle in degrees (30 = standard isometric)
     lineSmooth: true,                       // smooth curve through points
     linePoints: true,                       // show dots at each data point
+    line3D: false,                          // 3D ribbon style for line charts
+    line3DDepth: 14,                        // px: depth offset for shadow line
+    line3DAngle: 30,                        // projection angle in degrees
+    scatter3D: false,                       // 3D scatter — points lift with floor shadows
+    scatter3DDepth: 12,                     // px: shadow offset / point lift amount
     lineWidth: 3,                           // stroke width
     bg: 'transparent',                      // chart background; transparent so slide bg shows
     bc: 'transparent',                      // border around the chart element
@@ -11482,6 +11487,15 @@ function renderLineChart(el, isPres){
       ? 'M '+visible[0].x+' '+visible[0].y+' L '+visible[0].x+' '+visible[0].y
       : buildLinePath(visible, smooth);
 
+    // 3D state for line/area — declared early so area block can use it.
+    // Field name `line3D` is shared between line and area (each chart only
+    // ever uses one renderer code path).
+    var line3DOn = !!el.line3D;
+    var line3DDepth = Math.max(0, Math.min(60, Number(el.line3DDepth) || 14));
+    var line3DAngle = (Number(el.line3DAngle) || 30) * Math.PI / 180;
+    var l3dx = line3DOn ? line3DDepth * Math.cos(line3DAngle) : 0;
+    var l3dy = line3DOn ? -line3DDepth * Math.sin(line3DAngle) : 0;
+
     // Area fill — render BEFORE the line so the line draws on top.
     // The area path = line path + line down to baseline + line back to start,
     // forming a closed polygon. Baseline = zero line if range crosses zero,
@@ -11494,6 +11508,59 @@ function renderLineChart(el, isPres){
         ' Z';
       var fillStyle = el.areaFillStyle || 'gradient';
       var fillOpacity = el.areaFillOpacity != null ? el.areaFillOpacity : 0.35;
+
+      // 3D area: back wall + side walls + top face. Render BEFORE front fill.
+      if(line3DOn){
+        // Back wall — translated copy of the entire area, darkened
+        var backPts = visible.map(function(p){
+          return { x: p.x + l3dx, y: p.y + l3dy, v: p.v, reveal: p.reveal };
+        });
+        var backLineD = buildLinePath(backPts, smooth);
+        var backAreaD = backLineD +
+          ' L '+(visible[visible.length - 1].x + l3dx)+' '+(baselineY + l3dy) +
+          ' L '+(visible[0].x + l3dx)+' '+(baselineY + l3dy) +
+          ' Z';
+        var backFill = darkenColor(color, 0.55);
+        svg += '<path d="'+backAreaD+'" fill="'+backFill+'" fill-opacity="'+(fillOpacity * 0.7)+'" stroke="none"/>';
+
+        // Left side wall — quad from front-baseline-left to back-baseline-left
+        var sideColor = darkenColor(color, 0.45);
+        svg += '<polygon points="'
+             + visible[0].x+','+baselineY+' '
+             + visible[0].x+','+visible[0].y+' '
+             + (visible[0].x + l3dx)+','+(visible[0].y + l3dy)+' '
+             + (visible[0].x + l3dx)+','+(baselineY + l3dy)
+             + '" fill="'+sideColor+'" fill-opacity="'+(fillOpacity * 0.85)+'"/>';
+        // Right side wall
+        var lastP = visible[visible.length - 1];
+        svg += '<polygon points="'
+             + lastP.x+','+baselineY+' '
+             + lastP.x+','+lastP.y+' '
+             + (lastP.x + l3dx)+','+(lastP.y + l3dy)+' '
+             + (lastP.x + l3dx)+','+(baselineY + l3dy)
+             + '" fill="'+sideColor+'" fill-opacity="'+(fillOpacity * 0.85)+'"/>';
+
+        // Top face — curve-following ribbon (same technique as line ribbon)
+        var topRibbonColor = lightenColor(color, 0.18);
+        var topRibbonD;
+        if(smooth && visible.length > 2){
+          var topD = buildLinePath(visible, true);
+          var revShadow = backPts.slice().reverse();
+          var revShadowLine = buildLinePath(revShadow, true).replace(/^M\s/, 'L ');
+          topRibbonD = topD + ' ' + revShadowLine + ' Z';
+        } else {
+          topRibbonD = 'M '+visible[0].x+' '+visible[0].y;
+          for(var ari = 1; ari < visible.length; ari++){
+            topRibbonD += ' L '+visible[ari].x+' '+visible[ari].y;
+          }
+          for(var arj = visible.length - 1; arj >= 0; arj--){
+            topRibbonD += ' L '+(visible[arj].x + l3dx)+' '+(visible[arj].y + l3dy);
+          }
+          topRibbonD += ' Z';
+        }
+        svg += '<path d="'+topRibbonD+'" fill="'+topRibbonColor+'" fill-opacity="'+Math.min(1, fillOpacity + 0.3)+'" stroke="none"/>';
+      }
+
       var fillRef;
       if(fillStyle === 'gradient'){
         // Add a linearGradient defining color → transparent (top → bottom)
@@ -11511,6 +11578,47 @@ function renderLineChart(el, isPres){
     }
 
     var prevRevealForPath = (isPres && S.pres) ? Math.max(0, S.revealStep - 1) : 0;
+    // 3D ribbon for line charts (not area — area got its own 3D above)
+    if(line3DOn && !isArea && visible.length >= 2){
+      // Shadow line — translated copy of the main path
+      var shadowPts = visible.map(function(p){
+        return { x: p.x + l3dx, y: p.y + l3dy, v: p.v, reveal: p.reveal };
+      });
+      var shadowPathD = buildLinePath(shadowPts, smooth);
+      var shadowColor = darkenColor(color, 0.55);
+      // Top-face ribbon — closed path that follows the same curve smoothing as
+      // the main line. Goes along top forward, drops to shadow, comes back along
+      // shadow in reverse, closes back at the start.
+      var ribbonTopColor = lightenColor(color, 0.12);
+      // For smooth curves: use buildLinePath then reverse-traverse the shadow.
+      // For straight lines: simple polygon connecting tops to shadows.
+      var ribbonD;
+      if(smooth && visible.length > 2){
+        // Forward along top (same as main path)
+        var topD = buildLinePath(visible, true);
+        // Backward along shadow — reverse the points and trace
+        var revShadow = shadowPts.slice().reverse();
+        var revShadowD = buildLinePath(revShadow, true);
+        // Stitch: top path forward, line down to last shadow point, reverse shadow path, close
+        // The reverse path starts with M; we need L to keep the path connected.
+        // revShadowD looks like 'M x y C ... C ... ...'. Replace the leading M with L.
+        var revShadowLine = revShadowD.replace(/^M\s/, 'L ');
+        ribbonD = topD + ' ' + revShadowLine + ' Z';
+      } else {
+        // Straight segments — single polygon traced manually
+        ribbonD = 'M '+visible[0].x+' '+visible[0].y;
+        for(var ri = 1; ri < visible.length; ri++){
+          ribbonD += ' L '+visible[ri].x+' '+visible[ri].y;
+        }
+        for(var rj = visible.length - 1; rj >= 0; rj--){
+          ribbonD += ' L '+(visible[rj].x + l3dx)+' '+(visible[rj].y + l3dy);
+        }
+        ribbonD += ' Z';
+      }
+      svg += '<path d="'+ribbonD+'" fill="'+ribbonTopColor+'" fill-opacity="0.55" stroke="none"/>';
+      // Shadow line — drawn on top of ribbon
+      svg += '<path d="'+shadowPathD+'" fill="none" stroke="'+shadowColor+'" stroke-width="'+lineWidth+'" stroke-linecap="round" stroke-linejoin="round"/>';
+    }
     svg += '<path data-anim-line="1" data-chart-id="'+el.id+'" data-current-reveal="'+S.revealStep+'" d="'+pathD+'" fill="none" stroke="'+color+'" stroke-width="'+lineWidth+'" stroke-linecap="round" stroke-linejoin="round"/>';
   }
 
@@ -11902,12 +12010,26 @@ function renderScatterChart(el, isPres){
     svg += '<line x1="'+padLeft+'" y1="'+zeroY+'" x2="'+(padLeft+chartW)+'" y2="'+zeroY+'" stroke="rgba(255,255,255,0.35)" stroke-width="1" stroke-dasharray="4,3"/>';
   }
 
+  // 3D state for scatter (shadows below points + slight lift)
+  var scat3DOn = !!el.scatter3D;
+  var scat3DDepth = Math.max(0, Math.min(40, Number(el.scatter3DDepth) || 12));
+
   // Render each point. In sequential/manual reveal, hidden points are skipped.
   data.forEach(function(d, i){
     if(isPres && S.pres && revealSteps[i] > S.revealStep) return;
     var px = valueToX(Number(d.x) || 0);
     var py = valueToY(Number(d.y) || 0);
     var revealStep = revealSteps[i];
+    // 3D shadow ellipse BELOW point (drawn first so point sits on top)
+    if(scat3DOn){
+      var shadowColor = darkenColor(color, 0.6);
+      var shadowR = pointSize * 0.85;
+      // Shadow sits below the point on the chart's "floor", slightly offset down-left
+      svg += '<ellipse cx="'+(px - scat3DDepth*0.3)+'" cy="'+(py + scat3DDepth*0.6)+'" rx="'+shadowR+'" ry="'+(shadowR*0.35)+'" fill="'+shadowColor+'" fill-opacity="0.4"/>';
+      // Lift point slightly up-right so it looks like it's floating above the shadow
+      px = px + scat3DDepth * 0.5;
+      py = py - scat3DDepth * 0.25;
+    }
     // Each point gets a marker class so animation system can target newly-revealed points.
     var pointEl;
     if(pointShape === 'square'){
@@ -12530,11 +12652,121 @@ function drawLineChartToCanvas(ctx, el){
     }
 
     if(drawPts.length >= 2){
+      // 3D state for line/area canvas — declared early so area can use it
+      var lc3DOn = !!el.line3D;
+      var lc3DDepth = Math.max(0, Math.min(60, Number(el.line3DDepth) || 14));
+      var lc3DAngle = (Number(el.line3DAngle) || 30) * Math.PI / 180;
+      var lcdx = lc3DOn ? lc3DDepth * Math.cos(lc3DAngle) : 0;
+      var lcdy = lc3DOn ? -lc3DDepth * Math.sin(lc3DAngle) : 0;
+
       // For area charts, fill the region below the line first.
       if(el.chartType === 'area'){
         var baselineY = (range.min < 0 && range.max > 0) ? valueToY(0) : (el.y + padTop + chartH);
         var fillStyle = el.areaFillStyle || 'gradient';
         var fillOpacity = el.areaFillOpacity != null ? el.areaFillOpacity : 0.35;
+
+        // 3D area extrusion: back wall, side walls, top face — BEFORE front fill
+        if(lc3DOn){
+          // Helper: trace closed area path on ctx, optionally offset by (offX, offY)
+          var traceAreaPath = function(offX, offY){
+            ctx.beginPath();
+            ctx.moveTo(drawPts[0].x + offX, baselineY + offY);
+            ctx.lineTo(drawPts[0].x + offX, drawPts[0].y + offY);
+            if(smooth && drawPts.length > 2){
+              var tns = 0.2;
+              for(var ti = 0; ti < drawPts.length - 1; ti++){
+                var tp0 = drawPts[Math.max(0, ti - 1)];
+                var tp1 = drawPts[ti];
+                var tp2 = drawPts[ti + 1];
+                var tp3 = drawPts[Math.min(drawPts.length - 1, ti + 2)];
+                var tc1x = tp1.x + (tp2.x - tp0.x) * tns + offX;
+                var tc1y = tp1.y + (tp2.y - tp0.y) * tns + offY;
+                var tc2x = tp2.x - (tp3.x - tp1.x) * tns + offX;
+                var tc2y = tp2.y - (tp3.y - tp1.y) * tns + offY;
+                ctx.bezierCurveTo(tc1x, tc1y, tc2x, tc2y, tp2.x + offX, tp2.y + offY);
+              }
+            } else {
+              for(var ti = 1; ti < drawPts.length; ti++){
+                ctx.lineTo(drawPts[ti].x + offX, drawPts[ti].y + offY);
+              }
+            }
+            ctx.lineTo(drawPts[drawPts.length - 1].x + offX, baselineY + offY);
+            ctx.closePath();
+          };
+          // Back wall — translated area, darkened
+          ctx.fillStyle = darkenColor(color, 0.55);
+          ctx.globalAlpha = fillOpacity * 0.7;
+          traceAreaPath(lcdx, lcdy);
+          ctx.fill();
+          // Left side wall
+          ctx.fillStyle = darkenColor(color, 0.45);
+          ctx.globalAlpha = fillOpacity * 0.85;
+          ctx.beginPath();
+          ctx.moveTo(drawPts[0].x, baselineY);
+          ctx.lineTo(drawPts[0].x, drawPts[0].y);
+          ctx.lineTo(drawPts[0].x + lcdx, drawPts[0].y + lcdy);
+          ctx.lineTo(drawPts[0].x + lcdx, baselineY + lcdy);
+          ctx.closePath();
+          ctx.fill();
+          // Right side wall
+          var lastDrawPt = drawPts[drawPts.length - 1];
+          ctx.beginPath();
+          ctx.moveTo(lastDrawPt.x, baselineY);
+          ctx.lineTo(lastDrawPt.x, lastDrawPt.y);
+          ctx.lineTo(lastDrawPt.x + lcdx, lastDrawPt.y + lcdy);
+          ctx.lineTo(lastDrawPt.x + lcdx, baselineY + lcdy);
+          ctx.closePath();
+          ctx.fill();
+          // Top face — curve-following ribbon (lightened)
+          ctx.fillStyle = lightenColor(color, 0.18);
+          ctx.globalAlpha = Math.min(1, fillOpacity + 0.3);
+          ctx.beginPath();
+          // Forward along top
+          ctx.moveTo(drawPts[0].x, drawPts[0].y);
+          if(smooth && drawPts.length > 2){
+            var tns2 = 0.2;
+            for(var afi = 0; afi < drawPts.length - 1; afi++){
+              var ap0 = drawPts[Math.max(0, afi - 1)];
+              var ap1 = drawPts[afi];
+              var ap2 = drawPts[afi + 1];
+              var ap3 = drawPts[Math.min(drawPts.length - 1, afi + 2)];
+              var ac1x = ap1.x + (ap2.x - ap0.x) * tns2;
+              var ac1y = ap1.y + (ap2.y - ap0.y) * tns2;
+              var ac2x = ap2.x - (ap3.x - ap1.x) * tns2;
+              var ac2y = ap2.y - (ap3.y - ap1.y) * tns2;
+              ctx.bezierCurveTo(ac1x, ac1y, ac2x, ac2y, ap2.x, ap2.y);
+            }
+          } else {
+            for(var afli = 1; afli < drawPts.length; afli++){
+              ctx.lineTo(drawPts[afli].x, drawPts[afli].y);
+            }
+          }
+          // Drop to shadow at last point
+          ctx.lineTo(drawPts[drawPts.length - 1].x + lcdx, drawPts[drawPts.length - 1].y + lcdy);
+          // Backward along shadow
+          if(smooth && drawPts.length > 2){
+            var tns3 = 0.2;
+            for(var abi = drawPts.length - 1; abi > 0; abi--){
+              var bp0 = drawPts[Math.max(0, abi - 2)];
+              var bp1 = drawPts[abi - 1];
+              var bp2 = drawPts[abi];
+              var bp3 = drawPts[Math.min(drawPts.length - 1, abi + 1)];
+              var abc1x = bp2.x - (bp3.x - bp1.x) * tns3 + lcdx;
+              var abc1y = bp2.y - (bp3.y - bp1.y) * tns3 + lcdy;
+              var abc2x = bp1.x + (bp2.x - bp0.x) * tns3 + lcdx;
+              var abc2y = bp1.y + (bp2.y - bp0.y) * tns3 + lcdy;
+              ctx.bezierCurveTo(abc1x, abc1y, abc2x, abc2y, bp1.x + lcdx, bp1.y + lcdy);
+            }
+          } else {
+            for(var abli = drawPts.length - 2; abli >= 0; abli--){
+              ctx.lineTo(drawPts[abli].x + lcdx, drawPts[abli].y + lcdy);
+            }
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+
         var fillStyleObj;
         if(fillStyle === 'gradient'){
           var grad = ctx.createLinearGradient(0, el.y + padTop, 0, el.y + padTop + chartH);
@@ -12569,6 +12801,94 @@ function drawLineChartToCanvas(ctx, el){
         ctx.lineTo(drawPts[drawPts.length-1].x, baselineY);
         ctx.closePath();
         ctx.fill();
+      }
+
+      // 3D ribbon for LINE charts only (area got its own 3D above).
+      // Renders BEFORE main stroke so main line draws on top.
+      if(lc3DOn && el.chartType !== 'area' && drawPts.length >= 2){
+        // Top-face ribbon — single closed path that follows the curve smoothing
+        ctx.fillStyle = lightenColor(color, 0.12);
+        ctx.globalAlpha = 0.55;
+        ctx.beginPath();
+        // Forward along top curve
+        ctx.moveTo(drawPts[0].x, drawPts[0].y);
+        if(smooth && drawPts.length > 2){
+          var tns = 0.2;
+          for(var ri = 0; ri < drawPts.length - 1; ri++){
+            var rp0 = drawPts[Math.max(0, ri - 1)];
+            var rp1 = drawPts[ri];
+            var rp2 = drawPts[ri + 1];
+            var rp3 = drawPts[Math.min(drawPts.length - 1, ri + 2)];
+            var rc1x = rp1.x + (rp2.x - rp0.x) * tns;
+            var rc1y = rp1.y + (rp2.y - rp0.y) * tns;
+            var rc2x = rp2.x - (rp3.x - rp1.x) * tns;
+            var rc2y = rp2.y - (rp3.y - rp1.y) * tns;
+            ctx.bezierCurveTo(rc1x, rc1y, rc2x, rc2y, rp2.x, rp2.y);
+          }
+        } else {
+          for(var rli = 1; rli < drawPts.length; rli++){
+            ctx.lineTo(drawPts[rli].x, drawPts[rli].y);
+          }
+        }
+        // Drop down to shadow at the last point
+        ctx.lineTo(drawPts[drawPts.length - 1].x + lcdx, drawPts[drawPts.length - 1].y + lcdy);
+        // Backward along shadow curve (reverse traversal — for smooth, we reverse
+        // the points and re-derive bezier controls so curvature matches)
+        if(smooth && drawPts.length > 2){
+          var tnsR = 0.2;
+          for(var bi = drawPts.length - 1; bi > 0; bi--){
+            // Going from bi to bi-1, mirror the forward bezier logic:
+            // forward used pts [bi-2, bi-1, bi, bi+1] to draw segment bi-1→bi
+            // backward we want to draw bi→bi-1 with the SAME geometric curve
+            var bp0 = drawPts[Math.max(0, bi - 2)];
+            var bp1 = drawPts[bi - 1];
+            var bp2 = drawPts[bi];
+            var bp3 = drawPts[Math.min(drawPts.length - 1, bi + 1)];
+            // Forward control points were:
+            //   c1 = bp1 + (bp2 - bp0) * tns  (tangent at bp1)
+            //   c2 = bp2 - (bp3 - bp1) * tns  (tangent at bp2)
+            // Reversed: we draw bp2 → bp1, so c1_rev = old c2, c2_rev = old c1
+            var bc1x_ = bp2.x - (bp3.x - bp1.x) * tnsR + lcdx;
+            var bc1y_ = bp2.y - (bp3.y - bp1.y) * tnsR + lcdy;
+            var bc2x_ = bp1.x + (bp2.x - bp0.x) * tnsR + lcdx;
+            var bc2y_ = bp1.y + (bp2.y - bp0.y) * tnsR + lcdy;
+            ctx.bezierCurveTo(bc1x_, bc1y_, bc2x_, bc2y_, bp1.x + lcdx, bp1.y + lcdy);
+          }
+        } else {
+          for(var bli = drawPts.length - 2; bli >= 0; bli--){
+            ctx.lineTo(drawPts[bli].x + lcdx, drawPts[bli].y + lcdy);
+          }
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // Shadow line stroke
+        ctx.strokeStyle = darkenColor(color, 0.55);
+        ctx.lineWidth = lineWidth;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(drawPts[0].x + lcdx, drawPts[0].y + lcdy);
+        if(smooth && drawPts.length > 2){
+          var tns2 = 0.2;
+          for(var si = 0; si < drawPts.length - 1; si++){
+            var sp0 = drawPts[Math.max(0, si - 1)];
+            var sp1 = drawPts[si];
+            var sp2 = drawPts[si + 1];
+            var sp3 = drawPts[Math.min(drawPts.length - 1, si + 2)];
+            var sc1x = sp1.x + (sp2.x - sp0.x) * tns2 + lcdx;
+            var sc1y = sp1.y + (sp2.y - sp0.y) * tns2 + lcdy;
+            var sc2x = sp2.x - (sp3.x - sp1.x) * tns2 + lcdx;
+            var sc2y = sp2.y - (sp3.y - sp1.y) * tns2 + lcdy;
+            ctx.bezierCurveTo(sc1x, sc1y, sc2x, sc2y, sp2.x + lcdx, sp2.y + lcdy);
+          }
+        } else {
+          for(var li = 1; li < drawPts.length; li++){
+            ctx.lineTo(drawPts[li].x + lcdx, drawPts[li].y + lcdy);
+          }
+        }
+        ctx.stroke();
       }
 
       ctx.strokeStyle = color;
@@ -13073,6 +13393,10 @@ function drawScatterChartToCanvas(ctx, el){
     ctx.setLineDash([]);
   }
 
+  // 3D state for canvas scatter
+  var canvasScat3DOn = !!el.scatter3D;
+  var canvasScat3DDepth = Math.max(0, Math.min(40, Number(el.scatter3DDepth) || 12));
+
   // Render points
   data.forEach(function(d, i){
     if(S.pres && revealSteps[i] > S.revealStep) return;
@@ -13081,6 +13405,22 @@ function drawScatterChartToCanvas(ctx, el){
     // Per-point scale animation: only the just-revealed point scales
     var ptScale = (S.pres && revealSteps[i] === S.revealStep) ? prog : 1;
     if(ptScale <= 0) return;
+
+    // 3D shadow ellipse on the chart "floor" below the point (drawn before
+    // point so point sits on top). Shadow fades in with point animation.
+    if(canvasScat3DOn){
+      ctx.save();
+      ctx.fillStyle = darkenColor(color, 0.6);
+      ctx.globalAlpha = 0.4 * ptScale;
+      var shadowR = pointSize * 0.85;
+      ctx.beginPath();
+      ctx.ellipse(px - canvasScat3DDepth * 0.3, py + canvasScat3DDepth * 0.6, shadowR, shadowR * 0.35, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      // Lift point so it appears floating above the shadow
+      px = px + canvasScat3DDepth * 0.5;
+      py = py - canvasScat3DDepth * 0.25;
+    }
 
     ctx.save();
     if(ptScale < 1){
@@ -14517,6 +14857,31 @@ function renderPropsPanel(el){
       h += '<div class="pr"><span class="pr-l">Smooth</span><input type="checkbox" '+(el.lineSmooth!==false?'checked':'')+' onchange="updateEl(\''+el.id+'\',{lineSmooth:this.checked})"></div>';
       h += '<div class="pr"><span class="pr-l">Show points</span><input type="checkbox" '+(el.linePoints!==false?'checked':'')+' onchange="updateEl(\''+el.id+'\',{linePoints:this.checked})"></div>';
       h += '<div class="pr"><span class="pr-l">Y from zero</span><input type="checkbox" '+(el.yFromZero?'checked':'')+' onchange="updateEl(\''+el.id+'\',{yFromZero:this.checked})"></div>';
+      // 3D picker — applies to both line and area
+      if(el.chartType === 'line' || el.chartType === 'area'){
+        h += '<div style="font-size:10px;color:var(--muted);margin-top:8px;margin-bottom:4px">Style</div>';
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px">';
+        [['flat','Flat',!el.line3D],['3d','3D',!!el.line3D]].forEach(function(pair){
+          h += '<button class="sp-btn" style="padding:6px 4px;font-size:10px'+(pair[2]?';border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)':'')+'" onclick="updateEl(\''+el.id+'\',{line3D:'+(pair[0]==='3d'?'true':'false')+'})">'+pair[1]+'</button>';
+        });
+        h += '</div>';
+        if(el.line3D){
+          var lDep = (typeof el.line3DDepth === 'number') ? el.line3DDepth : 14;
+          var lAngVal = (typeof el.line3DAngle === 'number') ? el.line3DAngle : 30;
+          h += '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:6px;margin-bottom:3px">';
+          h += '<span>Depth</span><span id="line3d-dep-'+el.id+'" style="color:#f0f0f5;font-weight:600">'+lDep+'px</span></div>';
+          h += '<input type="range" min="0" max="50" step="1" value="'+lDep+'" '+
+               'style="width:100%;accent-color:var(--g)" '+
+               'oninput="document.getElementById(\'line3d-dep-'+el.id+'\').textContent=this.value+\'px\'" '+
+               'onchange="updateEl(\''+el.id+'\',{line3DDepth:+this.value})">';
+          h += '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:6px;margin-bottom:3px">';
+          h += '<span>Angle</span><span id="line3d-ang-'+el.id+'" style="color:#f0f0f5;font-weight:600">'+lAngVal+'\u00b0</span></div>';
+          h += '<input type="range" min="15" max="60" step="1" value="'+lAngVal+'" '+
+               'style="width:100%;accent-color:var(--g);margin-bottom:8px" '+
+               'oninput="document.getElementById(\'line3d-ang-'+el.id+'\').textContent=this.value+\'\u00b0\'" '+
+               'onchange="updateEl(\''+el.id+'\',{line3DAngle:+this.value})">';
+        }
+      }
       h += '<div class="pr"><span class="pr-l">Line width</span><input type="number" class="pr-i" min="1" max="10" value="'+(el.lineWidth||3)+'" oninput="updateEl(\''+el.id+'\',{lineWidth:Math.max(1,+this.value)})"></div>';
       if(el.chartType === 'area'){
         // Fill style picker
@@ -14551,6 +14916,22 @@ function renderPropsPanel(el){
       });
       h += '</div>';
       h += '<div class="pr"><span class="pr-l">Y from zero</span><input type="checkbox" '+(el.yFromZero?'checked':'')+' onchange="updateEl(\''+el.id+'\',{yFromZero:this.checked})"></div>';
+      // 3D picker for scatter
+      h += '<div style="font-size:10px;color:var(--muted);margin-top:8px;margin-bottom:4px">Style</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px">';
+      [['flat','Flat',!el.scatter3D],['3d','3D',!!el.scatter3D]].forEach(function(pair){
+        h += '<button class="sp-btn" style="padding:6px 4px;font-size:10px'+(pair[2]?';border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)':'')+'" onclick="updateEl(\''+el.id+'\',{scatter3D:'+(pair[0]==='3d'?'true':'false')+'})">'+pair[1]+'</button>';
+      });
+      h += '</div>';
+      if(el.scatter3D){
+        var sDep = (typeof el.scatter3DDepth === 'number') ? el.scatter3DDepth : 12;
+        h += '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:6px;margin-bottom:3px">';
+        h += '<span>Lift / shadow</span><span id="scat3d-dep-'+el.id+'" style="color:#f0f0f5;font-weight:600">'+sDep+'px</span></div>';
+        h += '<input type="range" min="0" max="30" step="1" value="'+sDep+'" '+
+             'style="width:100%;accent-color:var(--g);margin-bottom:8px" '+
+             'oninput="document.getElementById(\'scat3d-dep-'+el.id+'\').textContent=this.value+\'px\'" '+
+             'onchange="updateEl(\''+el.id+'\',{scatter3DDepth:+this.value})">';
+      }
       h += '<div class="pr"><span class="pr-l">Show labels</span><input type="checkbox" '+(el.scatterShowLabels?'checked':'')+' onchange="updateEl(\''+el.id+'\',{scatterShowLabels:this.checked})"></div>';
       h += '</div>';
     }
@@ -14608,7 +14989,13 @@ function renderPropsPanel(el){
 
       // 3D effect section (separate from Slice Display for clarity)
       h += '<div class="ps"><div class="ps-t">3D Effect</div>';
-      h += '<div class="pr"><span class="pr-l">Enable 3D</span><input type="checkbox" '+(el.pie3D?'checked':'')+' onchange="updateEl(\''+el.id+'\',{pie3D:this.checked})"></div>';
+      // Flat/3D button picker — matches the bar chart picker for consistency
+      h += '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Style</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px">';
+      [['flat','Flat',!el.pie3D],['3d','3D',!!el.pie3D]].forEach(function(pair){
+        h += '<button class="sp-btn" style="padding:6px 4px;font-size:10px'+(pair[2]?';border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)':'')+'" onclick="updateEl(\''+el.id+'\',{pie3D:'+(pair[0]==='3d'?'true':'false')+'})">'+pair[1]+'</button>';
+      });
+      h += '</div>';
       if(el.pie3D){
         var tiltPct = Math.round((el.pie3DTilt || 0.6) * 100);
         // Stacked layout: label + value on top row, slider full-width below.
