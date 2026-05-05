@@ -485,8 +485,15 @@ body.ep-speed-slow{--ep-trans-dur:1.1s;--ep-reveal-dur:0.85s}
 .ep-sp-actions{display:flex;align-items:center;gap:6px}
 .ep-sp-refresh{background:var(--d3);border:1px solid var(--brd);color:var(--w);padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:0.3px;transition:all 0.12s}
 .ep-sp-refresh:hover{background:var(--d4);border-color:var(--g)}
-.ep-sp-footnote{font-size:11px;color:var(--muted);margin-top:18px;padding:10px 12px;background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.2);border-radius:6px;line-height:1.5}
+.ep-sp-footnote{font-size:11px;color:var(--muted);margin-top:12px;padding:10px 12px;background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.2);border-radius:6px;line-height:1.5}
 .ep-sp-footnote strong{color:var(--o)}
+.ep-sp-footer{padding:14px 22px 18px;border-top:1px solid var(--brd);background:var(--d2);flex-shrink:0}
+.ep-sp-audio-row{padding:12px 14px;background:rgba(126,217,87,0.05);border:1px solid rgba(126,217,87,0.2);border-radius:8px}
+.ep-sp-audio-toggle{display:flex;align-items:flex-start;gap:12px;cursor:pointer;color:#f0f0f5}
+.ep-sp-audio-toggle input[type="checkbox"]{width:18px;height:18px;margin-top:2px;flex-shrink:0;accent-color:var(--g);cursor:pointer}
+.ep-sp-audio-label{display:flex;flex-direction:column;gap:4px;font-size:13px}
+.ep-sp-audio-label strong{color:#f0f0f5;font-weight:600}
+.ep-sp-audio-note{font-size:11px;color:var(--muted);line-height:1.4}
 .ep-sp-title{font-size:17px;font-weight:600;margin:0;color:var(--w)}
 .ep-sp-close{background:transparent;border:none;color:var(--muted);font-size:28px;line-height:1;cursor:pointer;padding:0 4px;font-family:inherit}
 .ep-sp-close:hover{color:var(--w)}
@@ -2256,7 +2263,9 @@ var I = {
   monitor:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
   chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="3" y1="20" x2="21" y2="20"/></svg>',
   mic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>',
-  micOff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V5a3 3 0 00-5.94-.6"/><path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>'
+  micOff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V5a3 3 0 00-5.94-.6"/><path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>',
+  screenAudio:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="14" height="10" rx="1.5"/><line x1="6" y1="18" x2="12" y2="18"/><line x1="9" y1="14" x2="9" y2="18"/><path d="M18 7c1 1 1 3 0 4M20 5c2 2 2 6 0 8"/></svg>',
+  screenAudioOff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><rect x="2" y="4" width="14" height="10" rx="1.5"/><line x1="6" y1="18" x2="12" y2="18"/><line x1="9" y1="14" x2="9" y2="18"/></svg>'
 };
 
 // =========================================================
@@ -2832,7 +2841,7 @@ function mkNote(x,y){return{id:uid(),type:'note',x:x,y:y,w:200,h:160,text:'Note.
 // the STICKER_LIBRARY render functions (live SVG with browser-driven CSS
 // animations) AND via canvas rasterization during recording.
 function mkSticker(kind, x, y){return{id:uid(),type:'sticker',kind:kind,x:x,y:y,w:120,h:120,t:Math.floor(Math.random()*1000),lk:false}}
-function mkScreenShare(x,y){return{id:uid(),type:'screenshare',x:x,y:y,w:640,h:360,label:'Screen Share',bc:'#7ed957',bc2:'#9b59ff',bw:2,br:10,borderStyle:'solid',badgeStyle:'full',badgePos:'tl',lk:false}}
+function mkScreenShare(x,y){return{id:uid(),type:'screenshare',x:x,y:y,w:640,h:360,label:'Screen Share',bc:'#7ed957',bc2:'#9b59ff',bw:2,br:10,borderStyle:'solid',badgeStyle:'full',badgePos:'tl',lk:false,audioCapture:true,audioRecVolume:100}}
 
 // Chart element. chartType can be 'bar' (Ship 1), 'line', 'pie', etc. (future ships).
 // Data is an array of {label, value} pairs — same shape works for all chart types
@@ -3007,6 +3016,24 @@ window.updateEl = function(id, patch){
     s.els = s.els.map(function(e){return e.id===id ? Object.assign({},e,patch) : e});
     return s;
   });
+};
+
+// Like updateEl but doesn't trigger render — for live-drag scenarios (volume
+// sliders, etc.) where re-rendering the props panel mid-drag would break the
+// drag interaction. State still updates; visual catches up on next render.
+window.updateElNoRender = function(id, patch){
+  var slide = cs();
+  if(!slide) return;
+  slide.els = slide.els.map(function(e){return e.id===id ? Object.assign({},e,patch) : e});
+};
+
+// Push the latest audio settings from the element into the live Web Audio nodes.
+// Called by props panel toggles/sliders. Looks up the element by id.
+window.applyScreenShareAudioFromEl = function(id){
+  var slide = cs();
+  if(!slide) return;
+  var el = slide.els.find(function(e){ return e.id === id; });
+  if(el) applyScreenShareAudioSettings(id, el);
 };
 
 window.doUndo = function(){
@@ -3990,6 +4017,45 @@ var _recCacheGeneration = 0; // bumped on any invalidation — guarantees freshn
 // Runtime-only: map of elementId → MediaStream for active screen shares.
 // Not persisted; browsers can't rehydrate streams across reloads.
 var _screenShareStreams = {};
+
+// Screen-share audio: simplified architecture (post-Phase-2/3/4 redesign).
+// Audio capture is configured in the picker and stored on the element. The
+// captured stream's audio tracks live with the stream itself — we don't set
+// up any Web Audio routing at connect time. Audio routing happens ENTIRELY
+// at record-start time: a fresh MediaStreamAudioSourceNode is created in the
+// recording mixer's context for each screen-share with audioCapture=true,
+// routed through a per-element GainNode, and connected to the recording dest.
+// Result: screen audio appears in recordings but never plays through speakers.
+//
+// This keeps these for backward-compat with the props panel hooks; no-ops now.
+var _screenShareAudioElements = {}; // legacy, unused
+var _screenShareAudioNodes = {};    // legacy, unused
+
+// No-op: no live audio context any more. Kept so existing call sites are safe.
+function setupScreenShareAudio(id, stream, el){
+  // Recording-only mode — no live setup needed. Audio nodes are built at
+  // record start in the recording context.
+}
+
+function teardownScreenShareAudio(id){
+  // Recording-only mode — no live nodes to tear down. Stream tracks stop
+  // in disconnectScreenShare via the existing track.stop() loop.
+}
+
+// Live volume changes during recording: update the active recording gain if
+// recording is in progress. (No live monitor to update, since we removed it.)
+function applyScreenShareAudioSettings(id, el){
+  if(!el) return;
+  if(S && S.recScreenShareGains && S.recScreenShareGains.length){
+    var recVol = (typeof el.audioRecVolume === 'number') ? el.audioRecVolume : 100;
+    S.recScreenShareGains.forEach(function(entry){
+      if(entry.ssId === id){
+        try { entry.gain.gain.value = recVol / 100; } catch(e){}
+      }
+    });
+  }
+}
+
 // Runtime-only: map of webcam-element-id → MediaStream.
 // Like screen shares, these are not persisted — browsers don't serialize MediaStreams.
 var _webcamElStreams = {};
@@ -4398,16 +4464,38 @@ window.handleExportFormat = async function(format){
   var quality = overlay._epQuality || 'fast';
   if(!blob) return;
 
-  // WebM: skip ffmpeg, save directly
+  // WebM: skip ffmpeg, save directly. Use Electron IPC if available — main.js
+  // writes via fs.writeFileSync, avoiding the Chromium download manager that
+  // leaves orphan .tmp / .crdownload files alongside the saved .webm.
   if(format === 'webm'){
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = name + '.webm';
-    a.click();
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
-    closeExportDialog(false);
-    showToast('Recording saved (WebM)');
+    if(window.epElectron && typeof window.epElectron.saveWebm === 'function'){
+      // Convert blob → ArrayBuffer for IPC, then call the handler.
+      blob.arrayBuffer().then(function(buf){
+        return window.epElectron.saveWebm(buf, name);
+      }).then(function(result){
+        if(result && result.ok){
+          closeExportDialog(false);
+          showToast('Recording saved (WebM)');
+        } else if(result && result.canceled){
+          // User canceled the save dialog — leave export dialog open
+        } else {
+          showToast('Save failed: ' + ((result && result.error) || 'unknown error'));
+        }
+      }).catch(function(err){
+        console.error('WebM save failed:', err);
+        showToast('Save failed: ' + (err && err.message || 'unknown error'));
+      });
+    } else {
+      // Browser/dev fallback — uses Chromium's download manager
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = name + '.webm';
+      a.click();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+      closeExportDialog(false);
+      showToast('Recording saved (WebM)');
+    }
     return;
   }
 
@@ -4534,17 +4622,118 @@ window.toggleRecAudio = function(evt){
   else render();
 };
 
+// Toggle screen-share audio capture across all connected screen-shares.
+// Sets el.audioCapture = newState on every screen-share with an audio track,
+// and updates the live recording gain so the change applies during an active
+// recording too. The toolbar button derives its state from these flags.
+window.toggleScreenAudio = function(evt){
+  if(evt) evt.stopPropagation();
+  // Determine current "any-on" state — if any captures are on, we turn them off
+  var anyOn = false;
+  Object.keys(_screenShareStreams).forEach(function(ssId){
+    var stream = _screenShareStreams[ssId];
+    if(!stream || stream.getAudioTracks().length === 0) return;
+    var ssEl = null;
+    S.slides.some(function(sl){
+      return sl.els.some(function(e){ if(e.id === ssId){ ssEl = e; return true; } return false; });
+    });
+    if(ssEl && ssEl.audioCapture) anyOn = true;
+  });
+  var newState = !anyOn;
+  // Apply to every connected share with audio
+  Object.keys(_screenShareStreams).forEach(function(ssId){
+    var stream = _screenShareStreams[ssId];
+    if(!stream || stream.getAudioTracks().length === 0) return;
+    S.slides.forEach(function(sl){
+      sl.els.forEach(function(e){
+        if(e.id === ssId) e.audioCapture = newState;
+      });
+    });
+  });
+  // If recording is active, update the live recording gains (or zero them out
+  // so audio is silenced from this point in the recording forward).
+  if(S.recScreenShareGains && S.recScreenShareGains.length){
+    S.recScreenShareGains.forEach(function(entry){
+      try {
+        // Find the element to read its target volume
+        var ssEl = null;
+        S.slides.some(function(sl){
+          return sl.els.some(function(e){ if(e.id === entry.ssId){ ssEl = e; return true; } return false; });
+        });
+        var recVol = (ssEl && typeof ssEl.audioRecVolume === 'number') ? ssEl.audioRecVolume : 100;
+        entry.gain.gain.value = newState ? (recVol / 100) : 0;
+      } catch(e){}
+    });
+  }
+  showToast('Screen audio: ' + (newState ? 'ON' : 'OFF') + (S.recActive ? ' (applied to current recording)' : ''));
+  if(S.pres) renderPres();
+  else render();
+};
+
+// Helper used by the toolbar to know whether the screen-audio button should
+// appear AT ALL, and what state to show.
+function getScreenAudioToolbarState(){
+  var hasAny = false;
+  var anyOn = false;
+  Object.keys(_screenShareStreams).forEach(function(ssId){
+    var stream = _screenShareStreams[ssId];
+    if(!stream || stream.getAudioTracks().length === 0) return;
+    hasAny = true;
+    var ssEl = null;
+    S.slides.some(function(sl){
+      return sl.els.some(function(e){ if(e.id === ssId){ ssEl = e; return true; } return false; });
+    });
+    if(ssEl && ssEl.audioCapture) anyOn = true;
+  });
+  return { visible: hasAny, on: anyOn };
+}
+
 window.startRecording = async function(){
   if(S.recActive){ return; }
   if(!S.pres){ showToast('Start recording from presentation mode'); return; }
 
-  // Detect whether any slide has audio attached — only then prompt
+  // Detect what audio sources are present.
   var hasAnyAudio = S.slides.some(function(s){ return s.audio && s.audio.data; });
+  var hasScreenShareAudio = Object.keys(_screenShareStreams).some(function(ssId){
+    var stream = _screenShareStreams[ssId];
+    if(!stream || stream.getAudioTracks().length === 0) return false;
+    // Also check the element's audioCapture flag — user may have disabled it post-connect
+    var ssEl = null;
+    S.slides.some(function(sl){
+      return sl.els.some(function(e){ if(e.id === ssId){ ssEl = e; return true; } return false; });
+    });
+    return ssEl && ssEl.audioCapture;
+  });
+
+  // Decide whether to enable the audio mixer ("includeAudio" == "wire up the
+  // full audio mixer including slide voiceovers AND screen-share audio").
+  // - Both slide audio AND screen audio: ask user about slide voiceovers,
+  //   but mixer runs either way (screen audio goes through it).
+  // - Only screen audio: auto-enable, no prompt — user already chose this
+  //   in the picker, asking again is redundant friction.
+  // - Only slide audio: original behavior — prompt about voiceovers.
+  // - Neither: false, no mixer needed.
   var includeAudio = false;
-  if(hasAnyAudio){
+  if(hasAnyAudio && hasScreenShareAudio){
+    includeAudio = confirm('Include slide voiceovers in the recording?\n\nScreen audio will be recorded regardless. Click OK to also include slide narration. Cancel for screen audio + mic only.');
+    // Even if user says no to slide audio, we still need the mixer running for
+    // screen-share audio. Keep includeAudio true so wiring runs; just skip
+    // the slide voiceover routing.
+    if(!includeAudio){
+      S.recIncludeSlideAudio = false;
+      includeAudio = true; // mixer ON, slide-voiceover OFF
+    } else {
+      S.recIncludeSlideAudio = true;
+    }
+  } else if(hasScreenShareAudio){
+    includeAudio = true;
+    S.recIncludeSlideAudio = false;
+  } else if(hasAnyAudio){
     includeAudio = confirm('Include slide voiceovers in the recording?\n\nClick OK to record narration audio together with the screen.\nClick Cancel for video only (or with mic if enabled).');
+    S.recIncludeSlideAudio = includeAudio;
+  } else {
+    S.recIncludeSlideAudio = false;
   }
-  S.recIncludeSlideAudio = includeAudio;
 
   try {
     // 1. Create canvas matching deck aspect (landscape: 1920×1080, portrait: 1080×1920)
@@ -4597,7 +4786,43 @@ window.startRecording = async function(){
         // creates a new <audio>, we need to also route it through the mixer.
         // _routeSlideAudioToMixer is checked by playSlideAudio after it creates
         // each element.
-        S.recRouteSlideAudio = !!includeAudio;
+        S.recRouteSlideAudio = !!S.recIncludeSlideAudio;
+
+        // Phase 4 (revised): route active screen-share audio into the recording.
+        // Audio is captured at picker time and lives with the MediaStream. We
+        // create a fresh MediaStreamAudioSourceNode in the recording mixer's
+        // context for each screen-share with audioCapture=true, route through
+        // a per-element GainNode (controls recording volume), and connect to
+        // the same recAudioDest that mic + slide voiceover use. This produces
+        // a single mixed audio track in the output. Screen audio NEVER plays
+        // through speakers — it only enters the recording.
+        S.recScreenShareGains = []; // {source, gain, ssId} — track for cleanup + live volume updates
+        if(includeAudio){
+          Object.keys(_screenShareStreams).forEach(function(ssId){
+            var stream = _screenShareStreams[ssId];
+            if(!stream || stream.getAudioTracks().length === 0) return;
+            // Find the element so we can check its audioCapture flag and read volume.
+            var ssEl = null;
+            S.slides.some(function(sl){
+              return sl.els.some(function(e){
+                if(e.id === ssId){ ssEl = e; return true; }
+                return false;
+              });
+            });
+            if(!ssEl || !ssEl.audioCapture) return;
+            try {
+              var recSrc = S.recAudioCtx.createMediaStreamSource(stream);
+              var recGain = S.recAudioCtx.createGain();
+              var recVol = (typeof ssEl.audioRecVolume === 'number') ? ssEl.audioRecVolume : 100;
+              recGain.gain.value = recVol / 100;
+              recSrc.connect(recGain);
+              recGain.connect(S.recAudioDest);
+              S.recScreenShareGains.push({source: recSrc, gain: recGain, ssId: ssId});
+            } catch(e){
+              console.warn('Failed to route screen-share audio for', ssId, e);
+            }
+          });
+        }
 
         // Add the destination's audio track
         S.recAudioDest.stream.getAudioTracks().forEach(function(t){
@@ -4645,6 +4870,14 @@ window.startRecording = async function(){
         try { S.recAudioCtx.close(); } catch(e){}
         S.recAudioCtx = null;
         S.recAudioDest = null;
+      }
+      // Phase 4: disconnect screen-share recording sources/gains
+      if(S.recScreenShareGains && S.recScreenShareGains.length){
+        S.recScreenShareGains.forEach(function(entry){
+          try { entry.source.disconnect(); } catch(e){}
+          try { entry.gain.disconnect(); } catch(e){}
+        });
+        S.recScreenShareGains = [];
       }
       S.recRouteSlideAudio = false;
       S.recChunks = [];
@@ -5901,6 +6134,16 @@ window.deleteEl = function(id){
       });
     }
   } catch(e){ /* defensive — never let cleanup break delete */ }
+  // Clean up screen-share audio if this element had any
+  try {
+    if(_screenShareAudioNodes[id] || _screenShareAudioElements[id]){
+      teardownScreenShareAudio(id);
+    }
+    if(_screenShareStreams[id]){
+      try { _screenShareStreams[id].getTracks().forEach(function(t){ t.stop(); }); } catch(e){}
+      delete _screenShareStreams[id];
+    }
+  } catch(e){ /* defensive */ }
   updateSlide(function(s){s.els = s.els.filter(function(e){return e.id !== id}); return s;});
   S.sel = null;
   S.ctxMenu = null;
@@ -5949,13 +6192,18 @@ window.connectScreenShare = async function(id, evt){
   if(evt) evt.stopPropagation();
 
   var stream = null;
+  var includeAudio = false;
   try {
     if(window.epElectron && typeof window.epElectron.listDesktopSources === 'function'){
       // Electron packaged build — always use custom picker
-      var source = await showScreenSourcePicker();
-      if(!source) return; // user cancelled
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
+      var pickerResult = await showScreenSourcePicker();
+      if(!pickerResult) return; // user cancelled
+      var source = pickerResult.source;
+      includeAudio = !!pickerResult.includeAudio;
+      // Build constraints. For audio, Electron supports system loopback via
+      // chromeMediaSource: 'desktop' on Windows. The id field is not needed
+      // for audio (Windows captures system audio, not per-source).
+      var constraints = {
         video: {
           mandatory: {
             chromeMediaSource: 'desktop',
@@ -5963,14 +6211,46 @@ window.connectScreenShare = async function(id, evt){
             maxFrameRate: 30
           }
         }
-      });
+      };
+      if(includeAudio){
+        constraints.audio = {
+          mandatory: {
+            chromeMediaSource: 'desktop'
+          }
+        };
+      } else {
+        constraints.audio = false;
+      }
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch(audioErr){
+        // If audio capture fails (e.g., loopback not supported on this OS),
+        // fall back to video-only and notify the user.
+        if(includeAudio){
+          console.warn('Screen audio capture failed, retrying without audio:', audioErr);
+          showToast('Screen audio unavailable on this system — sharing video only');
+          includeAudio = false;
+          constraints.audio = false;
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } else {
+          throw audioErr;
+        }
+      }
     } else if(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia){
-      // Browser / dev mode
+      // Browser / dev mode — use native getDisplayMedia.
+      // Read the same localStorage flag so behavior matches Electron mode.
+      var savedAudio = localStorage.getItem('ep-sp-include-audio');
+      includeAudio = savedAudio === null ? true : savedAudio === 'true';
       try {
         stream = await navigator.mediaDevices.getDisplayMedia({
           video: { frameRate: { ideal: 30, max: 60 } },
-          audio: false
+          audio: includeAudio
         });
+        // Some browsers accept the audio:true request but return no audio track
+        // (e.g., user picked a window without audio). Reflect actual state.
+        if(includeAudio && stream.getAudioTracks().length === 0){
+          includeAudio = false;
+        }
       } catch(err){
         if(err.name === 'NotAllowedError' || err.name === 'AbortError') return;
         throw err;
@@ -5982,7 +6262,31 @@ window.connectScreenShare = async function(id, evt){
 
     if(!stream) return;
 
+    // Tag the stream with audio capture state so we can read it later
+    // (e.g., in props panel rendering, recording pipeline)
+    stream._epIncludeAudio = includeAudio;
+
     _screenShareStreams[id] = stream;
+
+    // Sync the element's audioCapture flag with what was actually picked so
+    // the props panel reflects reality. If user unchecks audio in picker,
+    // element shows "off" in props.
+    var ssEl = cs().els.find(function(e){ return e.id === id; });
+    if(ssEl){
+      ssEl.audioCapture = includeAudio;
+      // Set up the audio routing graph if we have audio
+      if(includeAudio){
+        setupScreenShareAudio(id, stream, ssEl);
+      }
+    }
+
+    // Notify user that audio is being captured. Better than silent — matches
+    // their explicit "pop a notification on start" request.
+    if(includeAudio){
+      showToast('Screen sharing with audio capture enabled');
+    } else {
+      showToast('Screen sharing started (no audio)');
+    }
     // Auto-disconnect when the track ends (user closes the picker or the shared window)
     var vTrack = stream.getVideoTracks()[0];
     if(vTrack){
@@ -6024,6 +6328,11 @@ function showScreenSourcePicker(){
       return;
     }
 
+    // Load last "Include audio" choice from localStorage. Default to ON for new
+    // users (per user request). Persists between sessions.
+    var savedInclAudio = localStorage.getItem('ep-sp-include-audio');
+    var includeAudio = savedInclAudio === null ? true : savedInclAudio === 'true';
+
     function buildHTML(){
       var screens = sources.filter(function(s){ return s.id.indexOf('screen:') === 0; });
       var windows = sources.filter(function(s){ return s.id.indexOf('window:') === 0; });
@@ -6040,6 +6349,17 @@ function showScreenSourcePicker(){
             screens.map(renderSourceTile).join('') + '</div>' : '') +
           (windows.length ? '<div class="ep-sp-section-label">Windows</div><div class="ep-sp-grid">' +
             windows.map(renderSourceTile).join('') + '</div>' : '') +
+        '</div>' +
+        '<div class="ep-sp-footer">' +
+          '<div class="ep-sp-audio-row">' +
+            '<label class="ep-sp-audio-toggle">' +
+              '<input type="checkbox" data-act="audio-toggle" ' + (includeAudio ? 'checked' : '') + '>' +
+              '<span class="ep-sp-audio-label">' +
+                '<strong>Include audio</strong>' +
+                '<span class="ep-sp-audio-note">Captures system audio. On Windows this is all sound playing on your computer, not just the shared monitor.</span>' +
+              '</span>' +
+            '</label>' +
+          '</div>' +
           '<div class="ep-sp-footnote">Some apps (WhatsApp, Teams, Discord) use private rendering and don\'t appear here. To share one of them, pick the <strong>screen</strong> containing it.</div>' +
         '</div>' +
       '</div>';
@@ -6080,7 +6400,9 @@ function showScreenSourcePicker(){
       if(tile){
         var id = tile.getAttribute('data-id');
         var src = sources.find(function(s){ return s.id === id; });
-        done(src || null);
+        // Persist the audio choice and resolve with both
+        localStorage.setItem('ep-sp-include-audio', includeAudio ? 'true' : 'false');
+        done(src ? { source: src, includeAudio: includeAudio } : null);
         return;
       }
       if(e.target.closest('[data-act="refresh"]')){
@@ -6097,11 +6419,21 @@ function showScreenSourcePicker(){
         done(null);
       }
     });
+
+    // Audio toggle uses 'change' event since it's a checkbox
+    overlay.addEventListener('change', function(e){
+      if(e.target && e.target.matches('[data-act="audio-toggle"]')){
+        includeAudio = !!e.target.checked;
+        localStorage.setItem('ep-sp-include-audio', includeAudio ? 'true' : 'false');
+      }
+    });
   });
 }
 
 window.disconnectScreenShare = function(id, evt, silent){
   if(evt) evt.stopPropagation();
+  // Tear down audio routing first (Web Audio nodes + hidden <audio>)
+  teardownScreenShareAudio(id);
   var stream = _screenShareStreams[id];
   if(stream){
     try { stream.getTracks().forEach(function(t){ t.stop(); }); } catch(e){}
@@ -14608,6 +14940,30 @@ function renderPropsPanel(el){
     }
     h += '<div class="pr"><span class="pr-l">Label</span><input type="text" class="pr-i" value="'+esc(el.label||'')+'" placeholder="Screen Share" oninput="updateScreenShareLabel(\''+el.id+'\',this.value)"></div>';
     h += '</div>';
+
+    // AUDIO section — only show when connected (audio depends on live stream).
+    if(ssConnected){
+      var ssStream = _screenShareStreams[el.id];
+      var hasAudioTrack = ssStream && ssStream.getAudioTracks().length > 0;
+      var capOn = !!el.audioCapture && hasAudioTrack;
+      var recVol = (typeof el.audioRecVolume === 'number') ? el.audioRecVolume : 100;
+      h += '<div class="ps"><div class="ps-t">Audio</div>';
+      if(!hasAudioTrack){
+        h += '<div style="font-size:11px;color:var(--muted);line-height:1.5">No audio captured. Reconnect with the <strong>Include audio</strong> option enabled in the source picker.</div>';
+      } else {
+        // Capture toggle — when off, screen audio is excluded from recordings
+        h += '<div class="pr" style="margin-bottom:8px"><span class="pr-l">Capture</span>';
+        h += '<input type="checkbox" '+(capOn?'checked':'')+' onchange="updateEl(\''+el.id+'\',{audioCapture:this.checked});applyScreenShareAudioFromEl(\''+el.id+'\')"></div>';
+        // Recording mix volume slider — only this control is needed
+        h += '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:6px;margin-bottom:3px">';
+        h += '<span>Recording volume</span><span id="ss-rvol-'+el.id+'" style="color:#f0f0f5;font-weight:600">'+recVol+'%</span></div>';
+        h += '<input type="range" min="0" max="100" step="1" value="'+recVol+'" '+(capOn?'':'disabled ')+
+             'style="width:100%;accent-color:var(--g);margin-bottom:6px" '+
+             'oninput="document.getElementById(\'ss-rvol-'+el.id+'\').textContent=this.value+\'%\';updateElNoRender(\''+el.id+'\',{audioRecVolume:+this.value});applyScreenShareAudioFromEl(\''+el.id+'\')">';
+        h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-top:4px">Screen audio is captured ONLY into recordings — never plays through your speakers. Recording volume controls how loud screen audio is in your MP4 exports relative to your microphone.</div>';
+      }
+      h += '</div>';
+    }
     h += '<div class="ps"><div class="ps-t">Border</div>';
     // Border style picker: solid / gradient / animated
     var curBStyleSS = el.borderStyle || 'solid';
@@ -16768,6 +17124,11 @@ function renderPres(){
   h += '<button class="tb-b'+(S.webcamActive?' a':'')+'" onclick="toggleWebcam()" data-tip="Floating Camera (W) — separate from slide-element webcams" style="'+(S.webcamActive?'color:var(--g)':'')+'">'+I.webcam+'</button>';
   // Mic toggle (for recording)
   h += '<button class="tb-b" onclick="toggleRecAudio(event)" data-tip="Record audio: '+(S.recAudio?'ON':'OFF')+'" style="'+(S.recAudio?'color:var(--g)':'color:var(--muted)')+'">'+(S.recAudio?I.mic:I.micOff)+'</button>';
+  // Screen-share audio toggle (only visible when at least one screen-share with audio is connected)
+  var ssAudioState = getScreenAudioToolbarState();
+  if(ssAudioState.visible){
+    h += '<button class="tb-b" onclick="toggleScreenAudio(event)" data-tip="Screen audio: '+(ssAudioState.on?'ON':'OFF')+'" style="'+(ssAudioState.on?'color:var(--g)':'color:var(--muted)')+'">'+(ssAudioState.on?I.screenAudio:I.screenAudioOff)+'</button>';
+  }
   // Record start/stop
   if(!S.recActive){
     h += '<button class="tb-b" onclick="startRecording()" data-tip="Start Recording slide (R)" style="color:#ff2a2a">'+I.record+'</button>';
