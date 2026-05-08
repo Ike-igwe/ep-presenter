@@ -226,6 +226,32 @@ input[type=range].draw-size-slider::-moz-range-track,input[type=range].draw-opac
 
 /* ========= LASER POINTER ========= */
 .laser-dot{position:fixed;width:18px;height:18px;border-radius:50%;background:radial-gradient(circle,#ff2a2a 0%,#ff0000 40%,rgba(255,0,0,0.6) 70%,rgba(255,0,0,0) 100%);box-shadow:0 0 20px 6px rgba(255,30,30,0.6),0 0 40px 10px rgba(255,0,0,0.3);pointer-events:none;z-index:2000;transform:translate(-50%,-50%);transition:opacity 0.15s}
+/* ========= POINTER SETTINGS POPOVER ========= */
+.pointer-settings-pop{position:fixed;z-index:3000;background:rgba(20,20,28,0.96);backdrop-filter:blur(16px);border:1px solid var(--brd);border-radius:14px;padding:14px 16px;width:320px;box-shadow:0 16px 48px rgba(0,0,0,0.6);font-family:Outfit;color:#f0f0f5}
+.psp-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:8px}
+.psp-modes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:14px}
+.psp-modes-5{grid-template-columns:1fr 1fr 1fr 1fr 1fr}
+.psp-mode-btn{padding:8px 6px;font-size:11px;background:rgba(255,255,255,0.04);border:1px solid var(--brd);border-radius:8px;color:#f0f0f5;cursor:pointer;font-family:inherit;transition:background 0.12s}
+.psp-mode-btn:hover{background:rgba(255,255,255,0.08)}
+.psp-mode-btn.active{background:rgba(126,217,87,0.12);border-color:var(--g);color:var(--g)}
+.psp-section{padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);margin-top:6px}
+.psp-section.psp-tip{font-size:10px;color:var(--muted);line-height:1.5;margin-top:14px;border-top-style:dashed}
+.psp-section.psp-tip b{color:#f0f0f5}
+.psp-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:11px}
+.psp-l{color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;min-width:90px;font-size:10px}
+.psp-slider-row input[type="range"]{flex:1;accent-color:var(--g)}
+.psp-v{font-weight:600;color:#f0f0f5;min-width:54px;text-align:right;font-size:11px}
+.psp-colors{display:flex;gap:5px}
+.psp-color-btn{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;outline:none}
+.psp-color-btn.active{border-color:#fff}
+.psp-style-btns{display:flex;gap:4px;flex:1;flex-wrap:wrap}
+.psp-style-btn{flex:1;min-width:60px;padding:5px 6px;font-size:10px;background:rgba(255,255,255,0.04);border:1px solid var(--brd);border-radius:6px;color:#f0f0f5;cursor:pointer;font-family:inherit}
+.psp-style-btn.active{background:rgba(126,217,87,0.12);border-color:var(--g);color:var(--g)}
+.psp-emojis{display:flex;gap:4px;flex:1;flex-wrap:wrap}
+.psp-emoji-btn{width:30px;height:30px;font-size:18px;background:rgba(255,255,255,0.04);border:1px solid var(--brd);border-radius:6px;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;line-height:1}
+.psp-emoji-btn:hover{background:rgba(255,255,255,0.10)}
+.psp-emoji-btn.active{background:rgba(126,217,87,0.15);border-color:var(--g)}
+.psp-hint{font-size:10px;color:var(--muted);font-style:italic;margin-top:8px;line-height:1.4}
 
 /* ========= WEBCAM OVERLAY ========= */
 .webcam-overlay{position:fixed;z-index:1500;filter:drop-shadow(0 8px 32px rgba(0,0,0,0.6));transition:width 0.25s,height 0.25s;cursor:grab}
@@ -2754,6 +2780,24 @@ var S = {
   lassoIds:[],
   laserActive:false,
   laserPos:null,       // {x, y} in stage coords while visible
+  // Pointer system v2: mode-based, recording-aware. The user picks one mode
+  // in settings; clicking the toolbar laser button (or pressing L) toggles
+  // pointerActive. All modes are composited into the recording so they
+  // appear in MP4 exports.
+  pointerMode:'laser',         // 'off' | 'laser' | 'spotlight' | 'trail' | 'magnifier' | 'pulse'
+  pointerColor:'#ff2a2a',      // primary color for laser/trail/pulse
+  pointerSize:18,              // diameter in px on 1920-wide canvas
+  pointerLaserStyle:'dot',     // 'dot' | 'ring' | 'crosshair'
+  pointerSpotlightRadius:180,  // px (lit area diameter halved)
+  pointerSpotlightDim:0.7,     // 0..1, how dark the surround
+  pointerTrailLength:25,       // number of points kept in fading trail
+  pointerTrailFade:1500,       // ms over which a trail point fully fades
+  pointerMagnifierZoom:2,      // multiplier (2x, 3x, etc.)
+  pointerMagnifierSize:200,    // lens diameter in px
+  pointerMagnifierShape:'circle', // 'circle' | 'rectangle'
+  pointerEmoji:'👉',           // emoji used when laser style === 'emoji'
+  pointerPulseDuration:700,    // ms per click-pulse animation
+  pointerActive:false,         // toggled by toolbar button / L key during presentation
   webcamActive:false,
   webcamCorner:'br',   // 'tl' | 'tr' | 'bl' | 'br' — used when webcamPosX/Y are null
   webcamPosX:null,     // viewport x as percentage 0-1 (null = use corner). Stored as % so position survives window resize.
@@ -2809,6 +2853,279 @@ Object.defineProperty(S, 'sel', {
 
 var drag=null, resize=null, epDrag=null, groupResize=null;
 var _laserMoveHandler=null, _laserLeaveHandler=null;
+// Pointer v2 runtime state.
+// _pointerPos: live cursor position in CLIENT coords (matches what laser CSS used).
+// _pointerTrail: ring buffer of {x, y, t (ms timestamp)} for trail mode.
+// _pointerPulses: active click-pulses {x, y, t} drawn until trailFade or pulseDuration elapses.
+var _pointerPos = null;
+var _pointerTrail = [];
+var _pointerPulses = [];
+var _pointerHandlersAttached = false;
+var _pointerStageCanvas = null; // overlay canvas in DOM for live display
+
+// Draw the active pointer mode onto a 2D canvas context.
+// Called from both:
+//   (a) the live DOM overlay canvas (during presentation, every animation frame)
+//   (b) the recording canvas inside recComposeFrame (so pointer appears in MP4 exports)
+// posClient: cursor in client/window coords; W,H = target canvas size.
+// scale: how to translate client px → canvas px (recording canvas is typically
+// larger than the window, so this is W/window.innerWidth or similar).
+function drawPointerOnCtx(ctx, W, H, posClient, scale){
+  if(!S.pointerActive) return;
+  if(!posClient && S.pointerMode !== 'pulse') return; // pulses can render after cursor leaves
+  var mode = S.pointerMode || 'laser';
+  if(mode === 'off') return;
+  var color = S.pointerColor || '#ff2a2a';
+  var sizeBase = (S.pointerSize || 18) * scale;
+  var now = Date.now();
+
+  // Helper: client → canvas coordinates
+  function tx(p){ return { x: p.x * scale, y: p.y * scale }; }
+
+  // Spotlight: dim everything except a circle around cursor
+  if(mode === 'spotlight' && posClient){
+    var sp = tx(posClient);
+    var r = (S.pointerSpotlightRadius || 180) * scale;
+    var dim = (typeof S.pointerSpotlightDim === 'number') ? S.pointerSpotlightDim : 0.7;
+    ctx.save();
+    // Build a path that's the whole canvas with a circular hole
+    ctx.beginPath();
+    ctx.rect(0, 0, W, H);
+    ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2, true);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0,0,0,' + dim + ')';
+    ctx.fill('evenodd');
+    // Soft edge — ring of gradient just inside the spotlight
+    var grad = ctx.createRadialGradient(sp.x, sp.y, r * 0.85, sp.x, sp.y, r);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,' + dim + ')');
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  // Trail: fading line behind cursor + cursor dot at head
+  if(mode === 'trail'){
+    var fade = S.pointerTrailFade || 1500;
+    if(_pointerTrail.length >= 2){
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      for(var i = 1; i < _pointerTrail.length; i++){
+        var a = _pointerTrail[i-1], b = _pointerTrail[i];
+        var ageA = now - a.t, ageB = now - b.t;
+        if(ageA > fade && ageB > fade) continue;
+        var alphaA = Math.max(0, 1 - ageA / fade);
+        var alphaB = Math.max(0, 1 - ageB / fade);
+        var avgAlpha = (alphaA + alphaB) / 2;
+        if(avgAlpha <= 0.02) continue;
+        var ax = a.x * scale, ay = a.y * scale;
+        var bx = b.x * scale, by = b.y * scale;
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = avgAlpha * 0.8;
+        ctx.lineWidth = sizeBase * 0.55 * avgAlpha;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if(posClient){
+      var tp = tx(posClient);
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = sizeBase * 0.8;
+      ctx.beginPath();
+      ctx.arc(tp.x, tp.y, sizeBase * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    // Pulses can also be drawn (if user clicked while in trail mode)
+    drawPulses(ctx, scale);
+    return;
+  }
+
+  // Magnifier: capture region of the slide and re-draw at zoom around cursor.
+  // We use the cached slide bitmap (same one the recording uses) instead of
+  // trying to read from the canvas itself — the live overlay canvas is
+  // transparent, so getImageData would return nothing useful.
+  // Shape support: circle (lens) or rectangle (window).
+  if(mode === 'magnifier' && posClient){
+    var mp = tx(posClient);
+    var lensSize = (S.pointerMagnifierSize || 200) * scale;
+    var lensR = lensSize * 0.5;
+    var zoom = S.pointerMagnifierZoom || 2;
+    var shape = S.pointerMagnifierShape || 'circle';
+    // Find the slide stage element to compute slide-relative coordinates.
+    // posClient is in client coords; we need to know where on the SLIDE the
+    // cursor is so we can extract the right region of the slide bitmap.
+    var stageEl = document.getElementById('presStage');
+    var bm = _lastRecBitmap; // shared with recording pipeline
+    if(stageEl && bm && bm.width > 0){
+      var sr = stageEl.getBoundingClientRect();
+      // Cursor's position on the slide in 0..1 coords
+      var sxFrac = (posClient.x - sr.left) / sr.width;
+      var syFrac = (posClient.y - sr.top) / sr.height;
+      // Only render magnifier if cursor is over the slide
+      if(sxFrac >= 0 && sxFrac <= 1 && syFrac >= 0 && syFrac <= 1){
+        // Source rect on the bitmap
+        var srcSize = (lensSize / zoom) * (bm.width / sr.width);
+        var srcX = (sxFrac * bm.width) - srcSize / 2;
+        var srcY = (syFrac * bm.height) - srcSize / 2;
+        // Clamp source to bitmap bounds
+        var srcXc = Math.max(0, Math.min(bm.width - 1, srcX));
+        var srcYc = Math.max(0, Math.min(bm.height - 1, srcY));
+        var srcSizeC = Math.min(srcSize, bm.width - srcXc, bm.height - srcYc);
+        ctx.save();
+        ctx.beginPath();
+        if(shape === 'rectangle'){
+          ctx.rect(mp.x - lensR, mp.y - lensR, lensSize, lensSize);
+        } else {
+          ctx.arc(mp.x, mp.y, lensR, 0, Math.PI * 2);
+        }
+        ctx.clip();
+        try {
+          ctx.drawImage(bm,
+            srcXc, srcYc, srcSizeC, srcSizeC,
+            mp.x - lensR, mp.y - lensR, lensSize, lensSize);
+        } catch(e){ /* drawImage can fail on tainted bitmaps; just skip */ }
+        ctx.restore();
+        // Lens border
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(2, sizeBase * 0.15);
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 8 * scale;
+        ctx.beginPath();
+        if(shape === 'rectangle'){
+          ctx.rect(mp.x - lensR, mp.y - lensR, lensSize, lensSize);
+        } else {
+          ctx.arc(mp.x, mp.y, lensR, 0, Math.PI * 2);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    drawPulses(ctx, scale);
+    return;
+  }
+
+  // Pulse-only mode: just render active pulses (no continuous laser dot).
+  if(mode === 'pulse'){
+    drawPulses(ctx, scale);
+    return;
+  }
+
+  // Laser mode (the default): render a dot/ring/crosshair at cursor + any pulses
+  if(mode === 'laser' && posClient){
+    var lp = tx(posClient);
+    var style = S.pointerLaserStyle || 'dot';
+    ctx.save();
+    if(style === 'dot'){
+      // Glowing red dot — radial gradient for soft halo
+      var rg = ctx.createRadialGradient(lp.x, lp.y, 0, lp.x, lp.y, sizeBase);
+      rg.addColorStop(0, color);
+      rg.addColorStop(0.4, color);
+      rg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = rg;
+      ctx.beginPath();
+      ctx.arc(lp.x, lp.y, sizeBase, 0, Math.PI * 2);
+      ctx.fill();
+      // Brighter core
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(lp.x, lp.y, sizeBase * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    } else if(style === 'ring'){
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(2, sizeBase * 0.18);
+      ctx.shadowColor = color;
+      ctx.shadowBlur = sizeBase * 0.6;
+      ctx.beginPath();
+      ctx.arc(lp.x, lp.y, sizeBase * 0.7, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if(style === 'crosshair'){
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(2, sizeBase * 0.12);
+      ctx.shadowColor = color;
+      ctx.shadowBlur = sizeBase * 0.5;
+      var len = sizeBase * 1.1;
+      var gap = sizeBase * 0.3;
+      ctx.beginPath();
+      ctx.moveTo(lp.x - len, lp.y); ctx.lineTo(lp.x - gap, lp.y);
+      ctx.moveTo(lp.x + gap, lp.y); ctx.lineTo(lp.x + len, lp.y);
+      ctx.moveTo(lp.x, lp.y - len); ctx.lineTo(lp.x, lp.y - gap);
+      ctx.moveTo(lp.x, lp.y + gap); ctx.lineTo(lp.x, lp.y + len);
+      ctx.stroke();
+      // Center dot
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(lp.x, lp.y, Math.max(2, sizeBase * 0.15), 0, Math.PI * 2);
+      ctx.fill();
+    } else if(style === 'emoji'){
+      // Render selected emoji centered on cursor. Font size scales with pointerSize.
+      var emoji = S.pointerEmoji || '👉';
+      var fontSize = sizeBase * 2.2;
+      // Per-emoji tip offsets: position the visual tip AT the cursor, not the
+      // emoji's geometric center. Offsets are fractions of font size, applied
+      // OPPOSITE to where the tip is. Symmetric emojis use {0,0}.
+      var tipOffsets = {
+        '👉': { x: -0.35, y: 0 },     // tip on right → shift left
+        '👆': { x: 0, y: 0.35 },      // tip at top → shift down
+        '✏️': { x: 0.30, y: 0.30 },   // tip at top-left → shift down-right
+        '📍': { x: 0, y: -0.35 },     // point at bottom → shift up
+        '❗': { x: 0, y: -0.30 }      // dot at bottom → shift up
+      };
+      var offs = tipOffsets[emoji] || { x: 0, y: 0 };
+      var drawX = lp.x + offs.x * fontSize;
+      var drawY = lp.y + offs.y * fontSize;
+      ctx.font = fontSize + 'px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      // Soft drop shadow so emoji reads on any background
+      ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      ctx.shadowBlur = sizeBase * 0.4;
+      ctx.shadowOffsetY = sizeBase * 0.05;
+      ctx.fillText(emoji, drawX, drawY);
+    }
+    ctx.restore();
+    drawPulses(ctx, scale);
+    return;
+  }
+}
+
+// Render expanding/fading pulses regardless of base mode. Shared by all modes.
+function drawPulses(ctx, scale){
+  if(!_pointerPulses || !_pointerPulses.length) return;
+  var now = Date.now();
+  var dur = S.pointerPulseDuration || 700;
+  var color = S.pointerColor || '#ff2a2a';
+  var maxR = (S.pointerSize || 18) * scale * 4; // pulses expand to ~4x cursor size
+  // Iterate backwards so we can splice expired
+  for(var i = _pointerPulses.length - 1; i >= 0; i--){
+    var p = _pointerPulses[i];
+    var age = now - p.t;
+    if(age > dur){ _pointerPulses.splice(i, 1); continue; }
+    var prog = age / dur; // 0..1
+    var r = maxR * prog;
+    var alpha = (1 - prog) * 0.85;
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = Math.max(1.5, 4 * scale * (1 - prog));
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10 * scale * (1 - prog);
+    ctx.beginPath();
+    ctx.arc(p.x * scale, p.y * scale, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
 var isDrawing=false, currentStroke=[];
 // Lasso state — totally separate from ink drawing
 var lassoActive = false;     // true while user is drawing the lasso loop
@@ -3264,12 +3581,14 @@ window.exitPresent = function(){
   if(S.recActive){
     try { stopRecording(); } catch(e){}
   }
-  // Clean up laser pointer
-  if(S.laserActive){
+  // Clean up laser pointer / pointer overlay
+  if(S.laserActive || S.pointerActive){
     if(_laserMoveHandler){ document.removeEventListener('mousemove', _laserMoveHandler); _laserMoveHandler = null; }
     if(_laserLeaveHandler){ window.removeEventListener('blur', _laserLeaveHandler); _laserLeaveHandler = null; }
     removeLaserDot();
+    teardownPointerOverlay();
     S.laserActive = false;
+    S.pointerActive = false;
   }
   // Clean up webcam
   if(S.webcamStream){
@@ -3512,10 +3831,458 @@ window.presenterWinClosing = function(){
 // =========================================================
 // LASER POINTER
 // =========================================================
+window.toggleLaser = function(){
+  // Backward-compat name. Actually toggles the new pointerActive flag and
+  // ensures the pointer system is set up. Mode is whatever the user picked
+  // in settings (defaults to 'laser' = old behavior).
+  togglePointer();
+};
+
+window.togglePointer = function(){
+  S.pointerActive = !S.pointerActive;
+  // Backward-compat: keep S.laserActive in sync so existing UI (toolbar
+  // button highlighting) still works without rewiring.
+  S.laserActive = S.pointerActive;
+  if(S.pointerActive){
+    setupPointerOverlay();
+  } else {
+    teardownPointerOverlay();
+  }
+  renderPres();
+};
+
+// Pointer settings popover — opened from the chevron next to the laser button.
+// Implements the smart contextual UI: top row is the mode picker, below it
+// only the options for the selected mode appear.
+window.togglePointerSettings = function(evt){
+  if(evt) evt.stopPropagation();
+  var existing = document.getElementById('pointerSettingsPopover');
+  if(existing){
+    existing.remove();
+    document.removeEventListener('click', _pointerSettingsOutsideHandler, true);
+    return;
+  }
+  var pop = document.createElement('div');
+  pop.id = 'pointerSettingsPopover';
+  pop.className = 'pointer-settings-pop';
+  pop.onclick = function(e){ e.stopPropagation(); };
+  pop.innerHTML = renderPointerSettingsHTML();
+  // Render hidden first so we can measure
+  pop.style.visibility = 'hidden';
+  pop.style.left = '0px';
+  pop.style.top = '0px';
+  document.body.appendChild(pop);
+  // Now measure and position smartly. We try below-and-right first, then flip
+  // to above / left as needed. Always clamp inside viewport with 8px margin.
+  var btn = evt && evt.currentTarget;
+  if(btn){
+    var br = btn.getBoundingClientRect();
+    var pr = pop.getBoundingClientRect();
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var margin = 8;
+    // Vertical: prefer below button. If no room below, flip to above.
+    var top;
+    if(br.bottom + 8 + pr.height + margin <= vh){
+      top = br.bottom + 8;
+    } else if(br.top - 8 - pr.height >= margin){
+      top = br.top - 8 - pr.height;
+    } else {
+      // Doesn't fit either side — clamp to top of viewport
+      top = margin;
+    }
+    // Horizontal: try to center below the button. If that overflows right, push left.
+    // If still overflows left, clamp to margin.
+    var left = br.left + (br.width / 2) - (pr.width / 2);
+    if(left + pr.width > vw - margin){
+      left = vw - pr.width - margin;
+    }
+    if(left < margin) left = margin;
+    pop.style.top = top + 'px';
+    pop.style.left = left + 'px';
+  } else {
+    // Fallback: center on screen
+    pop.style.top = '50%';
+    pop.style.left = '50%';
+    pop.style.transform = 'translate(-50%, -50%)';
+  }
+  pop.style.visibility = '';
+  setTimeout(function(){
+    document.addEventListener('click', _pointerSettingsOutsideHandler, true);
+  }, 50);
+};
+function _pointerSettingsOutsideHandler(e){
+  var pop = document.getElementById('pointerSettingsPopover');
+  if(!pop) return;
+  if(!pop.contains(e.target)){
+    pop.remove();
+    document.removeEventListener('click', _pointerSettingsOutsideHandler, true);
+  }
+}
+
+function renderPointerSettingsHTML(){
+  var mode = S.pointerMode || 'laser';
+  // 'Off' is intentionally excluded — toggling on/off is done via the toolbar
+  // pointer button. The popover is purely for picking the active mode and
+  // configuring it.
+  var modes = [
+    ['laser', 'Laser'],
+    ['spotlight', 'Spotlight'],
+    ['trail', 'Trail'],
+    ['magnifier', 'Magnifier'],
+    ['pulse', 'Pulse']
+  ];
+  var h = '<div class="psp-title">Pointer mode</div>';
+  h += '<div class="psp-modes psp-modes-5">';
+  modes.forEach(function(m){
+    var active = (mode === m[0]);
+    h += '<button class="psp-mode-btn'+(active?' active':'')+'" onclick="setPointerMode(\''+m[0]+'\')">'+m[1]+'</button>';
+  });
+  h += '</div>';
+  // Contextual options
+  h += '<div class="psp-section">';
+  if(mode === 'laser'){
+    h += renderPspColorRow();
+    h += renderPspSizeRow();
+    h += '<div class="psp-row"><span class="psp-l">Style</span><div class="psp-style-btns">';
+    ['dot','ring','crosshair','emoji'].forEach(function(s){
+      var act = (S.pointerLaserStyle || 'dot') === s;
+      h += '<button class="psp-style-btn'+(act?' active':'')+'" onclick="setPointerLaserStyle(\''+s+'\')">'+s.charAt(0).toUpperCase()+s.slice(1)+'</button>';
+    });
+    h += '</div></div>';
+    // Emoji picker — only shown when emoji style is selected
+    if((S.pointerLaserStyle || 'dot') === 'emoji'){
+      var emojiOptions = ['👉','👆','✨','⭐','🔥','✏️','📍','❗','💡','🎯','👀','🖱️'];
+      // Cache the options on window so the click handler can look them up
+      // by index (avoids inlining the emoji string in an HTML attribute,
+      // which could cause issues with Unicode variant selectors).
+      window._pointerEmojiOptions = emojiOptions;
+      var current = S.pointerEmoji || '👉';
+      h += '<div class="psp-row"><span class="psp-l">Emoji</span><div class="psp-emojis">';
+      emojiOptions.forEach(function(e, idx){
+        var act = (current === e);
+        h += '<button class="psp-emoji-btn'+(act?' active':'')+'" data-idx="'+idx+'" onclick="setPointerEmojiByIdx(this)">'+e+'</button>';
+      });
+      h += '</div></div>';
+    }
+  } else if(mode === 'spotlight'){
+    h += renderPspSliderRow('Spotlight radius', 'pointerSpotlightRadius', 60, 400, 1, 'px', S.pointerSpotlightRadius || 180);
+    h += renderPspSliderRow('Dim level', 'pointerSpotlightDim', 30, 95, 1, '%', Math.round((S.pointerSpotlightDim || 0.7) * 100), function(v){ return v / 100; });
+  } else if(mode === 'trail'){
+    h += renderPspColorRow();
+    h += renderPspSliderRow('Trail length', 'pointerTrailLength', 5, 80, 1, '', S.pointerTrailLength || 25);
+    h += renderPspSliderRow('Fade time', 'pointerTrailFade', 300, 4000, 100, 'ms', S.pointerTrailFade || 1500);
+    h += renderPspSizeRow();
+  } else if(mode === 'magnifier'){
+    h += '<div class="psp-row"><span class="psp-l">Shape</span><div class="psp-style-btns">';
+    var shapeNow = S.pointerMagnifierShape || 'circle';
+    [['circle','Circle'],['rectangle','Rectangle']].forEach(function(s){
+      var act = (shapeNow === s[0]);
+      h += '<button class="psp-style-btn'+(act?' active':'')+'" onclick="setPointerMagnifierShape(\''+s[0]+'\')">'+s[1]+'</button>';
+    });
+    h += '</div></div>';
+    h += renderPspSliderRow('Lens size', 'pointerMagnifierSize', 80, 400, 1, 'px', S.pointerMagnifierSize || 200);
+    h += renderPspSliderRow('Zoom', 'pointerMagnifierZoom', 15, 50, 1, 'x', Math.round((S.pointerMagnifierZoom || 2) * 10), function(v){ return v / 10; });
+    h += renderPspColorRow();
+  } else if(mode === 'pulse'){
+    h += renderPspColorRow();
+    h += renderPspSizeRow();
+    h += renderPspSliderRow('Pulse duration', 'pointerPulseDuration', 200, 2000, 50, 'ms', S.pointerPulseDuration || 700);
+    h += '<div class="psp-hint">Click anywhere on the slide to emphasize a spot.</div>';
+  }
+  h += '</div>';
+  h += '<div class="psp-section psp-tip">Press <b>L</b> during presentation to toggle the pointer on/off. Click on the slide to spawn a pulse in any mode.</div>';
+  return h;
+}
+function renderPspColorRow(){
+  var color = S.pointerColor || '#ff2a2a';
+  var palette = ['#ff2a2a', '#7ed957', '#00b3ff', '#ffaa00', '#ff66cc', '#ffffff'];
+  var h = '<div class="psp-row"><span class="psp-l">Color</span><div class="psp-colors">';
+  palette.forEach(function(c){
+    var act = (color === c);
+    h += '<button class="psp-color-btn'+(act?' active':'')+'" style="background:'+c+'" onclick="setPointerColor(\''+c+'\')"></button>';
+  });
+  h += '</div></div>';
+  return h;
+}
+function renderPspSizeRow(){
+  return renderPspSliderRow('Size', 'pointerSize', 8, 60, 1, 'px', S.pointerSize || 18);
+}
+function renderPspSliderRow(label, field, min, max, step, suffix, displayValue, valueTransform){
+  var transformFn = valueTransform ? valueTransform.toString() : '';
+  var transformExpr = valueTransform ? '(' + transformFn + ')(+this.value)' : '+this.value';
+  var h = '<div class="psp-row psp-slider-row">';
+  h += '<span class="psp-l">'+label+'</span>';
+  h += '<input type="range" min="'+min+'" max="'+max+'" step="'+step+'" value="'+displayValue+'" oninput="setPointerField(\''+field+'\','+transformExpr+',this)" />';
+  h += '<span class="psp-v" data-field="'+field+'">'+displayValue+suffix+'</span>';
+  h += '</div>';
+  return h;
+}
+
+window.setPointerMode = function(m){
+  S.pointerMode = m;
+  // Re-render the popover to show contextual options
+  var pop = document.getElementById('pointerSettingsPopover');
+  if(pop) pop.innerHTML = renderPointerSettingsHTML();
+  savePointerSettings();
+  // If pointer is currently active, update toolbar button tip
+  if(S.pointerActive) renderPres();
+};
+window.setPointerColor = function(c){
+  S.pointerColor = c;
+  // Update active state in popover
+  var pop = document.getElementById('pointerSettingsPopover');
+  if(pop) pop.innerHTML = renderPointerSettingsHTML();
+  savePointerSettings();
+  if(S.pointerActive) renderPres(); // updates button color
+};
+window.setPointerLaserStyle = function(s){
+  S.pointerLaserStyle = s;
+  var pop = document.getElementById('pointerSettingsPopover');
+  if(pop) pop.innerHTML = renderPointerSettingsHTML();
+  savePointerSettings();
+};
+window.setPointerMagnifierShape = function(s){
+  S.pointerMagnifierShape = s;
+  var pop = document.getElementById('pointerSettingsPopover');
+  if(pop) pop.innerHTML = renderPointerSettingsHTML();
+  savePointerSettings();
+};
+window.setPointerEmoji = function(e){
+  S.pointerEmoji = e;
+  var pop = document.getElementById('pointerSettingsPopover');
+  if(pop) pop.innerHTML = renderPointerSettingsHTML();
+  savePointerSettings();
+};
+window.setPointerEmojiByIdx = function(btn){
+  if(!btn) return;
+  var idx = parseInt(btn.getAttribute('data-idx'), 10);
+  if(isNaN(idx)) return;
+  var opts = window._pointerEmojiOptions || [];
+  var emoji = opts[idx];
+  if(!emoji) return;
+  setPointerEmoji(emoji);
+};
+window.setPointerField = function(field, value, sliderEl){
+  S[field] = value;
+  // Live-update the displayed value next to the slider without re-rendering whole popover
+  var pop = document.getElementById('pointerSettingsPopover');
+  if(pop){
+    var span = pop.querySelector('[data-field="'+field+'"]');
+    if(span){
+      // Display value derivation matches what slider shows
+      var raw = sliderEl ? sliderEl.value : value;
+      var label = span.textContent.replace(/[\d.]+/, raw);
+      span.textContent = label;
+    }
+  }
+  savePointerSettings();
+};
+function savePointerSettings(){
+  try {
+    var snap = {
+      mode: S.pointerMode,
+      color: S.pointerColor,
+      size: S.pointerSize,
+      laserStyle: S.pointerLaserStyle,
+      spotlightRadius: S.pointerSpotlightRadius,
+      spotlightDim: S.pointerSpotlightDim,
+      trailLength: S.pointerTrailLength,
+      trailFade: S.pointerTrailFade,
+      magnifierZoom: S.pointerMagnifierZoom,
+      magnifierSize: S.pointerMagnifierSize,
+      magnifierShape: S.pointerMagnifierShape,
+      emoji: S.pointerEmoji,
+      pulseDuration: S.pointerPulseDuration
+    };
+    localStorage.setItem('ep-pointer-settings', JSON.stringify(snap));
+  } catch(e){}
+}
+function loadPointerSettings(){
+  try {
+    var raw = localStorage.getItem('ep-pointer-settings');
+    if(!raw) return;
+    var s = JSON.parse(raw);
+    if(s.mode) S.pointerMode = s.mode;
+    if(s.color) S.pointerColor = s.color;
+    if(typeof s.size === 'number') S.pointerSize = s.size;
+    if(s.laserStyle) S.pointerLaserStyle = s.laserStyle;
+    if(typeof s.spotlightRadius === 'number') S.pointerSpotlightRadius = s.spotlightRadius;
+    if(typeof s.spotlightDim === 'number') S.pointerSpotlightDim = s.spotlightDim;
+    if(typeof s.trailLength === 'number') S.pointerTrailLength = s.trailLength;
+    if(typeof s.trailFade === 'number') S.pointerTrailFade = s.trailFade;
+    if(typeof s.magnifierZoom === 'number') S.pointerMagnifierZoom = s.magnifierZoom;
+    if(typeof s.magnifierSize === 'number') S.pointerMagnifierSize = s.magnifierSize;
+    if(s.magnifierShape) S.pointerMagnifierShape = s.magnifierShape;
+    if(s.emoji) S.pointerEmoji = s.emoji;
+    if(typeof s.pulseDuration === 'number') S.pointerPulseDuration = s.pulseDuration;
+  } catch(e){}
+}
+// Load saved settings on first script run
+loadPointerSettings();
+
+function setupPointerOverlay(){
+  // Reset trail on each new activation so it doesn't show stale points
+  _pointerTrail = [];
+  _pointerPulses = [];
+  // Create the full-screen overlay canvas (sits above slides, below modal dialogs)
+  if(!_pointerStageCanvas){
+    var c = document.createElement('canvas');
+    c.id = 'pointerOverlay';
+    c.style.position = 'fixed';
+    c.style.top = '0';
+    c.style.left = '0';
+    c.style.width = '100%';
+    c.style.height = '100%';
+    c.style.pointerEvents = 'none';
+    c.style.zIndex = '1000';
+    document.body.appendChild(c);
+    _pointerStageCanvas = c;
+  }
+  resizePointerOverlay();
+  window.addEventListener('resize', resizePointerOverlay);
+  // Hide cursor on presentation stage when pointer is active (matches old behavior)
+  var stage = document.getElementById('presStage');
+  if(stage) stage.style.cursor = 'none';
+  // Attach handlers (only once)
+  if(!_pointerHandlersAttached){
+    document.addEventListener('mousemove', onPointerMouseMove);
+    document.addEventListener('click', onPointerClick);
+    window.addEventListener('blur', onPointerBlur);
+    _pointerHandlersAttached = true;
+  }
+  // Also remove the OLD CSS laser dot if it's still in DOM from prior version
+  var oldDot = document.getElementById('laserDot');
+  if(oldDot) oldDot.remove();
+  // Start the redraw loop
+  _pointerRafTick();
+}
+
+function teardownPointerOverlay(){
+  if(_pointerStageCanvas){
+    var ctx = _pointerStageCanvas.getContext('2d');
+    if(ctx) ctx.clearRect(0, 0, _pointerStageCanvas.width, _pointerStageCanvas.height);
+    _pointerStageCanvas.remove();
+    _pointerStageCanvas = null;
+  }
+  window.removeEventListener('resize', resizePointerOverlay);
+  if(_pointerHandlersAttached){
+    document.removeEventListener('mousemove', onPointerMouseMove);
+    document.removeEventListener('click', onPointerClick);
+    window.removeEventListener('blur', onPointerBlur);
+    _pointerHandlersAttached = false;
+  }
+  var stage = document.getElementById('presStage');
+  if(stage) stage.style.cursor = '';
+  _pointerPos = null;
+  _pointerTrail = [];
+  _pointerPulses = [];
+}
+
+function resizePointerOverlay(){
+  if(!_pointerStageCanvas) return;
+  var dpr = window.devicePixelRatio || 1;
+  _pointerStageCanvas.width = window.innerWidth * dpr;
+  _pointerStageCanvas.height = window.innerHeight * dpr;
+  _pointerStageCanvas.style.width = window.innerWidth + 'px';
+  _pointerStageCanvas.style.height = window.innerHeight + 'px';
+  var ctx = _pointerStageCanvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function onPointerMouseMove(e){
+  if(!S.pointerActive) return;
+  // Detect cursor over UI in a single closest() call. .pres-bar covers
+  // the presentation toolbar; .pointer-settings-pop covers the popover;
+  // .draw-subbar covers the ink subbar; the others cover modals / dialogs.
+  // Single closest() with comma-separated selector is much faster than
+  // multiple sequential calls on every mousemove (60+ events/sec).
+  var overUI = false;
+  if(e.target && typeof e.target.closest === 'function'){
+    overUI = !!e.target.closest('.pres-bar, .pointer-settings-pop, .draw-subbar, .popover, .modal');
+  }
+  if(overUI){
+    if(_pointerPos !== null){
+      _pointerPos = null;
+      _pointerOverlayDirty = true; // ensure overlay clears
+    }
+    return;
+  }
+  _pointerPos = { x: e.clientX, y: e.clientY };
+  _pointerOverlayDirty = true;
+  // Only maintain trail buffer when actually in trail mode — saves array
+  // operations on every mousemove for all other modes (vast majority of usage).
+  if(S.pointerMode === 'trail'){
+    _pointerTrail.push({ x: e.clientX, y: e.clientY, t: Date.now() });
+    var maxLen = (S.pointerTrailLength || 25) * 8;
+    if(_pointerTrail.length > maxLen) _pointerTrail.splice(0, _pointerTrail.length - maxLen);
+  }
+}
+
+function onPointerClick(e){
+  if(!S.pointerActive) return;
+  // Click anywhere → spawn a pulse at that point. Works in all modes.
+  _pointerPulses.push({ x: e.clientX, y: e.clientY, t: Date.now() });
+  _pointerOverlayDirty = true;
+  // Cap to avoid runaway memory if user clicks many times rapidly
+  if(_pointerPulses.length > 30) _pointerPulses.splice(0, _pointerPulses.length - 30);
+}
+
+function onPointerBlur(){
+  // When window loses focus, hide cursor position so dot doesn't get stuck
+  _pointerPos = null;
+  _pointerOverlayDirty = true;
+}
+
+// RAF loop — redraws pointer overlay each frame. Self-terminates when
+// S.pointerActive goes false.
+var _pointerLastBitmapFetch = 0;
+var _pointerOverlayDirty = true; // set by mousemove/click; cleared after redraw
+function _pointerRafTick(){
+  if(!S.pointerActive || !_pointerStageCanvas){
+    return;
+  }
+  // For magnifier mode: ensure slide bitmap is fresh. Throttled to ~6Hz
+  // (every 160ms) — slides don't change that fast and getSlideBitmap involves
+  // a Promise chain that's not free even when cached.
+  if(S.pointerMode === 'magnifier' && S.pres && !S.recActive){
+    var nowMs = Date.now();
+    if(nowMs - _pointerLastBitmapFetch > 160){
+      _pointerLastBitmapFetch = nowMs;
+      var slide = S.slides[S.presSlide];
+      if(slide && typeof getSlideBitmap === 'function'){
+        try {
+          getSlideBitmap(slide).then(function(bm){
+            _lastRecBitmap = bm;
+            _pointerOverlayDirty = true;
+          }).catch(function(){});
+        } catch(e){}
+      }
+    }
+  }
+  // Determine if anything needs redrawing this frame:
+  //   - cursor is on slide (laser/spotlight/magnifier/emoji need redraw)
+  //   - active pulses exist (animation in progress)
+  //   - in trail mode (trail keeps fading even without movement)
+  //   - dirty flag from recent input
+  var needsRedraw = _pointerOverlayDirty ||
+                    _pointerPos !== null ||
+                    (_pointerPulses && _pointerPulses.length) ||
+                    S.pointerMode === 'trail';
+  if(needsRedraw){
+    var ctx = _pointerStageCanvas.getContext('2d');
+    ctx.clearRect(0, 0, _pointerStageCanvas.width, _pointerStageCanvas.height);
+    drawPointerOnCtx(ctx, window.innerWidth, window.innerHeight, _pointerPos, 1);
+    _pointerOverlayDirty = false;
+  }
+  requestAnimationFrame(_pointerRafTick);
+}
+
+// =========================================================
+// LEGACY LASER POINTER (kept for backward compat with old UI; superseded by togglePointer above)
+// =========================================================
 function updateLaserDot(x, y){
   var dot = document.getElementById('laserDot');
   if(!dot){
-    // Create if not present (after first mousemove)
     dot = document.createElement('div');
     dot.id = 'laserDot';
     dot.className = 'laser-dot';
@@ -3532,39 +4299,6 @@ function removeLaserDot(){
   if(dot) dot.remove();
   S.laserPos = null;
 }
-
-window.toggleLaser = function(){
-  S.laserActive = !S.laserActive;
-  if(S.laserActive){
-    // Attach global listeners
-    _laserMoveHandler = function(e){
-      if(!S.pres || !S.laserActive) return;
-      updateLaserDot(e.clientX, e.clientY);
-    };
-    _laserLeaveHandler = function(){
-      var dot = document.getElementById('laserDot');
-      if(dot) dot.style.opacity = '0';
-    };
-    document.addEventListener('mousemove', _laserMoveHandler);
-    window.addEventListener('blur', _laserLeaveHandler);
-    // Hide default cursor on presentation stage
-    var stage = document.getElementById('presStage');
-    if(stage) stage.style.cursor = 'none';
-  } else {
-    if(_laserMoveHandler){
-      document.removeEventListener('mousemove', _laserMoveHandler);
-      _laserMoveHandler = null;
-    }
-    if(_laserLeaveHandler){
-      window.removeEventListener('blur', _laserLeaveHandler);
-      _laserLeaveHandler = null;
-    }
-    removeLaserDot();
-    var stage2 = document.getElementById('presStage');
-    if(stage2) stage2.style.cursor = '';
-  }
-  renderPres();
-};
 
 // =========================================================
 // WEBCAM OVERLAY
@@ -4209,6 +4943,30 @@ function recComposeFrame(){
     }
   }
 
+  // 1b. Live ink overlay (drawCanvas). The slide bitmap above only contains
+  // strokes that have already been COMMITTED to slide.draws (i.e., after the
+  // user lifts the mouse) AND that the cached bitmap has been re-rendered
+  // for. There's a gap between "stroke commits" and "bitmap re-renders"
+  // (typically 100-300ms) during which the recording would show no ink.
+  // To fill this gap, we composite the drawCanvas — but ONLY when needed,
+  // because drawCanvas redraws ALL strokes (committed + in-progress), and
+  // double-compositing would change opacity for highlighters.
+  //
+  // Composite drawCanvas when:
+  //   - isDrawing is true (stroke in progress, bitmap definitely doesn't have it)
+  //   - bitmap drawsLen is behind slide.draws.length (commit not yet rendered)
+  if(drawCanvas && drawCanvas.width > 0 && drawCanvas.height > 0 && slide){
+    var bitmapDrawsLen = (_recSlideCache && _recSlideCache.slideId === slide.id)
+                         ? _recSlideCache.drawsLen : -1;
+    var actualDrawsLen = (slide.draws || []).length;
+    var needLiveInk = isDrawing || (bitmapDrawsLen !== actualDrawsLen);
+    if(needLiveInk){
+      try {
+        ctx.drawImage(drawCanvas, 0, 0, W, H);
+      } catch(e){ /* drawImage can occasionally fail mid-resize; ignore */ }
+    }
+  }
+
   // 2. Webcam overlay (if active) — composite over slide
   if(S.webcamActive && S.webcamStream){
     var v = document.getElementById('webcamVideo');
@@ -4303,6 +5061,13 @@ function recComposeFrame(){
       }
     }
   }
+  // Pointer (laser/spotlight/trail/magnifier/pulse) — drawn last so it sits
+  // on top of everything. Uses recording canvas / window scale so the pointer
+  // appears correctly sized in the MP4 regardless of viewport size.
+  try {
+    var pointerScale = W / Math.max(1, window.innerWidth);
+    drawPointerOnCtx(ctx, W, H, _pointerPos, pointerScale);
+  } catch(e){ /* never let pointer rendering break the recording loop */ }
   // Note: no RAF reschedule — setInterval handles the next tick.
 }
 
@@ -17118,8 +17883,14 @@ function renderPres(){
   // Clear
   h += '<button class="tb-b" onclick="presClearDraws()" data-tip="Clear Ink (X)">'+I.clear+'</button>';
   h += '<div class="tb-sep"></div>';
-  // Laser pointer toggle
-  h += '<button class="tb-b'+(S.laserActive?' a':'')+'" onclick="toggleLaser()" data-tip="Laser Pointer (L)" style="'+(S.laserActive?'color:#ff2a2a':'')+'">'+I.laser+'</button>';
+  // Pointer (laser/spotlight/trail/magnifier/pulse) — split button:
+  //   main click toggles pointer ON/OFF
+  //   chevron opens pointer settings popover
+  var pcolor = S.pointerColor || '#ff2a2a';
+  h += '<div class="tb-pointer-split" style="display:inline-flex">';
+  h += '<button class="tb-b'+(S.pointerActive?' a':'')+'" onclick="togglePointer()" data-tip="Pointer (L): toggle ' + (S.pointerMode || 'laser') + '" style="'+(S.pointerActive?'color:'+pcolor:'')+';border-top-right-radius:0;border-bottom-right-radius:0;padding-right:4px">'+I.laser+'</button>';
+  h += '<button class="tb-b" onclick="togglePointerSettings(event)" data-tip="Pointer settings" style="border-top-left-radius:0;border-bottom-left-radius:0;border-left:1px solid rgba(255,255,255,0.08);padding-left:4px;padding-right:6px;font-size:9px"><svg viewBox="0 0 12 12" width="10" height="10" fill="currentColor"><polygon points="2,4 10,4 6,8"/></svg></button>';
+  h += '</div>';
   // Webcam toggle
   h += '<button class="tb-b'+(S.webcamActive?' a':'')+'" onclick="toggleWebcam()" data-tip="Floating Camera (W) — separate from slide-element webcams" style="'+(S.webcamActive?'color:var(--g)':'')+'">'+I.webcam+'</button>';
   // Mic toggle (for recording)
@@ -17156,7 +17927,45 @@ function renderPres(){
   // No inline render here.
 
   h += '</div>';
+
+  // FLICKER FIX: preserve active screen-share <video> elements across the
+  // innerHTML rebuild. Without this, every reveal click destroys all <video>
+  // elements (innerHTML wipe) and reattachScreenShareStreams creates new
+  // ones — but the new videos need a frame from the stream before showing
+  // anything, causing a visible black flicker. By holding onto the live
+  // videos and swapping them into the new DOM, we keep the streams playing
+  // without any frame gap.
+  var preservedVideos = {};
+  var activeIds = Object.keys(_screenShareStreams);
+  for(var pi = 0; pi < activeIds.length; pi++){
+    var pid = activeIds[pi];
+    var oldV = document.getElementById('ss-video-' + pid);
+    if(oldV && oldV.srcObject){
+      // Detach from current parent so innerHTML wipe doesn't destroy it.
+      // Keep a reference; we'll swap it into the new DOM after innerHTML.
+      preservedVideos[pid] = oldV;
+      if(oldV.parentNode) oldV.parentNode.removeChild(oldV);
+    }
+  }
+
   app.innerHTML = h;
+
+  // Now restore preserved videos: find the empty placeholder video the new
+  // HTML created with the same id, and replace it with the preserved one.
+  var preservedIds = Object.keys(preservedVideos);
+  for(var ri = 0; ri < preservedIds.length; ri++){
+    var rid = preservedIds[ri];
+    var newPlaceholder = document.getElementById('ss-video-' + rid);
+    var preservedV = preservedVideos[rid];
+    if(newPlaceholder && newPlaceholder.parentNode){
+      newPlaceholder.parentNode.replaceChild(preservedV, newPlaceholder);
+    } else {
+      // Element with this id not in new DOM (maybe slide changed) — discard
+      // the preserved video. Stream itself isn't affected; reattach will
+      // handle it next time the element appears.
+      try { preservedV.srcObject = null; } catch(e){}
+    }
+  }
 
   // Webcam overlay lives outside the render tree to avoid flicker — sync it now.
   ensureWebcamOverlay();
