@@ -18201,11 +18201,23 @@ function showStartupModal(savedDraft, onDone){
       // Close overlay first, then trigger file picker
       closeOverlay();
       onDone();
-      // Trigger the open file dialog
+      // Create a fresh hidden file input and trigger it. (We can't rely on
+      // the menuOpenInput in the File popover — that only exists in DOM
+      // when the popover is open, which isn't the case at boot.)
       setTimeout(function(){
-        var inp = document.querySelector('input[type="file"][accept=".json"]');
-        if(inp) inp.click();
-        else if(typeof window.openPresentation === 'function') window.openPresentation();
+        var fi = document.createElement('input');
+        fi.type = 'file';
+        fi.accept = '.json';
+        fi.style.display = 'none';
+        fi.addEventListener('change', function(e){
+          if(typeof window.loadPresentation === 'function'){
+            window.loadPresentation(e);
+          }
+          // Clean up the temporary input after handling
+          if(fi.parentNode) fi.parentNode.removeChild(fi);
+        });
+        document.body.appendChild(fi);
+        fi.click();
       }, 100);
     }
   });
