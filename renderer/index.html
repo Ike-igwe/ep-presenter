@@ -606,6 +606,13 @@ body.ep-speed-slow{--ep-trans-dur:1.1s;--ep-reveal-dur:0.85s}
 .pr-l{width:44px;font-size:10px;color:var(--muted);flex-shrink:0;text-transform:uppercase;letter-spacing:0.5px}
 .pr-i{flex:1;background:var(--d3);border:1px solid var(--brd);color:var(--w);padding:5px 7px;border-radius:6px;font-size:11px;font-family:'Outfit';min-width:0}
 .pr-i:focus{outline:none;border-color:var(--g)}
+/* v1.0.20: dark-themed <select> dropdown popups. Without this, Chromium
+ * defaults to a light-on-light option list because the page color-scheme
+ * isn't propagated into the popup. Affects every <select> across the app
+ * (camera picker, font, transitions, etc.) — they all needed it. */
+select option{background:#1a1a1e;color:#f0f0f5}
+select option:checked{background:#2a3a20;color:var(--g)}
+select option:hover{background:#22272e}
 .note-colors{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
 .note-c{width:100%;aspect-ratio:1;border-radius:5px;cursor:pointer;border:2px solid transparent}
 .note-c.a{border-color:var(--g)}
@@ -3093,6 +3100,10 @@ var S = {
   // Phase 3a: floating webcam media effects (mirrors slide-element webcam shape)
   webcamShadow:{on:false,x:0,y:8,blur:24,color:'#000000',opacity:0.4},
   webcamEffect3d:{style:'flat',depth:50},
+  // v1.0.20: floating webcam device picker. Empty string = OS default
+  // (facingMode:user). Otherwise an enumerateDevices() deviceId — typically
+  // the user's physical cam, NVIDIA Broadcast Camera, OBS Virtual Camera, etc.
+  webcamDeviceId:'',
   // Recording state
   recActive:false,      // true while recording
   recPaused:false,      // true if paused
@@ -4844,6 +4855,122 @@ function removeLaserDot(){
 // =========================================================
 // WEBCAM OVERLAY
 // =========================================================
+// v1.0.20: cached list of video input devices for the floating webcam
+// settings popover. Refreshed when the popover opens. Cache lets the
+// dropdown render synchronously while a fresh enumerateDevices call runs
+// in the background and updates the dropdown when it lands.
+var _webcamDevicesCache = [];
+
+async function refreshFloatingWebcamDevices(){
+  try {
+    if(!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return [];
+    var devs = await navigator.mediaDevices.enumerateDevices();
+    _webcamDevicesCache = devs.filter(function(d){ return d.kind === 'videoinput'; });
+    // If the popover is currently open, swap the dropdown options in-place.
+    var sel = document.getElementById('wsCameraSelect');
+    if(sel){
+      var current = S.webcamDeviceId || '';
+      sel.innerHTML = _floatingWebcamCameraOptionsHTML(current);
+    }
+    return _webcamDevicesCache;
+  } catch(e){ return []; }
+}
+
+function _floatingWebcamCameraOptionsHTML(currentDeviceId){
+  var devs = _webcamDevicesCache || [];
+  var opts = '<option value="">Default camera</option>';
+  if(!devs.length){
+    opts += '<option value="" disabled>(loading…)</option>';
+    return opts;
+  }
+  devs.forEach(function(d, idx){
+    var sel = (d.deviceId === currentDeviceId) ? ' selected' : '';
+    var label = (d.label || 'Camera ' + (idx + 1)).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    opts += '<option value="'+d.deviceId+'"'+sel+'>'+label+'</option>';
+  });
+  return opts;
+}
+
+// Persist + apply a chosen camera device. If the floating webcam is currently
+// active, restart the stream with the new device. Saves to localStorage so
+// the choice survives app restart.
+window.setFloatingWebcamDevice = async function(deviceId){
+  S.webcamDeviceId = deviceId || '';
+  try { localStorage.setItem('ep-webcam-device', S.webcamDeviceId); } catch(e){}
+  if(S.webcamActive){
+    // Stop existing stream + restart with new device
+    if(S.webcamStream){
+      try { S.webcamStream.getTracks().forEach(function(t){ t.stop(); }); } catch(e){}
+    }
+    S.webcamStream = null;
+    var newStream = await _acquireFloatingWebcamStream();
+    if(newStream){
+      S.webcamStream = newStream;
+      // Re-attach to the video element via the existing reattach helper
+      var v = document.getElementById('webcamVideo');
+      if(v){
+        try { v.srcObject = newStream; v.play().catch(function(){}); } catch(e){}
+      }
+    } else {
+      // Acquisition failed entirely; turn the cam off so UI matches reality
+      S.webcamActive = false;
+      ensureWebcamOverlay();
+      renderPres();
+    }
+  }
+};
+
+// Load persisted device id once on script init (matches pointer settings pattern)
+try {
+  var _savedDev = localStorage.getItem('ep-webcam-device');
+  if(typeof _savedDev === 'string') S.webcamDeviceId = _savedDev;
+} catch(e){}
+
+// v1.0.20: build the constraints for the floating webcam getUserMedia call.
+// Honors S.webcamDeviceId when set (so users can target NVIDIA Broadcast
+// Camera or any other virtual cam) and falls back to facingMode:user when
+// no device is selected.
+function _floatingWebcamConstraints(){
+  var v = { width: {ideal:640}, height: {ideal:480} };
+  var devId = S.webcamDeviceId || '';
+  if(devId) v.deviceId = { exact: devId };
+  else      v.facingMode = 'user';
+  return { video: v, audio: false };
+}
+
+// Acquire a stream for the floating webcam. Tries the chosen device first;
+// if that fails (device removed, permission denied for that specific cam,
+// etc.) and a device was specified, retries with the OS default so the user
+// at least gets SOME cam. Returns null on total failure.
+async function _acquireFloatingWebcamStream(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    showToast('Webcam not supported in this browser');
+    return null;
+  }
+  try {
+    return await navigator.mediaDevices.getUserMedia(_floatingWebcamConstraints());
+  } catch(err){
+    // Specific-device failure → fall back to default camera
+    if(S.webcamDeviceId){
+      console.warn('[EP] Camera "' + S.webcamDeviceId + '" unavailable:', err && err.message);
+      showToast('Selected camera unavailable — using default');
+      try {
+        return await navigator.mediaDevices.getUserMedia({
+          video: { width:{ideal:640}, height:{ideal:480}, facingMode:'user' },
+          audio: false
+        });
+      } catch(err2){
+        showToast('Webcam failed to start');
+        console.warn('[EP] Default camera also failed:', err2 && err2.message);
+        return null;
+      }
+    }
+    showToast('Webcam failed to start');
+    console.warn('[EP] Webcam getUserMedia failed:', err && err.message);
+    return null;
+  }
+}
+
 window.toggleWebcam = async function(){
   if(S.webcamActive){
     // Turn off
@@ -4856,16 +4983,10 @@ window.toggleWebcam = async function(){
     renderPres(); // refresh toolbar button state
     return;
   }
-  // Turn on — request webcam
+  // Turn on — request webcam via the helper so the chosen deviceId is honored
+  var stream = await _acquireFloatingWebcamStream();
+  if(!stream) return;
   try {
-    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-      showToast('Webcam not supported in this browser');
-      return;
-    }
-    var stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: {ideal:640}, height: {ideal:480}, facingMode: 'user' },
-      audio: false
-    });
     S.webcamStream = stream;
     S.webcamActive = true;
     // Pick a sensible default position based on deck aspect (only on first activation,
@@ -5218,6 +5339,13 @@ window.toggleWebcamSettings = function(evt){
   var overlay = document.getElementById('webcamOverlay');
   if(!overlay) return;
   var rect = overlay.getBoundingClientRect();
+  // v1.0.20: kick off a fresh device enumeration in the background. The
+  // popover renders synchronously (using the cache, which may show
+  // "(loading...)" if empty) and updates the dropdown in-place once the
+  // enumeration lands. This keeps popover open instant while still
+  // surfacing newly-plugged cameras and virtual devices like NVIDIA
+  // Broadcast that may have started after EP launched.
+  refreshFloatingWebcamDevices();
 
   var pop = document.createElement('div');
   pop.id = 'webcamSettingsPop';
@@ -5323,6 +5451,19 @@ function _renderWebcamSettingsHTML(){
   var palette = ['#7ed957','#9b59ff','#3da9fc','#ff5757','#ffd23f','#ff8c42','#ffffff','#888888'];
 
   var h = '<div class="ws-title">Floating Camera Style</div>';
+
+  // v1.0.20: Camera device picker. Lists every video input enumerated by
+  // navigator.mediaDevices.enumerateDevices — including virtual cams like
+  // NVIDIA Broadcast Camera, OBS Virtual Camera, etc. Selecting one routes
+  // the floating webcam through that device. "Default camera" leaves it on
+  // facingMode:user (whatever Windows considers the default).
+  var curDev = S.webcamDeviceId || '';
+  h += '<div class="ws-section"><div class="ws-label">Camera</div>';
+  h += '<select id="wsCameraSelect" class="ws-select" onchange="setFloatingWebcamDevice(this.value)" style="width:100%;padding:6px 8px;background:rgba(255,255,255,0.04);border:1px solid var(--brd);color:#f0f0f5;border-radius:6px;font-family:Outfit;font-size:11px">';
+  h += _floatingWebcamCameraOptionsHTML(curDev);
+  h += '</select>';
+  h += '<div style="font-size:9px;color:var(--muted);margin-top:4px;line-height:1.4">Tip: pick "NVIDIA Broadcast Camera" or any virtual cam to apply background blur, eye contact, etc.</div>';
+  h += '</div>';
 
   // Shape
   h += '<div class="ws-section"><div class="ws-label">Shape</div><div class="ws-row">';
@@ -11823,8 +11964,11 @@ async function renderSlideToCanvas(s, scale){
       var startY = textY - (lines.length - 1) * lineH / 2;
       if(vA === 'top') startY = textY;
       if(vA === 'bottom') startY = textY - (lines.length - 1) * lineH;
+      // v1.0.20: route through drawTextWithEffectsToCanvas so drop shadow,
+      // glow, outline, and gradient effects render in MP4 exports the same
+      // way they appear in the live editor (was CSS-only previously).
       lines.forEach(function(ln, li){
-        x.fillText(ln, textX, startY + li * lineH, el.w - 28);
+        drawTextWithEffectsToCanvas(x, el, ln, textX, startY + li * lineH, el.w - 28, el.color);
       });
     }
     if(el.type === 'line'){
@@ -16946,6 +17090,98 @@ function renderIconList(el, isPres, forCanvas){
 //  - shadow + glow combine via comma-separated text-shadow values
 //  - gradient uses background-clip:text + transparent fill, which OVERRIDES
 //    el.color visually. Outline still works (it's stroke, not fill).
+// v1.0.20: canvas counterpart of buildTextEffectStyle. Renders the text with
+// the same drop-shadow / glow / outline / gradient effects the DOM uses, so
+// MP4 exports match what users see in the editor. Each text line is drawn
+// via this helper; multiple shadow layers stack via a multi-pass fillText
+// pattern (same trick used for media effects in Phase 3b).
+//
+// Args:
+//   ctx       — canvas 2D context
+//   el        — the text element (reads el.shadow / el.glow / el.outline / el.gradient)
+//   text      — the line of text to render (split by caller for multi-line)
+//   x, y      — baseline-aligned position for fillText
+//   maxWidth  — passed to fillText for soft truncation (matches existing call)
+//   solidFill — el.color (fallback when no gradient)
+function drawTextWithEffectsToCanvas(ctx, el, text, x, y, maxWidth, solidFill){
+  // Build the fillStyle: gradient overrides solid color (matches CSS where
+  // background-clip:text + transparent fill replaces el.color visually).
+  var fillStyle = solidFill;
+  if(el.gradient){
+    var gd = el.gradient;
+    var angle = (typeof gd.angle === 'number') ? gd.angle : 135;
+    var rad = angle * Math.PI / 180;
+    // Gradient extends across the element's bounding box so it looks the
+    // same regardless of where the text wraps.
+    var cx = el.x + el.w/2, cy = el.y + el.h/2;
+    var len = Math.max(el.w, el.h);
+    var dx = Math.cos(rad) * len/2;
+    var dy = Math.sin(rad) * len/2;
+    try {
+      var grad = ctx.createLinearGradient(cx - dx, cy - dy, cx + dx, cy + dy);
+      grad.addColorStop(0, gd.from || '#7ed957');
+      grad.addColorStop(1, gd.to || '#ffa500');
+      fillStyle = grad;
+    } catch(e){ /* fall back to solid on any malformed gradient */ }
+  }
+
+  // Build the shadow stack from el.shadow + el.glow. Each entry becomes one
+  // fillText pass with that shadow* config; the visible text overlaps from
+  // earlier passes so multiple shadows accumulate (matches CSS text-shadow).
+  var shadowPasses = [];
+  if(el.shadow){
+    var sh = el.shadow;
+    var sop = (typeof sh.opacity === 'number') ? sh.opacity : 0.6;
+    shadowPasses.push({
+      offX: sh.x || 0,
+      offY: sh.y || 0,
+      blur: sh.blur || 0,
+      color: applyOpacity(sh.color || '#000000', sop)
+    });
+  }
+  if(el.glow){
+    var gl = el.glow;
+    var gop = (typeof gl.opacity === 'number') ? gl.opacity : 0.7;
+    var gcol = applyOpacity(gl.color || '#7ed957', gop);
+    // Two stacked 0-offset shadows mirror the CSS double-glow trick — wider
+    // soft halo on top of a tighter inner glow.
+    shadowPasses.push({ offX:0, offY:0, blur: gl.blur || 10, color: gcol });
+    shadowPasses.push({ offX:0, offY:0, blur: (gl.blur || 10) * 1.6, color: gcol });
+  }
+
+  // Render shadow passes (each draws the text with one shadow config). Text
+  // pixels from each pass overlay opaque, shadows accumulate underneath.
+  shadowPasses.forEach(function(s){
+    ctx.save();
+    ctx.fillStyle = fillStyle;
+    ctx.shadowColor = s.color;
+    ctx.shadowBlur = s.blur;
+    ctx.shadowOffsetX = s.offX;
+    ctx.shadowOffsetY = s.offY;
+    ctx.fillText(text, x, y, maxWidth);
+    ctx.restore();
+  });
+  // Clean fill pass on top (no shadow). Necessary so text edges stay crisp
+  // — multi-pass with blur can soften character outlines slightly.
+  ctx.save();
+  ctx.fillStyle = fillStyle;
+  ctx.fillText(text, x, y, maxWidth);
+  ctx.restore();
+
+  // Outline (stroke) — drawn AFTER fill so it sits on top of the letter
+  // shapes, matching CSS -webkit-text-stroke. Uses round joins for cleaner
+  // intersections at letter corners.
+  if(el.outline && el.outline.width > 0){
+    ctx.save();
+    ctx.strokeStyle = el.outline.color || '#ffffff';
+    ctx.lineWidth = el.outline.width;
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.strokeText(text, x, y, maxWidth);
+    ctx.restore();
+  }
+}
+
 function buildTextEffectStyle(el){
   var parts = [];
   // Build text-shadow string if shadow OR glow is set
@@ -18204,15 +18440,22 @@ function renderPropsPanel(el){
     // Connection state + connect/disconnect + label
     h += '<div class="ps"><div class="ps-t">Camera</div>';
     h += '<div style="font-size:11px;color:'+(wcConnected?'var(--g)':'var(--muted)')+';margin-bottom:8px;font-weight:600">'+(wcConnected?'● Live':'○ Not connected')+'</div>';
+    // v1.0.20: device picker is shown REGARDLESS of connection state. Lets
+    // users pre-select a camera (e.g. NVIDIA Broadcast Camera) before
+    // hitting Connect, so we don't blindly try the default physical cam
+    // when the user actually wants the virtual one. Connect/Reconnect/
+    // Disconnect buttons sit above; device dropdown sits below.
     if(wcConnected){
       h += '<button class="sp-btn" style="width:100%;margin-bottom:5px" onclick="connectWebcamEl(\''+el.id+'\')">Reconnect</button>';
       h += '<button class="sp-btn del" style="width:100%;margin-bottom:5px" onclick="disconnectWebcamEl(\''+el.id+'\')">Disconnect</button>';
-      h += '<div id="wc-devices-'+el.id+'" style="margin-top:6px"></div>';
-      // Populate device list asynchronously after DOM lands (populateWebcamDeviceList is defined globally)
-      setTimeout(function(){ populateWebcamDeviceList(el.id); }, 10);
     } else {
       h += '<button class="sp-btn" style="width:100%;margin-bottom:5px;border-color:var(--g);color:var(--g)" onclick="connectWebcamEl(\''+el.id+'\')">Connect Camera</button>';
     }
+    h += '<div id="wc-devices-'+el.id+'" style="margin-top:6px"></div>';
+    // Populate device list asynchronously after DOM lands. Works in both
+    // states — if the user hasn't yet granted camera permission, the dropdown
+    // shows "Camera 1 / 2 / 3" without labels but the deviceIds still work.
+    setTimeout(function(){ populateWebcamDeviceList(el.id); }, 10);
     h += '<div class="pr"><span class="pr-l">Label</span><input type="text" class="pr-i" value="'+esc(el.label||'')+'" placeholder="Webcam" oninput="updateWebcamLabel(\''+el.id+'\',this.value)"></div>';
     h += '</div>';
     // Shape selector
