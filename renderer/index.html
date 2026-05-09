@@ -2379,6 +2379,43 @@ function applyThemeToSlide(slide, themeKey){
           el.itemBg      = pal.surfaceBg;
           el.bodyColor   = pal.textSecondary;
           el.titleColor  = pal.textPrimary;
+        } else if(el.style === 'horizontal-timeline'){
+          // Phase 5a: same structural fields as vertical timeline
+          el.lineColor   = pal.placeholderBorder;
+          el.itemBg      = pal.surfaceBg;
+          el.bodyColor   = pal.textSecondary;
+          el.titleColor  = pal.textPrimary;
+        } else if(el.style === 'numbered-process'){
+          // Phase 5a: structural fields (numbered circles + arrows + labels)
+          el.numberColor = pal.textOnAccent;
+          el.arrowColor  = pal.borderStrong;
+          el.bodyColor   = pal.textSecondary;
+          el.titleColor  = pal.textPrimary;
+        } else if(el.style === 'stats-grid'){
+          // Phase 5a: card BG + small label color. Big-value color is left
+          // alone since it carries the per-item accent intent.
+          el.cardBg      = pal.surfaceBg;
+          el.labelColor  = pal.textSecondary;
+          el.valueColor  = pal.textPrimary;
+        } else if(el.style === 'pyramid'){
+          // Phase 5b: tier text colors. Tier fill colors are user-set per
+          // item — left alone since they carry user color intent.
+          el.titleColor  = pal.textOnAccent;
+          el.bodyColor   = pal.textOnAccent;
+        } else if(el.style === 'pros-cons'){
+          // Phase 5b: text + column tints. Pros/cons accent colors are
+          // semantic (green=positive, red=negative) so theme leaves them
+          // unless the theme is high-contrast or sepia where they need
+          // recoloring. We just touch the text + bg fills.
+          el.textColor   = pal.textPrimary;
+          el.prosBg      = pal.surfaceBgAlt;
+          el.consBg      = pal.surfaceBgAlt;
+        } else if(el.style === 'icon-list'){
+          // Phase 5b: card BG + body/title text. Icon color follows per-item
+          // accent and is left alone.
+          el.itemBg      = pal.surfaceBg;
+          el.bodyColor   = pal.textSecondary;
+          el.titleColor  = pal.textPrimary;
         }
         break;
       case 'chart':
@@ -2503,6 +2540,14 @@ var I = {
   tableIcon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>',
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><polyline points="4.5 6.5 5.5 7.5 8 5" stroke-width="2"/><line x1="13" y1="6.5" x2="21" y2="6.5"/><rect x="3" y="14" width="7" height="7" rx="1"/><line x1="13" y1="17.5" x2="21" y2="17.5"/></svg>',
   timelineIcon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="3" x2="6" y2="21"/><circle cx="6" cy="6" r="2" fill="currentColor"/><circle cx="6" cy="12" r="2" fill="currentColor"/><circle cx="6" cy="18" r="2" fill="currentColor"/><line x1="11" y1="6" x2="21" y2="6"/><line x1="11" y1="12" x2="21" y2="12"/><line x1="11" y1="18" x2="21" y2="18"/></svg>',
+  // Phase 5a: list-style icons for the new options
+  hTimelineIcon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><circle cx="6" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="18" cy="12" r="2" fill="currentColor"/><line x1="6" y1="16" x2="6" y2="20"/><line x1="12" y1="16" x2="12" y2="20"/><line x1="18" y1="16" x2="18" y2="20"/></svg>',
+  numberedProcessIcon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="19" cy="12" r="2.5"/><line x1="7.5" y1="12" x2="9.5" y2="12"/><polyline points="9 11 9.7 12 9 13"/><line x1="14.5" y1="12" x2="16.5" y2="12"/><polyline points="16 11 16.7 12 16 13"/></svg>',
+  statsGridIcon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/><line x1="5" y1="6" x2="9" y2="6" stroke-width="2.5"/><line x1="15" y1="6" x2="19" y2="6" stroke-width="2.5"/><line x1="5" y1="16" x2="9" y2="16" stroke-width="2.5"/><line x1="15" y1="16" x2="19" y2="16" stroke-width="2.5"/></svg>',
+  // Phase 5b
+  pyramidIcon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="12,3 16,9 8,9" fill="currentColor"/><polygon points="8,10 16,10 19,16 5,16" fill="currentColor" opacity="0.7"/><polygon points="5,17 19,17 22,22 2,22" fill="currentColor" opacity="0.45"/></svg>',
+  prosConsIcon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="8" r="3.5"/><polyline points="5.4 8 6.6 9.2 8.6 7"/><circle cx="17" cy="8" r="3.5"/><line x1="15.5" y1="6.5" x2="18.5" y2="9.5"/><line x1="18.5" y1="6.5" x2="15.5" y2="9.5"/><line x1="3.5" y1="15" x2="10.5" y2="15"/><line x1="3.5" y1="19" x2="10.5" y2="19"/><line x1="13.5" y1="15" x2="20.5" y2="15"/><line x1="13.5" y1="19" x2="20.5" y2="19"/></svg>',
+  iconListIcon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><polygon points="5,4 7,8 11,4 7,4" fill="currentColor"/><polyline points="13 5 21 5"/><polyline points="13 8 18 8" opacity="0.6"/><circle cx="6" cy="14" r="2.2" fill="currentColor"/><polyline points="13 13 21 13"/><polyline points="13 16 18 16" opacity="0.6"/><rect x="3.8" y="20.2" width="4.4" height="3.6" rx="0.6" fill="currentColor"/><polyline points="13 21 21 21"/><polyline points="13 24 18 24" opacity="0.6"/></svg>',
   template:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>',
   plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
   minusCircle:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>',
@@ -3030,6 +3075,7 @@ var S = {
   pointerMagnifierShape:'circle', // 'circle' | 'rectangle'
   pointerEmoji:'👉',           // emoji used when laser style === 'emoji'
   pointerPulseDuration:700,    // ms per click-pulse animation
+  pointerClickPulse:true,      // v1.0.19: when true, every click in non-pulse pointer modes spawns a brief click-pulse ring at the click point. Pulse-mode itself ignores this toggle (it IS the mode).
   pointerActive:false,         // toggled by toolbar button / L key during presentation
   webcamActive:false,
   webcamCorner:'br',   // 'tl' | 'tr' | 'bl' | 'br' — used when webcamPosX/Y are null
@@ -3304,6 +3350,52 @@ function drawPointerOnCtx(ctx, W, H, posClient, scale){
       ctx.beginPath();
       ctx.arc(lp.x, lp.y, Math.max(2, sizeBase * 0.15), 0, Math.PI * 2);
       ctx.fill();
+    } else if(style === 'mouse'){
+      // v1.0.19: classic OS-style arrow cursor. Drawn as a filled polygon
+      // so it stays crisp at any size. The tip sits AT the pointer position
+      // — the polygon coordinates are authored with (0,0) as the tip,
+      // extending down-right like a standard mouse cursor. Color follows
+      // pointerColor; thin contrasting outline keeps it readable on any bg.
+      // Scale the cursor with pointerSize: tip → tail length scales with sizeBase.
+      var cursorScale = sizeBase * 0.10;
+      // Path points: tip at (0,0), trailing down-right with the classic
+      // arrow notch. Coordinates roughly mirror the macOS / Windows arrow.
+      var pts = [
+        [0, 0], [0, 16], [4.5, 12], [7.5, 18.5], [10, 17], [7, 10.5], [12, 10]
+      ];
+      ctx.save();
+      ctx.translate(lp.x, lp.y);
+      ctx.scale(cursorScale, cursorScale);
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for(var pi=1; pi<pts.length; pi++) ctx.lineTo(pts[pi][0], pts[pi][1]);
+      ctx.closePath();
+      // Drop shadow so the cursor reads on any background
+      ctx.shadowColor = 'rgba(0,0,0,0.55)';
+      ctx.shadowBlur = 14;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 1;
+      ctx.fillStyle = color;
+      ctx.fill();
+      // Crisp outline (no shadow) for definition
+      ctx.shadowColor = 'rgba(0,0,0,0)';
+      ctx.shadowBlur = 0;
+      // Pick contrasting outline: white on dark colors, near-black on light
+      var oc = (function(c){
+        var m = String(c).match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        var r,g,b;
+        if(m){ r=+m[1]; g=+m[2]; b=+m[3]; }
+        else if(/^#[0-9a-f]{6}$/i.test(c)){
+          r=parseInt(c.slice(1,3),16); g=parseInt(c.slice(3,5),16); b=parseInt(c.slice(5,7),16);
+        } else { r=g=b=128; }
+        var lum = 0.2126*r + 0.7152*g + 0.0722*b;
+        return lum > 140 ? '#1a1a1a' : '#ffffff';
+      })(color);
+      ctx.strokeStyle = oc;
+      ctx.lineWidth = 1.6;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+      ctx.restore();
     } else if(style === 'emoji'){
       // Render selected emoji centered on cursor. Font size scales with pointerSize.
       var emoji = S.pointerEmoji || '👉';
@@ -3598,6 +3690,130 @@ function mkList(style, x, y){
       titleColor:''                 // item title color; '' = inherit per-item color (accent)
     });
   }
+  // Phase 5a: Horizontal Timeline — milestones flowing left → right with dots
+  // on a horizontal axis. Title above the dot, body below. Sized wide and
+  // shallow by default (presentation-friendly aspect for a roadmap strip).
+  if(style === 'horizontal-timeline'){
+    return Object.assign(base, {
+      w:1080, h:280,
+      items:[
+        {id:uid(), title:'Plan',    body:'Define goals and KPIs',  color:'#7ed957'},
+        {id:uid(), title:'Build',   body:'Develop and iterate',    color:'#ffa500'},
+        {id:uid(), title:'Test',    body:'Validate with users',    color:'#3b82f6'},
+        {id:uid(), title:'Launch',  body:'Ship and announce',      color:'#a855f7'}
+      ],
+      lineColor:'#3a3a44',
+      dotSize:18,
+      itemBg:'rgba(30,30,36,0.5)',
+      bodyColor:'#a0a0b0',
+      titleColor:'',                // '' = inherit per-item accent color
+      orientation:'auto'            // Phase 5d: 'auto' → follows slide aspect
+    });
+  }
+  // Phase 5a: Numbered Process — bold numbered circles in a horizontal row
+  // connected by arrows, with a label and short description under each. Use
+  // for sequential processes / step-by-step.
+  if(style === 'numbered-process'){
+    return Object.assign(base, {
+      w:1100, h:260,
+      items:[
+        {id:uid(), title:'Research',  body:'Understand the problem',  color:'#7ed957'},
+        {id:uid(), title:'Design',    body:'Sketch the solution',     color:'#ffa500'},
+        {id:uid(), title:'Build',     body:'Implement the design',    color:'#3b82f6'},
+        {id:uid(), title:'Ship',      body:'Release to users',        color:'#a855f7'}
+      ],
+      circleSize:78,
+      arrowColor:'rgba(255,255,255,0.35)',
+      bodyColor:'#a0a0b0',
+      titleColor:'',                // '' = inherit per-item accent color
+      numberColor:'#000',
+      orientation:'auto'            // Phase 5d: portrait flips to vertical column with ↓ arrows
+    });
+  }
+  // Phase 5a: Stats Grid — 2x2 grid of metric cards with big values and small
+  // labels. Cards distribute evenly into columns/rows based on `cols` field.
+  if(style === 'stats-grid'){
+    return Object.assign(base, {
+      w:760, h:420,
+      cols:2,                       // landscape default
+      portraitCols:1,               // Phase 5d: cards stack as a single column on portrait
+      items:[
+        {id:uid(), value:'$2.4M',  label:'Annual revenue',     color:'#7ed957'},
+        {id:uid(), value:'+38%',   label:'YoY growth',         color:'#ffa500'},
+        {id:uid(), value:'12K',    label:'Active users',       color:'#3b82f6'},
+        {id:uid(), value:'4.8★',   label:'Customer rating',    color:'#a855f7'}
+      ],
+      cardBg:'rgba(30,30,36,0.7)',
+      labelColor:'#a0a0b0',
+      valueColor:''                 // '' = inherit per-item accent color
+    });
+  }
+  // Phase 5b: Pyramid — N-tier hierarchical layers stacked top→bottom.
+  // Top tier is narrowest (summary), bottom is widest (foundation). Tiers
+  // are CSS clip-path trapezoids that meet seamlessly. Each tier has a
+  // title + optional body, displayed centered inside its visible area.
+  if(style === 'pyramid'){
+    return Object.assign(base, {
+      w:720, h:480,
+      items:[
+        {id:uid(), title:'Vision',     body:'Where we want to be',  color:'#7ed957'},
+        {id:uid(), title:'Strategy',   body:'How we get there',     color:'#3b82f6'},
+        {id:uid(), title:'Tactics',    body:'What we do daily',     color:'#a855f7'},
+        {id:uid(), title:'Foundation', body:'Skills and tools',     color:'#ffa500'}
+      ],
+      tierGap:2,                     // px between tiers; 0 = seamless pyramid
+      bodyColor:'#ffffff',
+      titleColor:'#ffffff'
+    });
+  }
+  // Phase 5b: Pros & Cons — two-column comparison. Each item has a `side`
+  // ('pro' or 'con') which controls which column it lands in. Headers per
+  // column are editable (prosLabel / consLabel). Symbol shown next to each
+  // item: ✓ for pros (green), ✗ for cons (red) by default.
+  if(style === 'cons-pros' || style === 'pros-cons'){
+    return Object.assign(base, {
+      style:'pros-cons',           // normalize key (alias above for safety)
+      w:780, h:420,
+      items:[
+        {id:uid(), text:'Easy to learn',           side:'pro'},
+        {id:uid(), text:'Fast to deploy',          side:'pro'},
+        {id:uid(), text:'Strong community',        side:'pro'},
+        {id:uid(), text:'Steeper learning curve',  side:'con'},
+        {id:uid(), text:'Limited offline support', side:'con'},
+        {id:uid(), text:'Requires JS runtime',     side:'con'}
+      ],
+      prosLabel:'Pros',
+      consLabel:'Cons',
+      prosColor:'#7ed957',
+      consColor:'#f43f5e',
+      prosBg:'rgba(126,217,87,0.08)',
+      consBg:'rgba(244,63,94,0.08)',
+      textColor:'#f0f0f5',
+      labelColor:'',                 // '' = use side color for header text
+      orientation:'auto'             // Phase 5d: portrait stacks pros above cons
+    });
+  }
+  // Phase 5b: Icon List — vertical list with prominent icon + title + body.
+  // Each item carries an `iconId` referencing SHAPE_BY_ID (which includes
+  // the icon library). Color tints the icon stroke + fill. Default icons
+  // rotate through a curated set so a fresh list looks varied at insert.
+  if(style === 'icon-list'){
+    var defaultIcons = ['ico-star','ico-check','ico-target','ico-trophy','ico-heart','ico-bell','ico-lightbulb','ico-shield'];
+    return Object.assign(base, {
+      w:600, h:440,
+      items:[
+        {id:uid(), iconId:'ico-target',  title:'Clear vision',     body:'Define what you are building and why', color:'#7ed957'},
+        {id:uid(), iconId:'ico-trophy',  title:'Strong execution', body:'Ship in small, predictable cycles',     color:'#ffa500'},
+        {id:uid(), iconId:'ico-heart',   title:'User empathy',     body:'Listen, learn, iterate',                color:'#3b82f6'},
+        {id:uid(), iconId:'ico-shield',  title:'Resilience',       body:'Plan for failure modes upfront',        color:'#a855f7'}
+      ],
+      iconSize:42,
+      itemBg:'rgba(30,30,36,0.5)',
+      itemPad:14,
+      bodyColor:'#a0a0b0',
+      titleColor:''                 // '' = inherit per-item accent color
+    });
+  }
   return base;
 }
 
@@ -3861,6 +4077,12 @@ window.startPresent = function(){
   _chartBarAnimated = {};
   _chartLineLastLen = {};
   _chartLastSlideIdx = null;
+  // v1.0.19: reset reveal-anim + slide-transition trackers for the recording
+  // compositor so animations replay cleanly on a fresh presentation session.
+  _revealAnimTimes = {};
+  _slideTransitionTime = 0;
+  _prevSlideBitmap = null;
+  _prevSlideForTransition = null;
   renderPres();
   syncPresenterView();
 };
@@ -4233,7 +4455,8 @@ function renderPointerSettingsHTML(){
     h += renderPspColorRow();
     h += renderPspSizeRow();
     h += '<div class="psp-row"><span class="psp-l">Style</span><div class="psp-style-btns">';
-    ['dot','ring','crosshair','emoji'].forEach(function(s){
+    // v1.0.19: 'mouse' style added — classic OS arrow cursor.
+    ['dot','ring','crosshair','mouse','emoji'].forEach(function(s){
       var act = (S.pointerLaserStyle || 'dot') === s;
       h += '<button class="psp-style-btn'+(act?' active':'')+'" onclick="setPointerLaserStyle(\''+s+'\')">'+s.charAt(0).toUpperCase()+s.slice(1)+'</button>';
     });
@@ -4279,7 +4502,20 @@ function renderPointerSettingsHTML(){
     h += '<div class="psp-hint">Click anywhere on the slide to emphasize a spot.</div>';
   }
   h += '</div>';
-  h += '<div class="psp-section psp-tip">Press <b>L</b> during presentation to toggle the pointer on/off. Click on the slide to spawn a pulse in any mode.</div>';
+  // v1.0.19: click-pulse toggle. Only meaningful in non-pulse modes — in
+  // pulse mode the click-pulse IS the mode, so we hide the toggle there.
+  if(mode !== 'pulse'){
+    var pulseOn = S.pointerClickPulse !== false;
+    h += '<div class="psp-section">';
+    h += '<div class="psp-row" style="justify-content:space-between"><span class="psp-l">Click pulse</span>';
+    h += '<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:var(--muted)">';
+    h += '<input type="checkbox"'+(pulseOn?' checked':'')+' onchange="setPointerClickPulse(this.checked)" style="cursor:pointer;accent-color:var(--g)">';
+    h += '<span>'+(pulseOn?'On':'Off')+'</span>';
+    h += '</label></div>';
+    h += '<div class="psp-hint">Show a glowing ring at every click on the slide.</div>';
+    h += '</div>';
+  }
+  h += '<div class="psp-section psp-tip">Press <b>L</b> during presentation to toggle the pointer on/off.</div>';
   return h;
 }
 function renderPspColorRow(){
@@ -4326,6 +4562,14 @@ window.setPointerColor = function(c){
 };
 window.setPointerLaserStyle = function(s){
   S.pointerLaserStyle = s;
+  var pop = document.getElementById('pointerSettingsPopover');
+  if(pop) pop.innerHTML = renderPointerSettingsHTML();
+  savePointerSettings();
+};
+// v1.0.19: toggle the click-pulse glow ring on/off. Only meaningful in
+// non-pulse modes (the pulse mode itself ignores this toggle).
+window.setPointerClickPulse = function(on){
+  S.pointerClickPulse = !!on;
   var pop = document.getElementById('pointerSettingsPopover');
   if(pop) pop.innerHTML = renderPointerSettingsHTML();
   savePointerSettings();
@@ -4381,7 +4625,8 @@ function savePointerSettings(){
       magnifierSize: S.pointerMagnifierSize,
       magnifierShape: S.pointerMagnifierShape,
       emoji: S.pointerEmoji,
-      pulseDuration: S.pointerPulseDuration
+      pulseDuration: S.pointerPulseDuration,
+      clickPulse: S.pointerClickPulse !== false
     };
     localStorage.setItem('ep-pointer-settings', JSON.stringify(snap));
   } catch(e){}
@@ -4404,6 +4649,7 @@ function loadPointerSettings(){
     if(s.magnifierShape) S.pointerMagnifierShape = s.magnifierShape;
     if(s.emoji) S.pointerEmoji = s.emoji;
     if(typeof s.pulseDuration === 'number') S.pointerPulseDuration = s.pulseDuration;
+    if(typeof s.clickPulse === 'boolean') S.pointerClickPulse = s.clickPulse;
   } catch(e){}
 }
 // Load saved settings on first script run
@@ -4509,7 +4755,13 @@ function onPointerMouseMove(e){
 
 function onPointerClick(e){
   if(!S.pointerActive) return;
-  // Click anywhere → spawn a pulse at that point. Works in all modes.
+  // v1.0.19: respect the click-pulse toggle for non-pulse modes. In 'pulse'
+  // mode the click-pulse IS the mode, so the toggle is ignored — the pulse
+  // always fires there. In other modes (laser/spotlight/trail/magnifier),
+  // the pulse is an optional accent and the user can switch it off.
+  var mode = S.pointerMode || 'laser';
+  var allowPulse = (mode === 'pulse') || (S.pointerClickPulse !== false);
+  if(!allowPulse) return;
   _pointerPulses.push({ x: e.clientX, y: e.clientY, t: Date.now() });
   _pointerOverlayDirty = true;
   // Cap to avoid runaway memory if user clicks many times rapidly
@@ -5334,14 +5586,18 @@ function slideHasAnimatedBorder(slide){
 
 async function getSlideBitmap(slide){
   // If slide has live content (screen share, animated sticker, connected webcam,
-  // animating chart, or animated gradient border), never use cache — all have
-  // frame-by-frame state that the cache would freeze.
+  // animating chart, animated gradient border, or in-progress reveal animation),
+  // never use cache — all have frame-by-frame state that the cache would freeze.
   var liveSS = slideHasLiveScreenShare(slide);
   var hasSticker = slideHasAnimatedSticker(slide);
   var liveWC = slideHasConnectedWebcam(slide);
   var animChart = slideHasAnimatingChart(slide);
   var animBorder = slideHasAnimatedBorder(slide);
-  var skipCache = liveSS || hasSticker || liveWC || animChart || animBorder;
+  // v1.0.19: bypass cache while a reveal animation is mid-flight so each
+  // recording frame regenerates the bitmap with the current animation state
+  // (transform/opacity per-element progressing 0→1 over animDuration ms).
+  var revealAnim = slideHasInProgressReveal(slide);
+  var skipCache = liveSS || hasSticker || liveWC || animChart || animBorder || revealAnim;
 
   // Cache is valid only if: not skipping AND all identity checks match
   if(!skipCache &&
@@ -5412,12 +5668,81 @@ function recComposeFrame(){
     getSlideBitmap(slide).then(function(bm){
       _lastRecBitmap = bm;
     }).catch(function(){});
-    // Draw whatever's currently latest
-    if(_lastRecBitmap){
-      ctx.drawImage(_lastRecBitmap, 0, 0, W, H);
+    // v1.0.19: composite a slide transition between the previous slide's
+    // bitmap and the current one for ~animation duration after a slide
+    // change. Maps the chosen transition kind (fade / slide-left / etc.)
+    // into a per-frame composition. Cache is invalidated on slide change
+    // (presNext/presPrev), so _lastRecBitmap is the CURRENT slide's bitmap
+    // (or the prev one until the new render completes). _prevSlideBitmap
+    // holds a snapshot of the bitmap from BEFORE the change.
+    var transOn = slideTransitionInProgress() && _prevSlideBitmap;
+    if(transOn){
+      var transElapsed = performance.now() - _slideTransitionTime;
+      var transDur = _slideTransitionDurationMs();
+      var transProg = _easeOutCubic(Math.min(1, transElapsed / transDur));
+      var transKind = (_prevSlideForTransition && _prevSlideForTransition.transition)
+                       || S.globalTransition || 'fade';
+      // Draw the previous slide first
+      ctx.save();
+      switch(transKind){
+        case 'slide-left':
+          // Previous moves OFF to the left; new moves IN from the right
+          ctx.drawImage(_prevSlideBitmap, -W * transProg, 0, W, H);
+          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, W * (1 - transProg), 0, W, H);
+          break;
+        case 'slide-right':
+          ctx.drawImage(_prevSlideBitmap, W * transProg, 0, W, H);
+          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, -W * (1 - transProg), 0, W, H);
+          break;
+        case 'slide-up':
+          ctx.drawImage(_prevSlideBitmap, 0, -H * transProg, W, H);
+          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, 0, H * (1 - transProg), W, H);
+          break;
+        case 'slide-down':
+          ctx.drawImage(_prevSlideBitmap, 0, H * transProg, W, H);
+          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, 0, -H * (1 - transProg), W, H);
+          break;
+        case 'zoom':
+          // Prev fades + scales up, new fades + scales from below
+          ctx.globalAlpha = 1 - transProg;
+          var ps = 1 + 0.1 * transProg;
+          ctx.translate(W/2, H/2); ctx.scale(ps, ps); ctx.translate(-W/2, -H/2);
+          ctx.drawImage(_prevSlideBitmap, 0, 0, W, H);
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.globalAlpha = transProg;
+          var ns = 0.95 + 0.05 * transProg;
+          ctx.translate(W/2, H/2); ctx.scale(ns, ns); ctx.translate(-W/2, -H/2);
+          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, 0, 0, W, H);
+          break;
+        case 'none':
+          // No transition — just draw current
+          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, 0, 0, W, H);
+          else { ctx.fillStyle = slide.bg || '#111113'; ctx.fillRect(0, 0, W, H); }
+          break;
+        case 'fade':
+        default:
+          // Cross-fade: prev at 1-progress, new at progress
+          ctx.globalAlpha = 1 - transProg;
+          ctx.drawImage(_prevSlideBitmap, 0, 0, W, H);
+          ctx.globalAlpha = transProg;
+          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, 0, 0, W, H);
+          break;
+      }
+      ctx.restore();
+      // When transition completes, drop the snapshot to free memory.
+      if(transProg >= 1){
+        _prevSlideBitmap = null;
+        _prevSlideForTransition = null;
+        _slideTransitionTime = 0;
+      }
     } else {
-      ctx.fillStyle = slide.bg || '#111113';
-      ctx.fillRect(0, 0, W, H);
+      // Normal path: draw whatever's currently latest
+      if(_lastRecBitmap){
+        ctx.drawImage(_lastRecBitmap, 0, 0, W, H);
+      } else {
+        ctx.fillStyle = slide.bg || '#111113';
+        ctx.fillRect(0, 0, W, H);
+      }
     }
   }
 
@@ -6245,6 +6570,12 @@ window.presNext = function(){
   var maxStep = maxRevealStep(slide);
   if(S.revealStep < maxStep){
     S.revealStep++;
+    // v1.0.19: timestamp this reveal step so the canvas slide-renderer can
+    // animate the elements that just became visible. Required for the
+    // recording compositor to show fade/slide/zoom/pop transitions in MP4.
+    if(slide && slide.id){
+      _revealAnimTimes[slide.id + ':' + S.revealStep] = performance.now();
+    }
     invalidateRecCache();
     if(S.recActive) prewarmRecCache();
     renderPres();
@@ -6252,6 +6583,22 @@ window.presNext = function(){
     return;
   }
   if(S.presSlide < S.slides.length - 1){
+    // v1.0.19: capture a snapshot of the slide we're leaving so the
+    // recording compositor can cross-fade to the next bitmap during the
+    // transition window. _lastRecBitmap holds the last fully-rendered slide
+    // bitmap; clone it (drawImage to a fresh canvas) so it survives further
+    // cache invalidations.
+    if(S.recActive && _lastRecBitmap){
+      try {
+        var snap = document.createElement('canvas');
+        snap.width = _lastRecBitmap.width;
+        snap.height = _lastRecBitmap.height;
+        snap.getContext('2d').drawImage(_lastRecBitmap, 0, 0);
+        _prevSlideBitmap = snap;
+        _prevSlideForTransition = slide;
+        _slideTransitionTime = performance.now();
+      } catch(e){ _prevSlideBitmap = null; }
+    }
     S.presSlide++;
     S.revealStep = 0;
     S.pop = null;
@@ -6264,6 +6611,12 @@ window.presNext = function(){
 
 window.presPrev = function(){
   if(S.revealStep > 0){
+    // No backward animation — instantly snap back. Clear the timestamp so
+    // the just-hidden step doesn't re-animate if user goes forward again.
+    var slideBack = S.slides[S.presSlide];
+    if(slideBack && slideBack.id){
+      delete _revealAnimTimes[slideBack.id + ':' + S.revealStep];
+    }
     S.revealStep--;
     invalidateRecCache();
     if(S.recActive) prewarmRecCache();
@@ -6272,6 +6625,17 @@ window.presPrev = function(){
     return;
   }
   if(S.presSlide > 0){
+    if(S.recActive && _lastRecBitmap){
+      try {
+        var snap2 = document.createElement('canvas');
+        snap2.width = _lastRecBitmap.width;
+        snap2.height = _lastRecBitmap.height;
+        snap2.getContext('2d').drawImage(_lastRecBitmap, 0, 0);
+        _prevSlideBitmap = snap2;
+        _prevSlideForTransition = S.slides[S.presSlide];
+        _slideTransitionTime = performance.now();
+      } catch(e){ _prevSlideBitmap = null; }
+    }
     S.presSlide--;
     S.revealStep = maxRevealStep(S.slides[S.presSlide]);
     S.pop = null;
@@ -6365,14 +6729,41 @@ function moveDraw(evt){
   var pt = getStagePoint(evt);
   currentStroke.push(pt);
   if(currentStroke.length < 2) return;
-  // Draw live segment
+  var t = S.tool;
+  // v1.0.19: highlighter live-draw fix. Drawing each segment with alpha 0.4
+  // separately causes adjacent segments to overlap at endpoints, where the
+  // alpha stacks and approaches opaque — making the live stroke look like a
+  // solid pen until mouseup, when the stroke is repainted as one polyline.
+  // Match the saved-stroke render path: clear, redraw committed strokes,
+  // then draw the entire in-progress stroke as ONE polyline at 0.4 alpha.
+  // Single stroke = uniform alpha across the whole path, no stacking.
+  if(t === 'highlighter'){
+    redrawStrokes();
+    drawCtx.beginPath();
+    drawCtx.moveTo(currentStroke[0].x * S.stageScale, currentStroke[0].y * S.stageScale);
+    for(var k=1; k<currentStroke.length; k++){
+      drawCtx.lineTo(currentStroke[k].x * S.stageScale, currentStroke[k].y * S.stageScale);
+    }
+    drawCtx.lineCap = 'round';
+    drawCtx.lineJoin = 'round';
+    drawCtx.strokeStyle = S.penColor;
+    drawCtx.lineWidth = S.penSize * S.stageScale;
+    drawCtx.globalCompositeOperation = 'source-over';
+    drawCtx.globalAlpha = (S.penOpacity / 100) * 0.4;
+    drawCtx.stroke();
+    drawCtx.globalAlpha = 1;
+    drawCtx.globalCompositeOperation = 'source-over';
+    return;
+  }
+  // Pen / brush / eraser: per-segment incremental render is cheap and the
+  // alpha-stacking issue doesn't apply (pen/eraser are opaque; brush at full
+  // opacity behaves the same).
   var prev = currentStroke[currentStroke.length-2];
   drawCtx.beginPath();
   drawCtx.moveTo(prev.x * S.stageScale, prev.y * S.stageScale);
   drawCtx.lineTo(pt.x * S.stageScale, pt.y * S.stageScale);
   drawCtx.lineCap = 'round';
   drawCtx.lineJoin = 'round';
-  var t = S.tool;
   if(t === 'eraser'){
     drawCtx.strokeStyle = 'rgba(0,0,0,1)';
     drawCtx.lineWidth = S.penSize * 4 * S.stageScale;
@@ -6392,7 +6783,7 @@ function moveDraw(evt){
     drawCtx.strokeStyle = S.penColor;
     drawCtx.lineWidth = S.penSize * S.stageScale;
     drawCtx.globalCompositeOperation = 'source-over';
-    drawCtx.globalAlpha = t === 'highlighter' ? (S.penOpacity/100) * 0.4 : S.penOpacity/100;
+    drawCtx.globalAlpha = S.penOpacity / 100;
   }
   drawCtx.stroke();
   drawCtx.setLineDash([]);
@@ -7802,6 +8193,189 @@ window.switchWebcamDevice = async function(id, deviceId){
 // animation. Reset on slide change. Format: "chartId:barIdx" → true.
 var _chartBarAnimated = {};
 var _chartLastSlideIdx = null;
+
+// v1.0.19 / Phase 4b: reveal animation timing tracker for the recording
+// compositor. Maps "slideId:revealStep" → performance.now() of when that
+// step was hit. The canvas slide-renderer reads these to compute per-element
+// animation progress so MP4 exports show the same fade/slide/zoom/pop
+// motions the live DOM presentation does. Cleared on slide entry/exit.
+var _revealAnimTimes = {};
+
+// Slide transition timing. Tracks the timestamp of the last slide change
+// during a recording session, plus a snapshot of the previous slide's
+// bitmap. recComposeFrame uses these to composite a fade/slide transition
+// between the two bitmaps for the duration of the transition animation.
+var _slideTransitionTime = 0;
+var _prevSlideBitmap = null;
+var _prevSlideForTransition = null;
+
+// Read the active reveal animation duration in ms. Mirrors the CSS speed
+// classes (fast=280, normal=550, slow=850). Defaults to normal.
+function _revealAnimDurationMs(){
+  var sp = S.globalSpeed || 'normal';
+  if(sp === 'fast') return 280;
+  if(sp === 'slow') return 850;
+  return 550;
+}
+function _slideTransitionDurationMs(){
+  var sp = S.globalSpeed || 'normal';
+  if(sp === 'fast') return 300;
+  if(sp === 'slow') return 1100;
+  return 600;
+}
+
+// Resolve effective reveal animation type for an element (per-element override
+// → per-slide override → global default). Mirrors the cascade applied via
+// CSS classes in renderPres.
+function _effectiveRevealAnim(slide, el){
+  return (el && el.revealAnim) || (slide && slide.revealAnim) || S.globalRevealAnim || 'fade';
+}
+
+// Cubic ease-out (matches the cubic-bezier(0.2,0.9,0.3,1) feel closely enough
+// for visual purposes — exact bezier interpolation is heavy and unnecessary).
+function _easeOutCubic(t){ t = Math.max(0, Math.min(1, t)); return 1 - Math.pow(1 - t, 3); }
+
+// Apply the reveal-animation transform / alpha to a canvas context. Uses
+// ctx.save() — caller must call ctx.restore() after drawing the element.
+// progress is 0..1 (0 = animation start, 1 = animation finished). animType
+// matches the reveal-anim option keys (fade, slide-up, slide-left,
+// slide-right, zoom, pop, none).
+function applyRevealAnimToCanvas(ctx, el, animType, progress){
+  ctx.save();
+  if(progress >= 1) return;
+  var p = _easeOutCubic(progress);
+  var cx = el.x + (el.w || 0) / 2;
+  var cy = el.y + (el.h || 0) / 2;
+  switch(animType){
+    case 'slide-up':
+      ctx.globalAlpha = (ctx.globalAlpha || 1) * p;
+      ctx.translate(0, 28 * (1 - p));
+      break;
+    case 'slide-left':
+      ctx.globalAlpha = (ctx.globalAlpha || 1) * p;
+      ctx.translate(-28 * (1 - p), 0);
+      break;
+    case 'slide-right':
+      ctx.globalAlpha = (ctx.globalAlpha || 1) * p;
+      ctx.translate(28 * (1 - p), 0);
+      break;
+    case 'zoom':
+      ctx.globalAlpha = (ctx.globalAlpha || 1) * p;
+      var sz = 0.85 + (1 - 0.85) * p;
+      ctx.translate(cx, cy);
+      ctx.scale(sz, sz);
+      ctx.translate(-cx, -cy);
+      break;
+    case 'pop':
+      // Opacity hits 1 at 60%, then stays. Scale 0.6 → 1.05 (overshoot at 60%) → 1.
+      ctx.globalAlpha = (ctx.globalAlpha || 1) * Math.min(1, progress * 1.667);
+      var ps;
+      if(progress < 0.6) ps = 0.6 + (1.05 - 0.6) * (progress / 0.6);
+      else ps = 1.05 - (1.05 - 1) * ((progress - 0.6) / 0.4);
+      ctx.translate(cx, cy);
+      ctx.scale(ps, ps);
+      ctx.translate(-cx, -cy);
+      break;
+    case 'none':
+      // Instant — no transform, full opacity
+      break;
+    case 'fade':
+    default:
+      ctx.globalAlpha = (ctx.globalAlpha || 1) * p;
+      ctx.translate(0, 8 * (1 - p));
+      break;
+  }
+}
+
+// Returns animation progress (0..1) for an element on the given slide. 1
+// means "fully revealed, no animation in progress". Reads from
+// _revealAnimTimes which is populated when the reveal step advances.
+// Elements without a reveal field, or whose reveal step is 0, return 1.
+function getRevealAnimProgress(slide, el){
+  if(!el || !el.reveal || el.reveal === 0) return 1;
+  if(!slide || !slide.id) return 1;
+  // Only animate when this element's reveal step exactly matches the
+  // current step. Earlier-revealed steps are fully visible; later-revealed
+  // steps shouldn't even be drawn (filtered upstream).
+  if(el.reveal !== S.revealStep) return 1;
+  var key = slide.id + ':' + el.reveal;
+  var ts = _revealAnimTimes[key];
+  if(!ts) return 1;
+  var elapsed = performance.now() - ts;
+  var dur = _revealAnimDurationMs();
+  if(elapsed >= dur) return 1;
+  return elapsed / dur;
+}
+
+// Returns true if any animation on the slide is mid-reveal. Checks the
+// current step's timestamp — covers BOTH top-level element reveals (text,
+// images, etc. with el.reveal set) and item-level reveals (list items in
+// sequential/manual mode, chart bars). All items revealing at the same
+// step share the same timestamp keyed by `slideId:step`.
+function slideHasInProgressReveal(slide){
+  if(!slide || !slide.id) return false;
+  var key = slide.id + ':' + S.revealStep;
+  var ts = _revealAnimTimes[key];
+  if(!ts) return false;
+  return (performance.now() - ts) < _revealAnimDurationMs();
+}
+
+// Build an inline CSS string for an item that's currently animating. Used
+// by the list/chart renderers when rendering for the canvas (recording),
+// where CSS keyframe animations don't run because the rasterized SVG
+// captures only a single frame. By computing progress in JS and emitting
+// transform/opacity inline, each rasterization frame snapshots the
+// in-progress animation — sequence of snapshots over time forms the
+// animation in the MP4. progress is 0..1.
+function _buildItemRevealInlineStyle(animType, progress){
+  if(progress >= 1) return '';
+  var p = _easeOutCubic(progress);
+  switch(animType){
+    case 'slide-up':
+      return 'opacity:'+p.toFixed(3)+';transform:translateY('+(28*(1-p)).toFixed(2)+'px);';
+    case 'slide-left':
+      return 'opacity:'+p.toFixed(3)+';transform:translateX('+(-28*(1-p)).toFixed(2)+'px);';
+    case 'slide-right':
+      return 'opacity:'+p.toFixed(3)+';transform:translateX('+(28*(1-p)).toFixed(2)+'px);';
+    case 'zoom':
+      var sz = 0.85 + (1 - 0.85) * p;
+      return 'opacity:'+p.toFixed(3)+';transform:scale('+sz.toFixed(3)+');';
+    case 'pop':
+      var op = Math.min(1, progress * 1.667);
+      var ps;
+      if(progress < 0.6) ps = 0.6 + (1.05 - 0.6) * (progress / 0.6);
+      else ps = 1.05 - (1.05 - 1) * ((progress - 0.6) / 0.4);
+      return 'opacity:'+op.toFixed(3)+';transform:scale('+ps.toFixed(3)+');';
+    case 'none':
+      return '';
+    case 'fade':
+    default:
+      return 'opacity:'+p.toFixed(3)+';transform:translateY('+(8*(1-p)).toFixed(2)+'px);';
+  }
+}
+
+// Compute current animation progress for an item revealing at `itemStep`
+// on the given slide. Returns 1 (no animation) when the item isn't the
+// currently-revealing one or its animation has finished. Looks up the
+// shared step timestamp seeded by presNext.
+function getItemRevealProgress(slide, itemStep){
+  if(!slide || !slide.id || !itemStep || itemStep === 0) return 1;
+  if(itemStep !== S.revealStep) return 1;
+  var ts = _revealAnimTimes[slide.id + ':' + itemStep];
+  if(!ts) return 1;
+  var elapsed = performance.now() - ts;
+  var dur = _revealAnimDurationMs();
+  if(elapsed >= dur) return 1;
+  return elapsed / dur;
+}
+
+// Returns true if a slide transition is currently animating (used by
+// recComposeFrame to composite the cross-fade / slide between bitmaps).
+function slideTransitionInProgress(){
+  if(!_slideTransitionTime) return false;
+  var elapsed = performance.now() - _slideTransitionTime;
+  return elapsed < _slideTransitionDurationMs();
+}
 // Per-chart line-chart length tracking. Maps "line:chartId" → last animated
 // total path length (px), used to compute the delta for the next reveal so
 // we animate only the new portion of the line, not the whole thing.
@@ -8821,6 +9395,111 @@ var TEXT_TEMPLATES = [
           italic:false, transform:'none', letterSpacing:0, lk:false }
       ];
     }
+  },
+  // ============================================================
+  // Phase 5c: 4 new text templates (v1.0.19)
+  // ============================================================
+  {
+    id: 'big-keyword',
+    cat: 'titles',
+    label: 'Big Keyword',
+    desc: 'One huge word + tagline',
+    spawn: function(x, y){
+      return [
+        // The single huge keyword — uppercase, wide letter spacing
+        { type:'text', x:x, y:y, w:780, h:140, text:'INNOVATION',
+          fs:128, fw:'800', color:'#ffffff', align:'center', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'uppercase', letterSpacing:6, lk:false },
+        // Tagline — small italic muted line below
+        { type:'text', x:x, y:y+145, w:780, h:42, text:'Where ideas turn into impact',
+          fs:22, fw:'400', color:'#a0a0a8', align:'center', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:true, transform:'none', letterSpacing:1, lk:false }
+      ];
+    }
+  },
+  {
+    id: 'speaker-quote',
+    cat: 'quotes',
+    label: 'Speaker Quote',
+    desc: 'Quote with avatar + attribution',
+    spawn: function(x, y){
+      return [
+        // Big opening quote mark in accent color
+        { type:'text', x:x, y:y, w:62, h:90, text:'“',
+          fs:90, fw:'800', color:'#ffa500', align:'left', vAlign:'top',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false },
+        // The quote
+        { type:'text', x:x+62, y:y+12, w:660, h:90, text:'A short, memorable quote that captures the idea your audience should remember.',
+          fs:24, fw:'400', color:'#f0f0f5', align:'left', vAlign:'top',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:true, transform:'none', letterSpacing:0, lk:false },
+        // Avatar circle — colored placeholder; user can replace with an image
+        { type:'shape', shape:'circle', x:x+62, y:y+115, w:48, h:48,
+          fill:'#7ed957', fillOp:1, stroke:'#7ed957', sw:0, lk:false },
+        // Speaker name
+        { type:'text', x:x+122, y:y+113, w:340, h:24, text:'Speaker Name',
+          fs:16, fw:'700', color:'#ffffff', align:'left', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false },
+        // Role / title — small uppercase accent text
+        { type:'text', x:x+122, y:y+138, w:340, h:22, text:'Title / Role',
+          fs:12, fw:'600', color:'#7ed957', align:'left', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'uppercase', letterSpacing:2, lk:false }
+      ];
+    }
+  },
+  {
+    id: 'section-divider',
+    cat: 'titles',
+    label: 'Section Divider',
+    desc: 'Lines flanking centered label',
+    spawn: function(x, y){
+      return [
+        // Left horizontal line — translucent accent
+        { type:'shape', shape:'rect', x:x, y:y+18, w:140, h:2,
+          fill:'rgba(126,217,87,0.6)', fillOp:1, stroke:'rgba(126,217,87,0.6)', sw:0, lk:false },
+        // Centered label — uppercase, wide letter spacing
+        { type:'text', x:x+150, y:y, w:320, h:38, text:'SECTION TITLE',
+          fs:18, fw:'700', color:'#7ed957', align:'center', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'uppercase', letterSpacing:3, lk:false },
+        // Right horizontal line — mirrors the left
+        { type:'shape', shape:'rect', x:x+480, y:y+18, w:140, h:2,
+          fill:'rgba(126,217,87,0.6)', fillOp:1, stroke:'rgba(126,217,87,0.6)', sw:0, lk:false }
+      ];
+    }
+  },
+  {
+    id: 'step-pair',
+    cat: 'steps',
+    label: 'Step Pair',
+    desc: 'Step badge + heading + body',
+    spawn: function(x, y){
+      return [
+        // Step pill — small rounded rect with the step label inside
+        { type:'shape', shape:'rrect', x:x, y:y+8, w:96, h:32,
+          fill:'#7ed957', fillOp:1, stroke:'#7ed957', sw:0, lk:false },
+        // Pill text overlay (visually centered on the pill)
+        { type:'text', x:x, y:y+8, w:96, h:32, text:'STEP 1',
+          fs:13, fw:'800', color:'#000000', align:'center', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'uppercase', letterSpacing:1.5, lk:false },
+        // Heading — large bold title to the right of the pill
+        { type:'text', x:x+110, y:y, w:540, h:48, text:'Step heading goes here',
+          fs:30, fw:'700', color:'#ffffff', align:'left', vAlign:'center',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:-0.3, lk:false },
+        // Body description — short paragraph beneath
+        { type:'text', x:x+110, y:y+52, w:540, h:48, text:'A brief description of what this step covers - keep it short and clear.',
+          fs:15, fw:'400', color:'#a0a0a8', align:'left', vAlign:'top',
+          bc:'transparent', bw:0, br:0, bg:'transparent',
+          italic:false, transform:'none', letterSpacing:0, lk:false }
+      ];
+    }
   }
 ];
 
@@ -9546,15 +10225,33 @@ window.setListStyle = function(id, style){
   newEl.lk = el.lk;
   // Preserve existing items if structurally compatible
   if(el.items && el.items.length && style !== 'table'){
+    var defaultColors = ['#7ed957','#ffa500','#3b82f6','#a855f7','#ec4899','#f43f5e'];
+    var defaultIcons = ['ico-star','ico-check','ico-target','ico-trophy','ico-heart','ico-bell','ico-lightbulb','ico-shield'];
     // Map items from whatever they were into new format where possible
     if(style === 'checklist'){
       newEl.items = el.items.map(function(it){
-        return {id:uid(), text: it.text || it.title || it.body || 'Item', checked: it.checked || false};
+        return {id:uid(), text: it.text || it.title || it.label || it.value || it.body || 'Item', checked: it.checked || false};
       });
-    } else if(style === 'stacked-card' || style === 'timeline'){
-      var defaultColors = ['#7ed957','#ffa500','#3b82f6','#a855f7','#ec4899','#f43f5e'];
+    } else if(style === 'stacked-card' || style === 'timeline' || style === 'horizontal-timeline' || style === 'numbered-process' || style === 'pyramid'){
+      // Five styles share the same item shape: title + body + color.
       newEl.items = el.items.map(function(it, i){
-        return {id:uid(), title: it.title || it.text || 'Title', body: it.body || '', color: it.color || defaultColors[i % defaultColors.length]};
+        return {id:uid(), title: it.title || it.text || it.value || 'Title', body: it.body || it.label || '', color: it.color || defaultColors[i % defaultColors.length]};
+      });
+    } else if(style === 'stats-grid'){
+      // Stats Grid uses value + label instead of title + body. Map best-effort.
+      newEl.items = el.items.map(function(it, i){
+        return {id:uid(), value: it.value || it.title || it.text || '0', label: it.label || it.body || 'Metric', color: it.color || defaultColors[i % defaultColors.length]};
+      });
+    } else if(style === 'pros-cons'){
+      // Pros & Cons items: text + side. Distribute existing items round-robin
+      // between pro/con so the user sees both columns populated after switch.
+      newEl.items = el.items.map(function(it, i){
+        return {id:uid(), text: it.text || it.title || it.label || it.value || 'Item', side: (i % 2 === 0) ? 'pro' : 'con'};
+      });
+    } else if(style === 'icon-list'){
+      // Icon List adds iconId; rotate through default icon set.
+      newEl.items = el.items.map(function(it, i){
+        return {id:uid(), iconId: it.iconId || defaultIcons[i % defaultIcons.length], title: it.title || it.text || it.value || 'Title', body: it.body || it.label || '', color: it.color || defaultColors[i % defaultColors.length]};
       });
     }
   }
@@ -9569,8 +10266,18 @@ window.addListItem = function(id){
   if(!el) return;
   var newItem;
   var accentColors = ['#7ed957','#ffa500','#3b82f6','#a855f7','#ec4899','#f43f5e'];
-  if(el.style === 'stacked-card' || el.style === 'timeline'){
+  if(el.style === 'stacked-card' || el.style === 'timeline' || el.style === 'horizontal-timeline' || el.style === 'numbered-process' || el.style === 'pyramid'){
     newItem = {id:uid(), title:'New item', body:'Description', color:accentColors[el.items.length % accentColors.length]};
+  } else if(el.style === 'stats-grid'){
+    newItem = {id:uid(), value:'0', label:'Metric', color:accentColors[el.items.length % accentColors.length]};
+  } else if(el.style === 'pros-cons'){
+    // New item alternates side based on existing pros vs cons distribution
+    var proCount = el.items.filter(function(x){ return (x.side||'pro') === 'pro'; }).length;
+    var conCount = el.items.length - proCount;
+    newItem = {id:uid(), text:'New item', side: (proCount <= conCount) ? 'pro' : 'con'};
+  } else if(el.style === 'icon-list'){
+    var defIcons = ['ico-star','ico-check','ico-target','ico-trophy','ico-heart','ico-bell','ico-lightbulb','ico-shield'];
+    newItem = {id:uid(), iconId:defIcons[el.items.length % defIcons.length], title:'New item', body:'Description', color:accentColors[el.items.length % accentColors.length]};
   } else if(el.style === 'checklist'){
     newItem = {id:uid(), text:'New item', checked:false};
   } else if(el.style === 'table'){
@@ -9585,6 +10292,44 @@ window.addListItem = function(id){
     });
     return s;
   });
+};
+
+// v1.0.19 (Phase 5e): wipe all item-level backgrounds for this list so the
+// wrapper BG shows through cleanly. Per-style: stacked-card / stats-grid
+// have cardBg, table has altRowBg + headerBg, checklist / timeline / h-timeline
+// / icon-list have itemBg, pros-cons has prosBg + consBg. Pyramid and
+// numbered-process don't carry per-item BG fields so this is a no-op for
+// them — the wrapper BG is already their dominant background.
+window.clearListInnerBgs = function(id){
+  var el = gEl(id);
+  if(!el) return;
+  var patch = {};
+  switch(el.style){
+    case 'stacked-card':
+    case 'stats-grid':
+      patch.cardBg = 'transparent';
+      break;
+    case 'table':
+      patch.altRowBg = 'transparent';
+      patch.headerBg = 'transparent';
+      break;
+    case 'checklist':
+    case 'timeline':
+    case 'horizontal-timeline':
+    case 'icon-list':
+      patch.itemBg = 'transparent';
+      break;
+    case 'pros-cons':
+      patch.prosBg = 'transparent';
+      patch.consBg = 'transparent';
+      break;
+  }
+  if(Object.keys(patch).length === 0){
+    showToast('This list style has no item backgrounds to clear');
+    return;
+  }
+  updateEl(id, patch);
+  showToast('Item backgrounds cleared — wrapper BG now shows through');
 };
 
 window.removeListItem = function(id, itemId){
@@ -10419,6 +11164,16 @@ window.setSlideTransition = function(t){
   render();
 };
 
+// v1.0.19: per-slide reveal-animation override. '__inherit' falls back to
+// global S.globalRevealAnim. Per-element el.revealAnim still wins over this.
+window.setSlideRevealAnim = function(t){
+  var s = cs(); if(!s) return;
+  if(t === '__inherit'){ delete s.revealAnim; }
+  else { s.revealAnim = t; }
+  pushHist();
+  render();
+};
+
 // =========================================================
 // SLIDE AUDIO (per-slide voiceovers)
 // =========================================================
@@ -11034,6 +11789,14 @@ async function renderSlideToCanvas(s, scale){
   x.fillRect(0, 0, STAGE_W, STAGE_H);
   for(var i=0; i<s.els.length; i++){
     var el = s.els[i];
+    // v1.0.19: apply per-element reveal animation transform/alpha for the
+    // recording compositor. Returns 1 when no animation is active (identity
+    // transform, alpha unchanged) so non-revealing elements render normally.
+    // applyRevealAnimToCanvas always calls ctx.save() — we ctx.restore() at
+    // the end of this iteration regardless of which element-type branch ran.
+    var _revealProg = getRevealAnimProgress(s, el);
+    var _revealType = _effectiveRevealAnim(s, el);
+    applyRevealAnimToCanvas(x, el, _revealType, _revealProg);
     if(el.type === 'text'){
       if(el.bg && el.bg !== 'transparent'){
         x.fillStyle = el.bg;
@@ -11283,15 +12046,43 @@ async function renderSlideToCanvas(s, scale){
         // Ensure custom fonts are loaded before rasterizing (otherwise Outfit may fallback to serif and shift sizes)
         if(document.fonts && document.fonts.ready) await document.fonts.ready;
 
-        var listHtml = renderList(el, true);
+        // v1.0.19: pass forCanvas=true so the list renderer injects inline
+        // transform/opacity per item based on real-time animation progress
+        // (CSS keyframes don't run inside a rasterized SVG snapshot).
+        var listHtml = renderList(el, true, true);
+
+        // v1.0.19 (Phase 5d polish): measure the list's natural content height
+        // by mounting it into a hidden offscreen div BEFORE rasterizing. When
+        // the user enlarges typography or adds many items, the content can
+        // exceed the element's user-set `el.h` — and the SVG/foreignObject
+        // pipeline previously clipped to el.h, cutting off the bottom rows
+        // in MP4 exports (most visible in vertical Pros & Cons / Numbered
+        // Process layouts on portrait slides). Now we use max(el.h, measured)
+        // for both the SVG box AND the drawImage destination so the recording
+        // captures everything the user can see in the editor.
+        var measureDiv = document.createElement('div');
+        measureDiv.style.cssText = 'position:absolute;top:-99999px;left:-99999px;width:'+el.w+'px;font-family:Outfit,sans-serif;color:#f0f0f5;box-sizing:border-box;visibility:hidden;pointer-events:none';
+        measureDiv.innerHTML = listHtml;
+        document.body.appendChild(measureDiv);
+        // Measure both offsetHeight (border box) and scrollHeight (content
+        // including overflow) — pick the larger so we never under-measure.
+        var measuredH = Math.max(measureDiv.offsetHeight || 0, measureDiv.scrollHeight || 0);
+        document.body.removeChild(measureDiv);
+        // Cap to the slide's remaining height from this element's top so we
+        // never extend the rendering off the slide canvas (which would just
+        // be invisible bytes anyway).
+        var maxAllowedH = Math.max(el.h, STAGE_H - el.y - 4);
+        var renderH = Math.max(el.h, Math.min(measuredH || el.h, maxAllowedH));
+
         // Wrap in xhtml-namespaced div, inline default dark background so transparent doesn't fall through
         var wrappedHtml =
           '<div xmlns="http://www.w3.org/1999/xhtml" style="font-family:\'Outfit\',sans-serif;width:'+el.w+'px;min-height:'+el.h+'px;color:#f0f0f5;box-sizing:border-box">' +
           listHtml +
           '</div>';
-        // Build SVG with foreignObject. Use allowing overflow so content isn't clipped prematurely.
+        // Build SVG with foreignObject. SVG height matches measured content
+        // (or el.h if smaller) so nothing is clipped by the rasterizer.
         var svgStr =
-          '<svg xmlns="http://www.w3.org/2000/svg" width="'+el.w+'" height="'+el.h+'">' +
+          '<svg xmlns="http://www.w3.org/2000/svg" width="'+el.w+'" height="'+renderH+'">' +
           '<foreignObject x="0" y="0" width="100%" height="100%" requiredExtensions="http://www.w3.org/1999/xhtml">' +
           wrappedHtml +
           '</foreignObject></svg>';
@@ -11311,7 +12102,11 @@ async function renderSlideToCanvas(s, scale){
           console.warn('[EP] List rasterize via SVG failed:', err, '— will use fallback');
           throw err;
         });
-        x.drawImage(listImg, el.x, el.y, el.w, el.h);
+        // drawImage at the same height we sized the SVG to — content extends
+        // past el.h on the slide canvas if necessary, matching what the user
+        // sees in the live editor where overflow:visible already flows the
+        // content beyond the element's stated bounding box.
+        x.drawImage(listImg, el.x, el.y, el.w, renderH);
       } catch(e){
         // Fallback: draw a readable visual so the list at least doesn't disappear in the output
         x.fillStyle = 'rgba(255,255,255,0.04)';
@@ -11531,6 +12326,8 @@ async function renderSlideToCanvas(s, scale){
     if(el.type === 'chart'){
       drawChartToCanvas(x, el);
     }
+    // v1.0.19: balance the applyRevealAnimToCanvas save() at top of loop body.
+    x.restore();
   }
   // Pen annotations
   var draws = s.draws || [];
@@ -15165,11 +15962,39 @@ function filterListItemsByReveal(items, isPres){
   });
 }
 
-function renderList(el, isPres){
-  if(el.style === 'stacked-card') return renderStackedCardList(el, isPres);
-  if(el.style === 'table') return renderTableList(el, isPres);
-  if(el.style === 'checklist') return renderChecklistList(el, isPres);
-  if(el.style === 'timeline') return renderTimelineList(el, isPres);
+// `forCanvas` (v1.0.19): when true, the list is being rasterized for the
+// recording compositor (canvas → SVG → image). In that mode, item reveal
+// animations CANNOT use CSS keyframes (a static SVG snapshot doesn't
+// progress over time), so each renderer instead injects an inline
+// transform/opacity per item based on real-time progress. Each frame's
+// rasterization captures a different progress value — sequence of frames
+// forms the animation in the MP4. Editor / live-presentation path keeps
+// using CSS classes (forCanvas=false) for smooth GPU-driven motion.
+// Phase 5d: resolve a list element's effective orientation.
+// `el.orientation` can be 'auto' (default), 'horizontal', or 'vertical'.
+// In auto mode, the renderer follows the slide's aspect ratio so a deck
+// re-aspect'd to portrait flips its h-timelines / processes / pros-cons
+// to vertical without the user having to touch each list. Explicit values
+// override aspect detection for users who want a specific layout.
+function resolveListOrientation(el){
+  var o = (el && el.orientation) || 'auto';
+  if(o === 'horizontal' || o === 'vertical') return o;
+  return (typeof getStageAspect === 'function' && getStageAspect() === 'portrait') ? 'vertical' : 'horizontal';
+}
+
+function renderList(el, isPres, forCanvas){
+  if(el.style === 'stacked-card') return renderStackedCardList(el, isPres, forCanvas);
+  if(el.style === 'table') return renderTableList(el, isPres, forCanvas);
+  if(el.style === 'checklist') return renderChecklistList(el, isPres, forCanvas);
+  if(el.style === 'timeline') return renderTimelineList(el, isPres, forCanvas);
+  // Phase 5a: new list styles
+  if(el.style === 'horizontal-timeline') return renderHorizontalTimelineList(el, isPres, forCanvas);
+  if(el.style === 'numbered-process') return renderNumberedProcessList(el, isPres, forCanvas);
+  if(el.style === 'stats-grid') return renderStatsGridList(el, isPres, forCanvas);
+  // Phase 5b: more list styles
+  if(el.style === 'pyramid') return renderPyramidList(el, isPres, forCanvas);
+  if(el.style === 'pros-cons') return renderProsConsList(el, isPres, forCanvas);
+  if(el.style === 'icon-list') return renderIconList(el, isPres, forCanvas);
   return '';
 }
 
@@ -15229,7 +16054,7 @@ function listItemRevealSteps(el){
   return items.map(function(){ return 0; }); // 'all' or unknown
 }
 
-function renderStackedCardList(el, isPres){
+function renderStackedCardList(el, isPres, forCanvas){
   var pad = el.pad || 20;
   var accentPos = el.accentPos || 'left';
   var items = el.items || [];
@@ -15259,15 +16084,32 @@ function renderStackedCardList(el, isPres){
     // visible (e.g. 'all' mode) and don't need an entry animation.
     var liKey = el.id + ':list-item:' + i + ':' + S.revealStep;
     var liShouldAnim = isPres && S.pres && revealStep > 0 && revealStep === S.revealStep && !_chartBarAnimated[liKey];
-    var revealAnim = liShouldAnim ? ' ep-revealing' : '';
-    if(liShouldAnim) _chartBarAnimated[liKey] = true;
+    var revealAnim = '';
+    var revealStyle = '';
+    if(forCanvas){
+      // v1.0.19: recording path — CSS keyframes don't run inside the
+      // rasterized SVG, so emit inline transform/opacity based on real-
+      // time progress. Each frame's rasterization snapshots the current
+      // animation state; sequence forms the animation in MP4.
+      if(isPres && S.pres && revealStep > 0 && revealStep === S.revealStep){
+        var _slide = S.slides[S.presSlide];
+        var _prog = getItemRevealProgress(_slide, revealStep);
+        if(_prog < 1){
+          var _animType = el.revealAnim || (_slide && _slide.revealAnim) || S.globalRevealAnim || 'fade';
+          revealStyle = _buildItemRevealInlineStyle(_animType, _prog);
+        }
+      }
+    } else if(liShouldAnim){
+      revealAnim = ' ep-revealing';
+      _chartBarAnimated[liKey] = true;
+    }
     var cardBg = el.cardBg || 'rgba(30,30,36,0.7)';
     var bodyColor = el.bodyColor || '#f0f0f5';
     var numberColor = el.numberColor || '#000';
     // Note: el.titleColor is the LIST-LEVEL field for per-item titles (decoupled
     // from accent in 1b). Distinct from el.title which is the new section header.
     var titleColor = el.titleColor || color; // '' falls back to per-item accent color
-    h += '<div class="ep-list-item'+revealAnim+'" style="background:'+cardBg+';border-radius:10px;padding:14px 16px;display:flex;align-items:flex-start;gap:14px;'+borderStyle+';position:relative">';
+    h += '<div class="ep-list-item'+revealAnim+'" style="background:'+cardBg+';border-radius:10px;padding:14px 16px;display:flex;align-items:flex-start;gap:14px;'+borderStyle+';position:relative;'+revealStyle+'">';
     // Editor-only: show reveal badge if this item has an effective reveal step > 0
     if(!isPres && revealStep > 0){
       h += '<div class="ep-item-reveal-badge" title="Reveal step '+revealStep+'">'+revealStep+'</div>';
@@ -15290,7 +16132,7 @@ function renderStackedCardList(el, isPres){
   return h;
 }
 
-function renderTableList(el, isPres){
+function renderTableList(el, isPres, forCanvas){
   var items = el.items || [];
   var headers = el.headers || [];
   var hpad = listHeadingPadding(el);
@@ -15322,9 +16164,23 @@ function renderTableList(el, isPres){
     // Cached so re-renders (e.g. laser toggle) don't replay the row reveal.
     var liKey = el.id + ':list-item:' + ri + ':' + S.revealStep;
     var liShouldAnim = isPres && S.pres && revealStep > 0 && revealStep === S.revealStep && !_chartBarAnimated[liKey];
-    var revealAnim = liShouldAnim ? ' ep-revealing' : '';
-    if(liShouldAnim) _chartBarAnimated[liKey] = true;
-    h += '<tr class="ep-list-item'+revealAnim+'" style="position:relative">';
+    var revealAnim = '';
+    var revealStyle = '';
+    if(forCanvas){
+      // v1.0.19: recording path — inline transform/opacity per real-time progress.
+      if(isPres && S.pres && revealStep > 0 && revealStep === S.revealStep){
+        var _slide = S.slides[S.presSlide];
+        var _prog = getItemRevealProgress(_slide, revealStep);
+        if(_prog < 1){
+          var _animType = el.revealAnim || (_slide && _slide.revealAnim) || S.globalRevealAnim || 'fade';
+          revealStyle = _buildItemRevealInlineStyle(_animType, _prog);
+        }
+      }
+    } else if(liShouldAnim){
+      revealAnim = ' ep-revealing';
+      _chartBarAnimated[liKey] = true;
+    }
+    h += '<tr class="ep-list-item'+revealAnim+'" style="position:relative;'+revealStyle+'">';
     for(var cj=0; cj<it.cells.length; cj++){
       // Editor-only: show reveal step badge in first cell of any row that has an effective reveal step
       var isFirstCell = cj === 0;
@@ -15344,7 +16200,7 @@ function renderTableList(el, isPres){
   return h;
 }
 
-function renderChecklistList(el, isPres){
+function renderChecklistList(el, isPres, forCanvas){
   var pad = el.pad || 20;
   var items = el.items || [];
   var hpad = listHeadingPadding(el);
@@ -15368,11 +16224,25 @@ function renderChecklistList(el, isPres){
     // Cached so re-renders (e.g. laser toggle) don't replay the item reveal.
     var liKey = el.id + ':list-item:' + i + ':' + S.revealStep;
     var liShouldAnim = isPres && S.pres && revealStep > 0 && revealStep === S.revealStep && !_chartBarAnimated[liKey];
-    var revealAnim = liShouldAnim ? ' ep-revealing' : '';
-    if(liShouldAnim) _chartBarAnimated[liKey] = true;
+    var revealAnim = '';
+    var revealStyle = '';
+    if(forCanvas){
+      // v1.0.19: recording path — inline animation styles per real-time progress.
+      if(isPres && S.pres && revealStep > 0 && revealStep === S.revealStep){
+        var _slide = S.slides[S.presSlide];
+        var _prog = getItemRevealProgress(_slide, revealStep);
+        if(_prog < 1){
+          var _animType = el.revealAnim || (_slide && _slide.revealAnim) || S.globalRevealAnim || 'fade';
+          revealStyle = _buildItemRevealInlineStyle(_animType, _prog);
+        }
+      }
+    } else if(liShouldAnim){
+      revealAnim = ' ep-revealing';
+      _chartBarAnimated[liKey] = true;
+    }
     var itemBg = el.itemBg || 'rgba(0,0,0,0.2)';
     var checkmarkColor = el.checkmarkColor || '#000';
-    h += '<div class="ep-list-item'+revealAnim+'" style="display:flex;align-items:flex-start;gap:12px;padding:10px;background:'+itemBg+';border-radius:8px;position:relative">';
+    h += '<div class="ep-list-item'+revealAnim+'" style="display:flex;align-items:flex-start;gap:12px;padding:10px;background:'+itemBg+';border-radius:8px;position:relative;'+revealStyle+'">';
     if(!isPres && revealStep > 0){
       h += '<div class="ep-item-reveal-badge" title="Reveal step '+revealStep+'">'+revealStep+'</div>';
     }
@@ -15393,7 +16263,7 @@ function renderChecklistList(el, isPres){
   return h;
 }
 
-function renderTimelineList(el, isPres){
+function renderTimelineList(el, isPres, forCanvas){
   var pad = el.pad || 20;
   var items = el.items || [];
   var dotSize = el.dotSize || 16;
@@ -15423,9 +16293,23 @@ function renderTimelineList(el, isPres){
     // Cached so re-renders (e.g. laser toggle) don't replay the item reveal.
     var liKey = el.id + ':list-item:' + i + ':' + S.revealStep;
     var liShouldAnim = isPres && S.pres && revealStep > 0 && revealStep === S.revealStep && !_chartBarAnimated[liKey];
-    var revealAnim = liShouldAnim ? ' ep-revealing' : '';
-    if(liShouldAnim) _chartBarAnimated[liKey] = true;
-    h += '<div class="ep-list-item'+revealAnim+'" style="display:flex;gap:16px;align-items:flex-start;position:relative">';
+    var revealAnim = '';
+    var revealStyle = '';
+    if(forCanvas){
+      // v1.0.19: recording path — inline animation styles per real-time progress.
+      if(isPres && S.pres && revealStep > 0 && revealStep === S.revealStep){
+        var _slide = S.slides[S.presSlide];
+        var _prog = getItemRevealProgress(_slide, revealStep);
+        if(_prog < 1){
+          var _animType = el.revealAnim || (_slide && _slide.revealAnim) || S.globalRevealAnim || 'fade';
+          revealStyle = _buildItemRevealInlineStyle(_animType, _prog);
+        }
+      }
+    } else if(liShouldAnim){
+      revealAnim = ' ep-revealing';
+      _chartBarAnimated[liKey] = true;
+    }
+    h += '<div class="ep-list-item'+revealAnim+'" style="display:flex;gap:16px;align-items:flex-start;position:relative;'+revealStyle+'">';
     if(!isPres && revealStep > 0){
       h += '<div class="ep-item-reveal-badge" title="Reveal step '+revealStep+'">'+revealStep+'</div>';
     }
@@ -15442,6 +16326,605 @@ function renderTimelineList(el, isPres){
     h += '</div>';
   }
   h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+// =========================================================
+// Phase 5a: Horizontal Timeline
+// =========================================================
+// Milestones flowing left → right along a horizontal axis. Each item shows
+// a dot on the line plus a title above and body below — so the deck reads
+// left-to-right naturally. Per-item reveal is supported (sequential mode
+// makes a perfect roadmap reveal). Colors editable via the same fields as
+// the vertical timeline so swapping styles preserves customization.
+function renderHorizontalTimelineList(el, isPres, forCanvas){
+  var pad = el.pad || 20;
+  var items = el.items || [];
+  var dotSize = el.dotSize || 18;
+  var hpad = listHeadingPadding(el);
+  var paddingStyle = (pad + hpad.top)+'px '+pad+'px '+(pad + hpad.bot)+'px '+pad+'px';
+  var revealSteps = listItemRevealSteps(el);
+  var bodyColor = el.bodyColor || '#a0a0b0';
+  var lineColor = el.lineColor || '#3a3a44';
+  var itemBgFallback = el.itemBg || 'rgba(30,30,36,0.5)';
+  // Phase 5d: orientation drives which layout to render. 'auto' uses slide aspect.
+  var orient = resolveListOrientation(el);
+
+  // Helper used by both layouts: compute reveal anim class + inline style.
+  function _itemRevealCss(revealStep, isHidden){
+    var anim = '', style = '';
+    var liKey = el.id + ':list-item:reveal:' + S.revealStep;
+    if(isHidden){
+      style = 'visibility:hidden;';
+    } else if(forCanvas){
+      if(isPres && S.pres && revealStep > 0 && revealStep === S.revealStep){
+        var _slide = S.slides[S.presSlide];
+        var _prog = getItemRevealProgress(_slide, revealStep);
+        if(_prog < 1){
+          var _animType = el.revealAnim || (_slide && _slide.revealAnim) || S.globalRevealAnim || 'fade';
+          style = _buildItemRevealInlineStyle(_animType, _prog);
+        }
+      }
+    } else if(isPres && S.pres && revealStep > 0 && revealStep === S.revealStep){
+      var liCacheKey = el.id + ':list-item:' + revealStep + ':' + S.revealStep;
+      if(!_chartBarAnimated[liCacheKey]){
+        anim = ' ep-revealing';
+        _chartBarAnimated[liCacheKey] = true;
+      }
+    }
+    return { anim: anim, style: style };
+  }
+
+  var h = '<div style="position:relative;width:'+el.w+'px;min-height:'+el.h+'px;background:'+el.bg+';border-radius:'+el.br+'px;padding:'+paddingStyle+';overflow:visible;box-sizing:border-box">';
+  h += renderListHeading(el);
+
+  if(orient === 'horizontal'){
+    // ── Horizontal layout (landscape) ────────────────────────────
+    var innerPadTop = pad + hpad.top;
+    var innerPadBot = pad + hpad.bot;
+    h += '<div style="position:relative;height:'+(el.h - innerPadTop - innerPadBot)+'px">';
+    h += '<div style="position:absolute;left:'+pad+'px;right:'+pad+'px;top:50%;transform:translateY(-50%);height:2px;background:'+lineColor+'"></div>';
+    h += '<div style="position:absolute;inset:0;display:flex;align-items:stretch;justify-content:space-around;gap:8px">';
+    for(var i=0; i<items.length; i++){
+      var it = items[i];
+      var color = it.color || '#7ed957';
+      var revealStep = revealSteps[i] || 0;
+      var hidden = isPres && S.pres && revealStep > 0 && revealStep > S.revealStep;
+      var titleColor = el.titleColor || color;
+      var fx = _itemRevealCss(revealStep, hidden);
+
+      h += '<div class="ep-list-item'+fx.anim+'" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:space-between;position:relative;'+fx.style+'">';
+      if(!isPres && revealStep > 0){
+        h += '<div class="ep-item-reveal-badge" title="Reveal step '+revealStep+'">'+revealStep+'</div>';
+      }
+      if(isPres){
+        h += '<div style="color:'+titleColor+';font-weight:700;font-size:'+el.titleFs+'px;line-height:1.2;text-align:center;white-space:pre-wrap;word-wrap:break-word">'+esc(it.title)+'</div>';
+      } else {
+        h += '<textarea rows="1" oninput="autoGrow(this);updateListItem(\''+el.id+'\',\''+it.id+'\',{title:this.value})" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" placeholder="Title" style="background:transparent;border:none;outline:none;color:'+titleColor+';font-weight:700;font-size:'+el.titleFs+'px;line-height:1.2;font-family:Outfit;padding:0;text-align:center;resize:none;overflow:hidden;width:100%">'+esc(it.title)+'</textarea>';
+      }
+      h += '<div style="width:'+dotSize+'px;height:'+dotSize+'px;border-radius:50%;background:'+color+';flex-shrink:0;box-shadow:0 0 0 4px '+el.bg+';margin:8px 0"></div>';
+      if(isPres){
+        h += '<div style="color:'+bodyColor+';font-size:'+el.fs+'px;line-height:1.4;text-align:center;white-space:pre-wrap;word-wrap:break-word;background:'+itemBgFallback+';padding:8px 10px;border-radius:6px;border-top:2px solid '+color+'">'+esc(it.body)+'</div>';
+      } else {
+        h += '<textarea rows="1" oninput="autoGrow(this);updateListItem(\''+el.id+'\',\''+it.id+'\',{body:this.value})" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" placeholder="Description" style="background:'+itemBgFallback+';border:none;border-top:2px solid '+color+';outline:none;color:'+bodyColor+';font-size:'+el.fs+'px;line-height:1.4;font-family:Outfit;padding:8px 10px;border-radius:6px;text-align:center;resize:none;overflow:hidden;width:100%;box-sizing:border-box">'+esc(it.body)+'</textarea>';
+      }
+      h += '</div>';
+    }
+    h += '</div>';   // close flex row
+    h += '</div>';   // close inner region
+  } else {
+    // ── Vertical layout (portrait) ───────────────────────────────
+    // Mirrors the existing vertical timeline pattern: line on the left,
+    // dots stacked, title + body to the right of each dot.
+    var lineX = pad + dotSize/2;
+    h += '<div style="position:absolute;left:'+lineX+'px;top:'+(pad+hpad.top+dotSize/2)+'px;bottom:'+(pad+hpad.bot+dotSize/2)+'px;width:2px;background:'+lineColor+'"></div>';
+    h += '<div style="display:flex;flex-direction:column;gap:14px;position:relative">';
+    for(var vi=0; vi<items.length; vi++){
+      var vit = items[vi];
+      var vcolor = vit.color || '#7ed957';
+      var vRevealStep = revealSteps[vi] || 0;
+      var vHidden = isPres && S.pres && vRevealStep > 0 && vRevealStep > S.revealStep;
+      var vTitleColor = el.titleColor || vcolor;
+      var vfx = _itemRevealCss(vRevealStep, vHidden);
+
+      h += '<div class="ep-list-item'+vfx.anim+'" style="display:flex;gap:16px;align-items:flex-start;position:relative;'+vfx.style+'">';
+      if(!isPres && vRevealStep > 0){
+        h += '<div class="ep-item-reveal-badge" title="Reveal step '+vRevealStep+'">'+vRevealStep+'</div>';
+      }
+      h += '<div style="width:'+dotSize+'px;height:'+dotSize+'px;border-radius:50%;background:'+vcolor+';flex-shrink:0;margin-top:4px;box-shadow:0 0 0 3px '+el.bg+';position:relative;z-index:1"></div>';
+      h += '<div style="flex:1;min-width:0;background:'+itemBgFallback+';border-radius:8px;padding:10px 14px;border-left:3px solid '+vcolor+'">';
+      if(isPres){
+        h += '<div style="color:'+vTitleColor+';font-weight:700;font-size:'+el.titleFs+'px;line-height:1.2;margin-bottom:4px;white-space:pre-wrap;word-wrap:break-word">'+esc(vit.title)+'</div>';
+        h += '<div style="color:'+bodyColor+';font-size:'+el.fs+'px;line-height:1.4;opacity:0.9;white-space:pre-wrap;word-wrap:break-word">'+esc(vit.body)+'</div>';
+      } else {
+        h += '<textarea rows="1" oninput="autoGrow(this);updateListItem(\''+el.id+'\',\''+vit.id+'\',{title:this.value})" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" placeholder="Title" style="width:100%;background:transparent;border:none;outline:none;color:'+vTitleColor+';font-weight:700;font-size:'+el.titleFs+'px;line-height:1.2;font-family:Outfit;padding:0;margin-bottom:4px;resize:none;overflow:hidden;display:block">'+esc(vit.title)+'</textarea>';
+        h += '<textarea rows="1" oninput="autoGrow(this);updateListItem(\''+el.id+'\',\''+vit.id+'\',{body:this.value})" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" placeholder="Description" style="width:100%;background:transparent;border:none;outline:none;color:'+bodyColor+';font-size:'+el.fs+'px;line-height:1.4;opacity:0.9;font-family:Outfit;padding:0;resize:none;overflow:hidden;display:block">'+esc(vit.body)+'</textarea>';
+      }
+      h += '</div>';
+      h += '</div>';
+    }
+    h += '</div>';
+  }
+  h += '</div>';   // close outer
+  return h;
+}
+
+// =========================================================
+// Phase 5a: Numbered Process
+// =========================================================
+// Big numbered circles in a horizontal row with arrows between them. Each
+// step has a title and short description underneath. Designed for
+// step-by-step processes where order matters and the visual flow should be
+// obvious. Sequential reveal mode pairs naturally — each click brings in
+// the next step + its arrow.
+function renderNumberedProcessList(el, isPres, forCanvas){
+  var pad = el.pad || 20;
+  var items = el.items || [];
+  var hpad = listHeadingPadding(el);
+  var paddingStyle = (pad + hpad.top)+'px '+pad+'px '+(pad + hpad.bot)+'px '+pad+'px';
+  var revealSteps = listItemRevealSteps(el);
+  var bodyColor = el.bodyColor || '#a0a0b0';
+  var arrowColor = el.arrowColor || 'rgba(255,255,255,0.35)';
+  var numberColor = el.numberColor || '#000';
+  var circleSize = el.circleSize || 78;
+  // Phase 5d: orientation drives the flow direction. 'auto' uses slide aspect.
+  var orient = resolveListOrientation(el);
+  var isVert = orient === 'vertical';
+
+  // Reveal CSS computed once per item
+  function _itemRevealCss(revealStep, isHidden){
+    var anim = '', style = '';
+    if(isHidden){
+      style = 'visibility:hidden;';
+    } else if(forCanvas){
+      if(isPres && S.pres && revealStep > 0 && revealStep === S.revealStep){
+        var _slide = S.slides[S.presSlide];
+        var _prog = getItemRevealProgress(_slide, revealStep);
+        if(_prog < 1){
+          var _animType = el.revealAnim || (_slide && _slide.revealAnim) || S.globalRevealAnim || 'fade';
+          style = _buildItemRevealInlineStyle(_animType, _prog);
+        }
+      }
+    } else if(isPres && S.pres && revealStep > 0 && revealStep === S.revealStep){
+      var liCacheKey = el.id + ':list-item:' + revealStep + ':' + S.revealStep;
+      if(!_chartBarAnimated[liCacheKey]){
+        anim = ' ep-revealing';
+        _chartBarAnimated[liCacheKey] = true;
+      }
+    }
+    return { anim: anim, style: style };
+  }
+
+  // Arrow svg in the chosen direction (right for horizontal, down for vertical)
+  function _arrowSvg(){
+    if(isVert){
+      return '<svg width="20" height="32" viewBox="0 0 20 32" style="overflow:visible">'
+           + '<line x1="10" y1="2" x2="10" y2="26" stroke="'+arrowColor+'" stroke-width="2" stroke-linecap="round"/>'
+           + '<polyline points="6,22 10,28 14,22" fill="none" stroke="'+arrowColor+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+           + '</svg>';
+    }
+    return '<svg width="32" height="16" viewBox="0 0 32 16" style="overflow:visible">'
+         + '<line x1="2" y1="8" x2="26" y2="8" stroke="'+arrowColor+'" stroke-width="2" stroke-linecap="round"/>'
+         + '<polyline points="22,4 28,8 22,12" fill="none" stroke="'+arrowColor+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+         + '</svg>';
+  }
+
+  var h = '<div style="position:relative;width:'+el.w+'px;min-height:'+el.h+'px;background:'+el.bg+';border-radius:'+el.br+'px;padding:'+paddingStyle+';overflow:visible;box-sizing:border-box">';
+  h += renderListHeading(el);
+
+  // Container layout differs by orientation. Vertical = column with rows, each
+  // row = circle + text on the right; arrows between rows point down.
+  // Horizontal = row of columns each centered; arrows between columns point right.
+  var containerStyle = isVert
+    ? 'display:flex;flex-direction:column;align-items:stretch;gap:0px'
+    : 'display:flex;align-items:flex-start;justify-content:space-around;gap:0px';
+  h += '<div style="'+containerStyle+'">';
+
+  for(var i=0; i<items.length; i++){
+    var it = items[i];
+    var color = it.color || '#7ed957';
+    var revealStep = revealSteps[i] || 0;
+    var hidden = isPres && S.pres && revealStep > 0 && revealStep > S.revealStep;
+    var titleColor = el.titleColor || color;
+    var fx = _itemRevealCss(revealStep, hidden);
+
+    if(isVert){
+      // Row: circle on the left, title + body on the right
+      h += '<div class="ep-list-item'+fx.anim+'" style="display:flex;align-items:flex-start;gap:14px;position:relative;'+fx.style+'">';
+      if(!isPres && revealStep > 0){
+        h += '<div class="ep-item-reveal-badge" title="Reveal step '+revealStep+'">'+revealStep+'</div>';
+      }
+      h += '<div style="width:'+circleSize+'px;height:'+circleSize+'px;border-radius:50%;background:'+color+';color:'+numberColor+';display:flex;align-items:center;justify-content:center;font-size:'+Math.round(circleSize*0.46)+'px;font-weight:800;flex-shrink:0">'+(i+1)+'</div>';
+      h += '<div style="flex:1;min-width:0;padding-top:'+Math.round(circleSize*0.12)+'px">';
+      if(isPres){
+        h += '<div style="color:'+titleColor+';font-weight:700;font-size:'+el.titleFs+'px;line-height:1.2;margin-bottom:4px;white-space:pre-wrap;word-wrap:break-word">'+esc(it.title)+'</div>';
+        h += '<div style="color:'+bodyColor+';font-size:'+el.fs+'px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word">'+esc(it.body)+'</div>';
+      } else {
+        h += '<textarea rows="1" oninput="autoGrow(this);updateListItem(\''+el.id+'\',\''+it.id+'\',{title:this.value})" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" placeholder="Title" style="background:transparent;border:none;outline:none;color:'+titleColor+';font-weight:700;font-size:'+el.titleFs+'px;line-height:1.2;font-family:Outfit;padding:0;margin-bottom:4px;resize:none;overflow:hidden;width:100%;display:block">'+esc(it.title)+'</textarea>';
+        h += '<textarea rows="1" oninput="autoGrow(this);updateListItem(\''+el.id+'\',\''+it.id+'\',{body:this.value})" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" placeholder="Description" style="background:transparent;border:none;outline:none;color:'+bodyColor+';font-size:'+el.fs+'px;line-height:1.4;font-family:Outfit;padding:0;resize:none;overflow:hidden;width:100%;display:block">'+esc(it.body)+'</textarea>';
+      }
+      h += '</div>';
+      h += '</div>';
+      // Down-arrow row between items (aligned with circle column)
+      if(i < items.length - 1){
+        h += '<div style="display:flex;align-items:center;justify-content:flex-start;padding-left:'+(circleSize/2 - 10)+'px;height:34px">'+_arrowSvg()+'</div>';
+      }
+    } else {
+      // Column: circle, then title, then body — original horizontal layout
+      h += '<div class="ep-list-item'+fx.anim+'" style="flex:1;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;'+fx.style+'">';
+      if(!isPres && revealStep > 0){
+        h += '<div class="ep-item-reveal-badge" title="Reveal step '+revealStep+'">'+revealStep+'</div>';
+      }
+      h += '<div style="width:'+circleSize+'px;height:'+circleSize+'px;border-radius:50%;background:'+color+';color:'+numberColor+';display:flex;align-items:center;justify-content:center;font-size:'+Math.round(circleSize*0.46)+'px;font-weight:800;flex-shrink:0;margin-bottom:14px">'+(i+1)+'</div>';
+      if(isPres){
+        h += '<div style="color:'+titleColor+';font-weight:700;font-size:'+el.titleFs+'px;line-height:1.2;margin-bottom:4px;white-space:pre-wrap;word-wrap:break-word">'+esc(it.title)+'</div>';
+      } else {
+        h += '<textarea rows="1" oninput="autoGrow(this);updateListItem(\''+el.id+'\',\''+it.id+'\',{title:this.value})" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" placeholder="Title" style="background:transparent;border:none;outline:none;color:'+titleColor+';font-weight:700;font-size:'+el.titleFs+'px;line-height:1.2;font-family:Outfit;padding:0;margin-bottom:4px;text-align:center;resize:none;overflow:hidden;width:100%">'+esc(it.title)+'</textarea>';
+      }
+      if(isPres){
+        h += '<div style="color:'+bodyColor+';font-size:'+el.fs+'px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word;padding:0 10px">'+esc(it.body)+'</div>';
+      } else {
+        h += '<textarea rows="1" oninput="autoGrow(this);updateListItem(\''+el.id+'\',\''+it.id+'\',{body:this.value})" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" placeholder="Description" style="background:transparent;border:none;outline:none;color:'+bodyColor+';font-size:'+el.fs+'px;line-height:1.4;font-family:Outfit;padding:0 10px;text-align:center;resize:none;overflow:hidden;width:100%">'+esc(it.body)+'</textarea>';
+      }
+      h += '</div>';
+      // Right-arrow column between items
+      if(i < items.length - 1){
+        h += '<div style="display:flex;align-items:flex-start;padding-top:'+(circleSize/2 - 8)+'px;flex-shrink:0;width:32px;justify-content:center">'+_arrowSvg()+'</div>';
+      }
+    }
+  }
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+// =========================================================
+// Phase 5a: Stats Grid
+// =========================================================
+// Grid of metric cards. Each cell shows a big value (e.g. "$2.4M") and a
+// small label ("Annual revenue"). Number of columns is configurable
+// (1 / 2 / 3) so the same data can flow as a row, a 2x2 grid, or a 3-up.
+// Each item carries its own accent color used for the value text.
+function renderStatsGridList(el, isPres, forCanvas){
+  var pad = el.pad || 20;
+  var items = el.items || [];
+  // Phase 5d: portraitCols overrides cols when the slide is in portrait
+  // aspect. Defaults to 1 so cards stack as a single column on phones —
+  // user can override per element via the props panel.
+  var aspectIsPortrait = (typeof getStageAspect === 'function' && getStageAspect() === 'portrait');
+  var rawCols = aspectIsPortrait ? (el.portraitCols || 1) : (el.cols || 2);
+  var cols = Math.max(1, Math.min(4, rawCols));
+  var hpad = listHeadingPadding(el);
+  var paddingStyle = (pad + hpad.top)+'px '+pad+'px '+(pad + hpad.bot)+'px '+pad+'px';
+  var revealSteps = listItemRevealSteps(el);
+  var cardBg = el.cardBg || 'rgba(30,30,36,0.7)';
+  var labelColor = el.labelColor || '#a0a0b0';
+
+  var h = '<div style="position:relative;width:'+el.w+'px;min-height:'+el.h+'px;background:'+el.bg+';border-radius:'+el.br+'px;padding:'+paddingStyle+';overflow:visible;box-sizing:border-box">';
+  h += renderListHeading(el);
+  h += '<div style="display:grid;grid-template-columns:repeat('+cols+',1fr);gap:14px">';
+  for(var i=0; i<items.length; i++){
+    var it = items[i];
+    var color = it.color || '#7ed957';
+    var revealStep = revealSteps[i] || 0;
+    var hidden = isPres && S.pres && revealStep > 0 && revealStep > S.revealStep;
+    var valueColor = el.valueColor || color;
+
+    var liKey = el.id + ':list-item:' + i + ':' + S.revealStep;
+    var liShouldAnim = isPres && S.pres && revealStep > 0 && revealStep === S.revealStep && !_chartBarAnimated[liKey];
+    var revealAnim = '';
+    var revealStyle = '';
+    // Hidden cards hold their grid slot via visibility:hidden — without this,
+    // missing cards collapse the grid and revealed cards visibly snap into
+    // a different position when each new one appears.
+    if(hidden){
+      revealStyle = 'visibility:hidden;';
+    } else if(forCanvas){
+      if(isPres && S.pres && revealStep > 0 && revealStep === S.revealStep){
+        var _slide = S.slides[S.presSlide];
+        var _prog = getItemRevealProgress(_slide, revealStep);
+        if(_prog < 1){
+          var _animType = el.revealAnim || (_slide && _slide.revealAnim) || S.globalRevealAnim || 'fade';
+          revealStyle = _buildItemRevealInlineStyle(_animType, _prog);
+        }
+      }
+    } else if(liShouldAnim){
+      revealAnim = ' ep-revealing';
+      _chartBarAnimated[liKey] = true;
+    }
+
+    h += '<div class="ep-list-item'+revealAnim+'" style="background:'+cardBg+';border-radius:12px;padding:24px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;position:relative;border-top:3px solid '+color+';'+revealStyle+'">';
+    if(!isPres && revealStep > 0){
+      h += '<div class="ep-item-reveal-badge" title="Reveal step '+revealStep+'">'+revealStep+'</div>';
+    }
+    // Big value
+    if(isPres){
+      h += '<div style="color:'+valueColor+';font-weight:800;font-size:'+(el.titleFs*2)+'px;line-height:1.05;letter-spacing:-1px;white-space:pre-wrap;word-wrap:break-word">'+esc(it.value || '')+'</div>';
+    } else {
+      h += '<textarea rows="1" oninput="autoGrow(this);updateListItem(\''+el.id+'\',\''+it.id+'\',{value:this.value})" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" placeholder="123" style="background:transparent;border:none;outline:none;color:'+valueColor+';font-weight:800;font-size:'+(el.titleFs*2)+'px;line-height:1.05;letter-spacing:-1px;font-family:Outfit;padding:0;text-align:center;resize:none;overflow:hidden;width:100%">'+esc(it.value || '')+'</textarea>';
+    }
+    // Small label
+    if(isPres){
+      h += '<div style="color:'+labelColor+';font-size:'+el.fs+'px;font-weight:600;line-height:1.3;text-transform:uppercase;letter-spacing:1px;margin-top:8px;white-space:pre-wrap;word-wrap:break-word">'+esc(it.label || '')+'</div>';
+    } else {
+      h += '<textarea rows="1" oninput="autoGrow(this);updateListItem(\''+el.id+'\',\''+it.id+'\',{label:this.value})" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" placeholder="Label" style="background:transparent;border:none;outline:none;color:'+labelColor+';font-size:'+el.fs+'px;font-weight:600;line-height:1.3;text-transform:uppercase;letter-spacing:1px;margin-top:8px;font-family:Outfit;padding:0;text-align:center;resize:none;overflow:hidden;width:100%">'+esc(it.label || '')+'</textarea>';
+    }
+    h += '</div>';
+  }
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+// =========================================================
+// Phase 5b: Pyramid
+// =========================================================
+// Hierarchical N-tier pyramid. Each tier is a CSS clip-path trapezoid that
+// meets the ones above and below seamlessly (or with a small gap). Top tier
+// is narrowest (summary), bottom is widest (foundation). Per-tier color +
+// title + optional body. Best for hierarchical models (Maslow's, value
+// stacks, organizational layers, etc.). Items are top→bottom (item 0 = top).
+function renderPyramidList(el, isPres, forCanvas){
+  var pad = el.pad || 20;
+  var items = el.items || [];
+  var n = items.length || 1;
+  var hpad = listHeadingPadding(el);
+  var paddingStyle = (pad + hpad.top)+'px '+pad+'px '+(pad + hpad.bot)+'px '+pad+'px';
+  var revealSteps = listItemRevealSteps(el);
+  var bodyColor = el.bodyColor || '#ffffff';
+  var tierGap = (typeof el.tierGap === 'number') ? el.tierGap : 2;
+
+  var h = '<div style="position:relative;width:'+el.w+'px;min-height:'+el.h+'px;background:'+el.bg+';border-radius:'+el.br+'px;padding:'+paddingStyle+';overflow:visible;box-sizing:border-box">';
+  h += renderListHeading(el);
+  // Inner stack of tiers
+  h += '<div style="position:relative;width:100%;display:flex;flex-direction:column;gap:'+tierGap+'px">';
+  // Linear width progression: tier i runs from top_w(i)% to top_w(i+1)% of the
+  // container width, where top_w(k) = startW + (endW - startW) * (k / n).
+  // startW=0 → triangular apex, endW=100 → full-width base.
+  var startW = 0;
+  var endW = 100;
+  for(var i=0; i<n; i++){
+    var it = items[i];
+    var color = it.color || '#7ed957';
+    var revealStep = revealSteps[i] || 0;
+    var hidden = isPres && S.pres && revealStep > 0 && revealStep > S.revealStep;
+    var titleColor = el.titleColor || '#ffffff';
+
+    var liKey = el.id + ':list-item:' + i + ':' + S.revealStep;
+    var liShouldAnim = isPres && S.pres && revealStep > 0 && revealStep === S.revealStep && !_chartBarAnimated[liKey];
+    var revealAnim = '';
+    var revealStyle = '';
+    if(hidden){
+      revealStyle = 'visibility:hidden;';
+    } else if(forCanvas){
+      if(isPres && S.pres && revealStep > 0 && revealStep === S.revealStep){
+        var _slide = S.slides[S.presSlide];
+        var _prog = getItemRevealProgress(_slide, revealStep);
+        if(_prog < 1){
+          var _animType = el.revealAnim || (_slide && _slide.revealAnim) || S.globalRevealAnim || 'fade';
+          revealStyle = _buildItemRevealInlineStyle(_animType, _prog);
+        }
+      }
+    } else if(liShouldAnim){
+      revealAnim = ' ep-revealing';
+      _chartBarAnimated[liKey] = true;
+    }
+
+    // Trapezoid clip-path coordinates
+    var topW = startW + (endW - startW) * (i / n);
+    var botW = startW + (endW - startW) * ((i + 1) / n);
+    var topL = (100 - topW) / 2;
+    var topR = topL + topW;
+    var botL = (100 - botW) / 2;
+    var botR = botL + botW;
+    var clipPath = 'polygon('+topL.toFixed(2)+'% 0%, '+topR.toFixed(2)+'% 0%, '+botR.toFixed(2)+'% 100%, '+botL.toFixed(2)+'% 100%)';
+    // Tier height — distribute remaining vertical space evenly
+    var tierHeight = (el.h - 2*pad - hpad.top - hpad.bot - tierGap*(n-1)) / n;
+
+    h += '<div class="ep-list-item'+revealAnim+'" style="position:relative;width:100%;height:'+tierHeight.toFixed(2)+'px;'+revealStyle+'">';
+    if(!isPres && revealStep > 0){
+      h += '<div class="ep-item-reveal-badge" title="Reveal step '+revealStep+'">'+revealStep+'</div>';
+    }
+    // Trapezoid background — clipped colored shape
+    h += '<div style="position:absolute;inset:0;clip-path:'+clipPath+';-webkit-clip-path:'+clipPath+';background:'+color+'"></div>';
+    // Text overlay — centered both ways. Width matches the trapezoid's
+    // mid-line so text doesn't overflow visible area.
+    var midW = (topW + botW) / 2;
+    h += '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 8px">';
+    h += '<div style="width:'+Math.min(96, Math.max(35, midW)).toFixed(0)+'%;display:flex;flex-direction:column;align-items:center;justify-content:center">';
+    if(isPres){
+      h += '<div style="color:'+titleColor+';font-weight:700;font-size:'+el.titleFs+'px;line-height:1.2;white-space:pre-wrap;word-wrap:break-word">'+esc(it.title)+'</div>';
+      if(it.body){
+        h += '<div style="color:'+bodyColor+';font-size:'+el.fs+'px;line-height:1.3;opacity:0.9;margin-top:2px;white-space:pre-wrap;word-wrap:break-word">'+esc(it.body)+'</div>';
+      }
+    } else {
+      h += '<textarea rows="1" oninput="autoGrow(this);updateListItem(\''+el.id+'\',\''+it.id+'\',{title:this.value})" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" placeholder="Title" style="background:transparent;border:none;outline:none;color:'+titleColor+';font-weight:700;font-size:'+el.titleFs+'px;line-height:1.2;font-family:Outfit;padding:0;text-align:center;resize:none;overflow:hidden;width:100%">'+esc(it.title)+'</textarea>';
+      h += '<textarea rows="1" oninput="autoGrow(this);updateListItem(\''+el.id+'\',\''+it.id+'\',{body:this.value})" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" placeholder="Description" style="background:transparent;border:none;outline:none;color:'+bodyColor+';font-size:'+el.fs+'px;line-height:1.3;opacity:0.9;font-family:Outfit;padding:0;margin-top:2px;text-align:center;resize:none;overflow:hidden;width:100%">'+esc(it.body || '')+'</textarea>';
+    }
+    h += '</div></div>';   // close text overlay + width container
+    h += '</div>';         // close tier
+  }
+  h += '</div>';   // close stack
+  h += '</div>';   // close outer
+  return h;
+}
+
+// =========================================================
+// Phase 5b: Pros & Cons
+// =========================================================
+// Two-column comparison: pros on the left (default green ✓), cons on the
+// right (default red ✗). Items carry a `side` field that decides which
+// column they render into. Headers per column are editable. Designed for
+// quick visual comparison — investment trade-offs, design decisions,
+// product roadmaps, etc.
+function renderProsConsList(el, isPres, forCanvas){
+  var pad = el.pad || 20;
+  var items = el.items || [];
+  var hpad = listHeadingPadding(el);
+  var paddingStyle = (pad + hpad.top)+'px '+pad+'px '+(pad + hpad.bot)+'px '+pad+'px';
+  var revealSteps = listItemRevealSteps(el);
+  var prosColor = el.prosColor || '#7ed957';
+  var consColor = el.consColor || '#f43f5e';
+  var prosBg = el.prosBg || 'rgba(126,217,87,0.08)';
+  var consBg = el.consBg || 'rgba(244,63,94,0.08)';
+  var textColor = el.textColor || '#f0f0f5';
+
+  // Phase 5d: vertical layout stacks pros above cons; horizontal puts them
+  // side-by-side. 'auto' → portrait stacks, landscape spreads.
+  var orient = resolveListOrientation(el);
+  var isVert = orient === 'vertical';
+
+  var h = '<div style="position:relative;width:'+el.w+'px;min-height:'+el.h+'px;background:'+el.bg+';border-radius:'+el.br+'px;padding:'+paddingStyle+';overflow:visible;box-sizing:border-box">';
+  h += renderListHeading(el);
+  // Grid template differs by orientation. Vertical: 1 column, 2 rows. Horizontal: 2 cols, 1 row.
+  var gridStyle = isVert
+    ? 'display:grid;grid-template-columns:1fr;grid-auto-rows:auto;gap:14px'
+    : 'display:grid;grid-template-columns:1fr 1fr;gap:14px;height:'+(el.h - 2*pad - hpad.top - hpad.bot)+'px';
+  h += '<div style="'+gridStyle+'">';
+
+  // Helper: render one column's header + items
+  function renderColumn(side, label, color, bgFill){
+    var col = '<div style="background:'+bgFill+';border-radius:10px;padding:14px;border:1.5px solid '+color+';display:flex;flex-direction:column;gap:8px;box-sizing:border-box">';
+    // Column header — text editable in editor
+    if(isPres){
+      col += '<div style="color:'+color+';font-weight:800;font-size:'+(el.titleFs || 22)+'px;text-transform:uppercase;letter-spacing:1px;text-align:center;margin-bottom:6px">'+esc(label)+'</div>';
+    } else {
+      var labelField = (side === 'pro') ? 'prosLabel' : 'consLabel';
+      col += '<input type="text" oninput="updateEl(\''+el.id+'\',{'+labelField+':this.value})" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" value="'+esc(label)+'" style="width:100%;background:transparent;border:none;outline:none;color:'+color+';font-weight:800;font-size:'+(el.titleFs || 22)+'px;text-transform:uppercase;letter-spacing:1px;text-align:center;font-family:Outfit;padding:0;margin-bottom:6px">';
+    }
+    // Items belonging to this column
+    for(var i=0; i<items.length; i++){
+      var it = items[i];
+      if((it.side || 'pro') !== side) continue;
+      var revealStep = revealSteps[i] || 0;
+      var hidden = isPres && S.pres && revealStep > 0 && revealStep > S.revealStep;
+      var liKey = el.id + ':list-item:' + i + ':' + S.revealStep;
+      var liShouldAnim = isPres && S.pres && revealStep > 0 && revealStep === S.revealStep && !_chartBarAnimated[liKey];
+      var revealAnim = '';
+      var revealStyle = '';
+      if(hidden){
+        revealStyle = 'visibility:hidden;';
+      } else if(forCanvas){
+        if(isPres && S.pres && revealStep > 0 && revealStep === S.revealStep){
+          var _slide = S.slides[S.presSlide];
+          var _prog = getItemRevealProgress(_slide, revealStep);
+          if(_prog < 1){
+            var _animType = el.revealAnim || (_slide && _slide.revealAnim) || S.globalRevealAnim || 'fade';
+            revealStyle = _buildItemRevealInlineStyle(_animType, _prog);
+          }
+        }
+      } else if(liShouldAnim){
+        revealAnim = ' ep-revealing';
+        _chartBarAnimated[liKey] = true;
+      }
+      // Symbol: ✓ for pros, ✗ for cons
+      var symbolSvg = (side === 'pro')
+        ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="'+color+'" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+        : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="'+color+'" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
+      col += '<div class="ep-list-item'+revealAnim+'" style="display:flex;align-items:flex-start;gap:10px;position:relative;'+revealStyle+'">';
+      if(!isPres && revealStep > 0){
+        col += '<div class="ep-item-reveal-badge" title="Reveal step '+revealStep+'">'+revealStep+'</div>';
+      }
+      col += '<div style="flex-shrink:0;margin-top:2px">'+symbolSvg+'</div>';
+      if(isPres){
+        col += '<div style="flex:1;color:'+textColor+';font-size:'+el.fs+'px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word">'+esc(it.text || '')+'</div>';
+      } else {
+        col += '<textarea rows="1" oninput="autoGrow(this);updateListItem(\''+el.id+'\',\''+it.id+'\',{text:this.value})" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" placeholder="Item" style="flex:1;background:transparent;border:none;outline:none;color:'+textColor+';font-size:'+el.fs+'px;line-height:1.4;font-family:Outfit;padding:0;resize:none;overflow:hidden">'+esc(it.text || '')+'</textarea>';
+      }
+      col += '</div>';
+    }
+    col += '</div>';
+    return col;
+  }
+
+  h += renderColumn('pro', el.prosLabel || 'Pros', prosColor, prosBg);
+  h += renderColumn('con', el.consLabel || 'Cons', consColor, consBg);
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+// =========================================================
+// Phase 5b: Icon List
+// =========================================================
+// Vertical list with a prominent icon on the left and a title + description
+// on the right per row. Uses the existing icon library (SHAPE_BY_ID for
+// 'ico-*' shapes). Per-item color tints the icon; per-item iconId picks
+// which icon. Cards are subtly backed for visual grouping.
+function renderIconList(el, isPres, forCanvas){
+  var pad = el.pad || 20;
+  var items = el.items || [];
+  var hpad = listHeadingPadding(el);
+  var paddingStyle = (pad + hpad.top)+'px '+pad+'px '+(pad + hpad.bot)+'px '+pad+'px';
+  var revealSteps = listItemRevealSteps(el);
+  var bodyColor = el.bodyColor || '#a0a0b0';
+  var itemBg = el.itemBg || 'rgba(30,30,36,0.5)';
+  var itemPad = el.itemPad || 14;
+  var iconSize = el.iconSize || 42;
+  var gap = 12;
+
+  var h = '<div style="position:relative;width:'+el.w+'px;min-height:'+el.h+'px;background:'+el.bg+';border-radius:'+el.br+'px;padding:'+paddingStyle+';overflow:visible;display:flex;flex-direction:column;gap:'+gap+'px;box-sizing:border-box">';
+  h += renderListHeading(el);
+  for(var i=0; i<items.length; i++){
+    var it = items[i];
+    var color = it.color || '#7ed957';
+    var revealStep = revealSteps[i] || 0;
+    var hidden = isPres && S.pres && revealStep > 0 && revealStep > S.revealStep;
+    var titleColor = el.titleColor || color;
+
+    var liKey = el.id + ':list-item:' + i + ':' + S.revealStep;
+    var liShouldAnim = isPres && S.pres && revealStep > 0 && revealStep === S.revealStep && !_chartBarAnimated[liKey];
+    var revealAnim = '';
+    var revealStyle = '';
+    if(hidden){
+      revealStyle = 'visibility:hidden;';
+    } else if(forCanvas){
+      if(isPres && S.pres && revealStep > 0 && revealStep === S.revealStep){
+        var _slide = S.slides[S.presSlide];
+        var _prog = getItemRevealProgress(_slide, revealStep);
+        if(_prog < 1){
+          var _animType = el.revealAnim || (_slide && _slide.revealAnim) || S.globalRevealAnim || 'fade';
+          revealStyle = _buildItemRevealInlineStyle(_animType, _prog);
+        }
+      }
+    } else if(liShouldAnim){
+      revealAnim = ' ep-revealing';
+      _chartBarAnimated[liKey] = true;
+    }
+
+    // Build the icon SVG using the shape catalog. Icons declare fill="none"
+    // on outline paths and inherit accent fill from the wrapper <g> for dots.
+    var iconSvg = '';
+    var iconDef = (typeof SHAPE_BY_ID !== 'undefined') ? SHAPE_BY_ID[it.iconId || 'ico-star'] : null;
+    if(iconDef && iconDef.cat === 'icon'){
+      var inner = iconDef.render(iconSize, iconSize, 2);
+      iconSvg = '<svg width="'+iconSize+'" height="'+iconSize+'" overflow="visible" style="flex-shrink:0">'
+              + '<g stroke="'+color+'" stroke-width="2" fill="'+color+'" fill-opacity="1" stroke-linejoin="round" stroke-linecap="round">'
+              + inner
+              + '</g></svg>';
+    } else {
+      // Fallback: a colored dot when icon lookup fails
+      iconSvg = '<div style="width:'+iconSize+'px;height:'+iconSize+'px;border-radius:50%;background:'+color+';flex-shrink:0"></div>';
+    }
+
+    h += '<div class="ep-list-item'+revealAnim+'" style="display:flex;align-items:flex-start;gap:14px;padding:'+itemPad+'px;background:'+itemBg+';border-radius:10px;border-left:3px solid '+color+';position:relative;'+revealStyle+'">';
+    if(!isPres && revealStep > 0){
+      h += '<div class="ep-item-reveal-badge" title="Reveal step '+revealStep+'">'+revealStep+'</div>';
+    }
+    h += iconSvg;
+    h += '<div style="flex:1;min-width:0">';
+    if(isPres){
+      h += '<div style="color:'+titleColor+';font-weight:700;font-size:'+el.titleFs+'px;line-height:1.2;margin-bottom:4px;white-space:pre-wrap;word-wrap:break-word">'+esc(it.title)+'</div>';
+      h += '<div style="color:'+bodyColor+';font-size:'+el.fs+'px;line-height:1.4;opacity:0.9;white-space:pre-wrap;word-wrap:break-word">'+esc(it.body)+'</div>';
+    } else {
+      h += '<textarea rows="1" oninput="autoGrow(this);updateListItem(\''+el.id+'\',\''+it.id+'\',{title:this.value})" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" placeholder="Title" style="width:100%;background:transparent;border:none;outline:none;color:'+titleColor+';font-weight:700;font-size:'+el.titleFs+'px;line-height:1.2;font-family:Outfit;padding:0;margin-bottom:4px;resize:none;overflow:hidden;display:block">'+esc(it.title)+'</textarea>';
+      h += '<textarea rows="1" oninput="autoGrow(this);updateListItem(\''+el.id+'\',\''+it.id+'\',{body:this.value})" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" placeholder="Description" style="width:100%;background:transparent;border:none;outline:none;color:'+bodyColor+';font-size:'+el.fs+'px;line-height:1.4;opacity:0.9;font-family:Outfit;padding:0;resize:none;overflow:hidden;display:block">'+esc(it.body)+'</textarea>';
+    }
+    h += '</div>';
+    h += '</div>';
+  }
   h += '</div>';
   return h;
 }
@@ -15829,8 +17312,17 @@ function renderElsHtml(slide, isPres){
     }
     var isRevealing = isPres && el.reveal && el.reveal === S.revealStep;
     var elAnimClass = '';
-    if(isRevealing && el.revealAnim){
-      // Per-element override — wrap in own animation class so it doesn't inherit the slide-level one
+    // Per-element animation override applies in two situations:
+    //   1. The element itself is revealing (existing behavior — its
+    //      .ep-revealing class picks up the matching animation rule)
+    //   2. The element CONTAINS items that reveal independently (lists with
+    //      sequential/manual mode, charts with sequential/manual reveal —
+    //      the inner items get .ep-revealing while the wrapper does not).
+    // In both cases, putting `ep-anim-X` on the wrapper makes any
+    // descendant `.ep-revealing` use the chosen animation, overriding the
+    // slide/global default. Class is inert when no descendants are
+    // revealing, so it's safe to apply unconditionally when set.
+    if(el.revealAnim){
       elAnimClass = ' ep-anim-' + el.revealAnim;
     }
     h += '<div class="el'+(sel?' sel':'')+(el.lk?' locked':'')+(isRevealing ? ' ep-revealing' : '')+elAnimClass+'" style="left:'+el.x+'px;top:'+el.y+'px;z-index:'+(i+2)+';pointer-events:'+pe+'"';
@@ -17330,20 +18822,138 @@ function renderPropsPanel(el){
       h += propColorAlphaRow('Title Txt', el.id, 'titleColor', _tlTitleEff, '#7ed957');
       h += '</div>';
     }
+    // Phase 5d: shared orientation picker for layouts that flow horizontally
+    // by default. 'auto' follows the slide's aspect ratio (portrait → vertical
+    // layout), explicit values pin the layout regardless of aspect.
+    function _renderOrientationRow(){
+      var cur = el.orientation || 'auto';
+      var hh = '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Layout</div>';
+      hh += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:8px">';
+      [['auto','Auto'],['horizontal','Horiz.'],['vertical','Vert.']].forEach(function(pair){
+        var active = cur === pair[0];
+        hh += '<button class="sp-btn" style="padding:6px 0;font-size:10px'+(active?';border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)':'')+'" onclick="updateEl(\''+el.id+'\',{orientation:\''+pair[0]+'\'})">'+pair[1]+'</button>';
+      });
+      hh += '</div>';
+      hh += '<div style="font-size:10px;color:var(--muted);margin-bottom:8px;line-height:1.4">Auto follows slide aspect ratio (portrait → vertical, landscape → horizontal).</div>';
+      return hh;
+    }
 
-    // Typography
+    // Phase 5a: Horizontal Timeline style controls
+    if(el.style === 'horizontal-timeline'){
+      h += '<div class="ps"><div class="ps-t">Horizontal Timeline</div>';
+      h += _renderOrientationRow();
+      h += propColorAlphaRow('Line', el.id, 'lineColor', el.lineColor, '#3a3a44');
+      h += propRow('Dot Size', el.dotSize, "updateEl('"+el.id+"',{dotSize:+this.value})", 'number');
+      h += propColorAlphaRow('Item BG', el.id, 'itemBg', el.itemBg, 'rgba(30,30,36,0.5)');
+      h += propColorAlphaRow('Body Txt', el.id, 'bodyColor', el.bodyColor, '#a0a0b0');
+      var _htTitleEff = el.titleColor || (el.items && el.items[0] && el.items[0].color) || '#7ed957';
+      h += propColorAlphaRow('Title Txt', el.id, 'titleColor', _htTitleEff, '#7ed957');
+      h += '</div>';
+    }
+    // Phase 5a: Numbered Process style controls
+    if(el.style === 'numbered-process'){
+      h += '<div class="ps"><div class="ps-t">Numbered Process</div>';
+      h += _renderOrientationRow();
+      h += propRow('Circle Size', el.circleSize || 78, "updateEl('"+el.id+"',{circleSize:Math.max(40,+this.value)})", 'number');
+      h += propColorAlphaRow('Number Txt', el.id, 'numberColor', el.numberColor, '#000');
+      h += propColorAlphaRow('Arrow', el.id, 'arrowColor', el.arrowColor, 'rgba(255,255,255,0.35)');
+      h += propColorAlphaRow('Body Txt', el.id, 'bodyColor', el.bodyColor, '#a0a0b0');
+      var _npTitleEff = el.titleColor || (el.items && el.items[0] && el.items[0].color) || '#7ed957';
+      h += propColorAlphaRow('Title Txt', el.id, 'titleColor', _npTitleEff, '#7ed957');
+      h += '</div>';
+    }
+    // Phase 5a: Stats Grid style controls
+    if(el.style === 'stats-grid'){
+      h += '<div class="ps"><div class="ps-t">Stats Grid</div>';
+      // Columns picker — landscape default
+      h += '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Columns (landscape)</div>';
+      h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:8px">';
+      [1,2,3,4].forEach(function(n){
+        var active = (el.cols||2) === n;
+        h += '<button class="sp-btn" style="padding:6px 0;font-size:10px'+(active?';border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)':'')+'" onclick="updateEl(\''+el.id+'\',{cols:'+n+'})">'+n+'</button>';
+      });
+      h += '</div>';
+      // Phase 5d: portrait-mode column override
+      h += '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">Columns (portrait)</div>';
+      h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:8px">';
+      [1,2,3,4].forEach(function(n){
+        var active = (el.portraitCols||1) === n;
+        h += '<button class="sp-btn" style="padding:6px 0;font-size:10px'+(active?';border-color:var(--g);color:var(--g);background:rgba(126,217,87,0.08)':'')+'" onclick="updateEl(\''+el.id+'\',{portraitCols:'+n+'})">'+n+'</button>';
+      });
+      h += '</div>';
+      h += '<div style="font-size:10px;color:var(--muted);margin-bottom:8px;line-height:1.4">Slide aspect ratio decides which column count is used at render time.</div>';
+      h += propColorAlphaRow('Card BG', el.id, 'cardBg', el.cardBg, 'rgba(30,30,36,0.7)');
+      h += propColorAlphaRow('Label Txt', el.id, 'labelColor', el.labelColor, '#a0a0b0');
+      var _sgValueEff = el.valueColor || (el.items && el.items[0] && el.items[0].color) || '#7ed957';
+      h += propColorAlphaRow('Value Txt', el.id, 'valueColor', _sgValueEff, '#7ed957');
+      h += '</div>';
+    }
+    // Phase 5b: Pyramid style controls
+    if(el.style === 'pyramid'){
+      h += '<div class="ps"><div class="ps-t">Pyramid</div>';
+      h += propRow('Tier Gap', (typeof el.tierGap === 'number' ? el.tierGap : 2), "updateEl('"+el.id+"',{tierGap:Math.max(0,+this.value)})", 'number');
+      h += propColorAlphaRow('Title Txt', el.id, 'titleColor', el.titleColor, '#ffffff');
+      h += propColorAlphaRow('Body Txt', el.id, 'bodyColor', el.bodyColor, '#ffffff');
+      h += '</div>';
+    }
+    // Phase 5b: Pros & Cons style controls
+    if(el.style === 'pros-cons'){
+      h += '<div class="ps"><div class="ps-t">Pros & Cons</div>';
+      h += _renderOrientationRow();
+      h += propColorAlphaRow('Pros Color', el.id, 'prosColor', el.prosColor, '#7ed957');
+      h += propColorAlphaRow('Cons Color', el.id, 'consColor', el.consColor, '#f43f5e');
+      h += propColorAlphaRow('Pros BG', el.id, 'prosBg', el.prosBg, 'rgba(126,217,87,0.08)');
+      h += propColorAlphaRow('Cons BG', el.id, 'consBg', el.consBg, 'rgba(244,63,94,0.08)');
+      h += propColorAlphaRow('Item Txt', el.id, 'textColor', el.textColor, '#f0f0f5');
+      h += '</div>';
+    }
+    // Phase 5b: Icon List style controls
+    if(el.style === 'icon-list'){
+      h += '<div class="ps"><div class="ps-t">Icon List</div>';
+      h += propRow('Icon Size', el.iconSize || 42, "updateEl('"+el.id+"',{iconSize:Math.max(16,+this.value)})", 'number');
+      h += propRow('Item Pad', el.itemPad || 14, "updateEl('"+el.id+"',{itemPad:Math.max(4,+this.value)})", 'number');
+      h += propColorAlphaRow('Item BG', el.id, 'itemBg', el.itemBg, 'rgba(30,30,36,0.5)');
+      h += propColorAlphaRow('Body Txt', el.id, 'bodyColor', el.bodyColor, '#a0a0b0');
+      var _ilTitleEff = el.titleColor || (el.items && el.items[0] && el.items[0].color) || '#7ed957';
+      h += propColorAlphaRow('Title Txt', el.id, 'titleColor', _ilTitleEff, '#7ed957');
+      h += '</div>';
+    }
+
+    // Typography — per-style labels so it's clear what each row resizes.
+    // For most styles `el.fs` is the body/item text size and `el.titleFs` is
+    // the per-item title. Stats Grid uses titleFs as the big-value size and
+    // fs as the small label; Pros & Cons uses titleFs for the column header.
+    var _typoLabels = ({
+      'stacked-card':        { body:'Body Size',  title:'Title Size' },
+      'timeline':            { body:'Body Size',  title:'Title Size' },
+      'horizontal-timeline': { body:'Body Size',  title:'Title Size' },
+      'numbered-process':    { body:'Body Size',  title:'Title Size' },
+      'pyramid':             { body:'Body Size',  title:'Title Size' },
+      'icon-list':           { body:'Body Size',  title:'Title Size' },
+      'table':               { body:'Cell Size',  title:null         },
+      'checklist':           { body:'Item Size',  title:null         },
+      'pros-cons':           { body:'Item Size',  title:'Header Size' },
+      'stats-grid':          { body:'Label Size', title:'Value Size' }
+    })[el.style] || { body:'Item Size', title:'Title Size' };
     h += '<div class="ps"><div class="ps-t">Typography</div>';
-    h += propRow('Body', el.fs, "updateEl('"+el.id+"',{fs:+this.value})", 'number');
-    if(el.style !== 'checklist' && el.style !== 'table'){
-      h += propRow('Title', el.titleFs, "updateEl('"+el.id+"',{titleFs:+this.value})", 'number');
+    h += propRow(_typoLabels.body, el.fs, "updateEl('"+el.id+"',{fs:+this.value})", 'number');
+    if(_typoLabels.title){
+      h += propRow(_typoLabels.title, el.titleFs, "updateEl('"+el.id+"',{titleFs:+this.value})", 'number');
     }
     h += propRow('Padding', el.pad, "updateEl('"+el.id+"',{pad:+this.value})", 'number');
     h += propRow('Radius', el.br, "updateEl('"+el.id+"',{br:+this.value})", 'number');
     h += '</div>';
 
-    // Background
+    // Background — wrapper BG sits BEHIND every item. Each list style also
+    // has its own item-level backgrounds (Card BG, Item BG, Header BG, etc.)
+    // shown in the style-specific section above. When users want the
+    // wrapper BG to dominate (so a vibrant color shows through cleanly),
+    // they can clear the inner backgrounds with one click — that's the
+    // "Clear item BGs" button below propFillRow.
     h += '<div class="ps"><div class="ps-t">Background</div>';
-    h += propFillRow('BG', el.id, 'bg', el.bg);
+    h += propFillRow('Wrapper BG', el.id, 'bg', el.bg);
+    h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-top:6px">Items have their own background fields above (Card BG / Item BG / Header BG / etc.). Clear them so the wrapper color shows through cleanly.</div>';
+    h += '<button class="sp-btn" style="width:100%;margin-top:8px" onclick="clearListInnerBgs(\''+el.id+'\')">Clear item BGs</button>';
     h += '</div>';
 
     // Section heading (list-level title shown above/below the items).
@@ -17397,7 +19007,7 @@ function renderPropsPanel(el){
     // Items manager
     h += '<div class="ps"><div class="ps-t">Items ('+(el.items?el.items.length:0)+')</div>';
     h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:8px">Set a Step number on any item to reveal it on click during presentation. Step 0 = always visible.</div>';
-    if(el.items && (el.style === 'stacked-card' || el.style === 'timeline')){
+    if(el.items && (el.style === 'stacked-card' || el.style === 'timeline' || el.style === 'horizontal-timeline' || el.style === 'numbered-process' || el.style === 'stats-grid' || el.style === 'pyramid' || el.style === 'icon-list')){
       // Column header so the small number column is understood
       h += '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;padding:0 2px">';
       h += '<div style="width:24px"></div>';
@@ -17407,11 +19017,54 @@ function renderPropsPanel(el){
       h += '</div>';
       for(var ii=0; ii<el.items.length; ii++){
         var it = el.items[ii];
+        // Stats-grid items use `value` + `label` instead of title+body — show
+        // value in the summary column for clarity. Other styles show title.
+        var summary = (el.style === 'stats-grid')
+          ? ((it.value || '') + ' · ' + (it.label || ''))
+          : (it.title || '');
         h += '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">';
         h += '<input type="color" value="'+(it.color||'#7ed957')+'" onchange="updateListItem(\''+el.id+'\',\''+it.id+'\',{color:this.value})" style="width:24px;height:24px;border:1px solid var(--brd);background:none;cursor:pointer;padding:0;border-radius:4px">';
-        h += '<span style="flex:1;font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc((it.title||'').slice(0,20))+'</span>';
+        h += '<span style="flex:1;font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(summary).slice(0,24))+'</span>';
         h += '<input type="number" min="0" max="20" value="'+(it.reveal||0)+'" title="Reveal step (0 = always visible)" onchange="updateListItem(\''+el.id+'\',\''+it.id+'\',{reveal:+this.value})" style="width:38px;background:var(--d3);border:1px solid var(--brd);color:var(--w);padding:2px 4px;border-radius:4px;font-size:11px;font-family:Outfit;text-align:center">';
         h += '<button class="sp-btn del" style="padding:3px 8px;font-size:10px" onclick="removeListItem(\''+el.id+'\',\''+it.id+'\')">×</button>';
+        h += '</div>';
+        // Phase 5b: Icon picker for icon-list items — small dropdown showing
+        // every icon in the catalog. Indented under the row so it's clearly
+        // associated with this specific item.
+        if(el.style === 'icon-list' && typeof SHAPE_CATALOG !== 'undefined'){
+          h += '<div style="display:flex;align-items:center;gap:5px;margin-bottom:8px;padding-left:29px">';
+          h += '<span style="font-size:10px;color:var(--muted);width:auto">Icon</span>';
+          h += '<select onchange="updateListItem(\''+el.id+'\',\''+it.id+'\',{iconId:this.value})" style="flex:1;background:var(--d3);border:1px solid var(--brd);color:var(--w);padding:3px 6px;border-radius:4px;font-size:11px;font-family:Outfit">';
+          var curIcon = it.iconId || 'ico-star';
+          SHAPE_CATALOG.forEach(function(sh){
+            if(sh.cat !== 'icon') return;
+            var sel = (sh.id === curIcon) ? ' selected' : '';
+            h += '<option value="'+sh.id+'"'+sel+'>'+esc(sh.label || sh.id)+'</option>';
+          });
+          h += '</select>';
+          h += '</div>';
+        }
+      }
+    } else if(el.items && el.style === 'pros-cons'){
+      // Pros & Cons items have `text` + `side` ('pro' / 'con'). Toggle button
+      // flips side; text is shown in the row summary.
+      h += '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;padding:0 2px">';
+      h += '<div style="width:46px;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;text-align:center">Side</div>';
+      h += '<div style="flex:1;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Item</div>';
+      h += '<div style="width:38px;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;text-align:center">Step</div>';
+      h += '<div style="width:30px"></div>';
+      h += '</div>';
+      for(var pc=0; pc<el.items.length; pc++){
+        var pcIt = el.items[pc];
+        var pcSide = pcIt.side || 'pro';
+        var nextSide = pcSide === 'pro' ? 'con' : 'pro';
+        var sideLabel = pcSide === 'pro' ? '✓ Pro' : '✗ Con';
+        var sideColor = pcSide === 'pro' ? '#7ed957' : '#f43f5e';
+        h += '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">';
+        h += '<button class="sp-btn" style="width:46px;padding:3px 0;font-size:10px;border-color:'+sideColor+';color:'+sideColor+'" onclick="updateListItem(\''+el.id+'\',\''+pcIt.id+'\',{side:\''+nextSide+'\'})">'+sideLabel+'</button>';
+        h += '<span style="flex:1;font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(String(pcIt.text||'').slice(0,28))+'</span>';
+        h += '<input type="number" min="0" max="20" value="'+(pcIt.reveal||0)+'" title="Reveal step (0 = always visible)" onchange="updateListItem(\''+el.id+'\',\''+pcIt.id+'\',{reveal:+this.value})" style="width:38px;background:var(--d3);border:1px solid var(--brd);color:var(--w);padding:2px 4px;border-radius:4px;font-size:11px;font-family:Outfit;text-align:center">';
+        h += '<button class="sp-btn del" style="padding:3px 8px;font-size:10px" onclick="removeListItem(\''+el.id+'\',\''+pcIt.id+'\')">×</button>';
         h += '</div>';
       }
     } else if(el.items && el.style === 'checklist'){
@@ -17452,21 +19105,33 @@ function renderPropsPanel(el){
   // Reveal animation (always shown)
   var revealVal = el.reveal || 0;
   var elRevealAnim = el.revealAnim || '__inherit';
+  // v1.0.19: lists and charts with sequential/manual reveal mode have
+  // ITEMS that reveal one-by-one (not the whole element). The animation
+  // picker below should be available for those too — without this, you
+  // can't choose how each item enters when the list/chart is set to
+  // sequential or manual.
+  var hasItemReveal = (el.type === 'list' || el.type === 'chart') &&
+                      (el.revealMode === 'sequential' || el.revealMode === 'manual');
   h += '<div class="ps"><div class="ps-t">Reveal on Click</div>';
   h += '<div style="display:flex;gap:5px;align-items:center;margin-bottom:6px">';
   h += '<span class="pr-l" style="width:auto">Step</span>';
   h += '<input type="number" min="0" max="20" value="'+revealVal+'" class="pr-i" style="flex:1" onchange="updateEl(\''+el.id+'\',{reveal:+this.value})">';
   h += '</div>';
-  // Reveal animation override (only meaningful if reveal > 0)
-  if(revealVal > 0){
+  // Reveal animation override — meaningful when the element itself reveals
+  // (revealVal > 0) OR when the element contains items that reveal
+  // independently (list/chart in sequential/manual mode).
+  if(revealVal > 0 || hasItemReveal){
     h += '<div style="margin-top:8px">';
-    h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Animation</div>';
+    h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Animation'+(hasItemReveal ? ' (per-item)' : '')+'</div>';
     h += '<select class="pr-i" style="width:100%" onchange="updateEl(\''+el.id+'\',{revealAnim:this.value === \'__inherit\' ? null : this.value})">';
     h += '<option value="__inherit"' + (elRevealAnim === '__inherit' ? ' selected' : '') + '>Use global default ('+(REVEAL_ANIM_OPTIONS.find(function(x){return x.v===(S.globalRevealAnim||'fade')})||{l:'Fade'}).l+')</option>';
     REVEAL_ANIM_OPTIONS.forEach(function(t){
       h += '<option value="'+t.v+'"' + (elRevealAnim === t.v ? ' selected' : '') + '>'+t.l+'</option>';
     });
     h += '</select>';
+    if(hasItemReveal){
+      h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-top:4px">Applied to each '+(el.type==='chart'?'data point':'item')+' as it reveals.</div>';
+    }
     h += '</div>';
   }
   h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-top:6px">0 = always visible. 1+ = reveal on Nth click during presentation.</div>';
@@ -17651,6 +19316,22 @@ function renderSlidePropsPanel(){
   h += '<option value="__inherit"' + (slideTrans === '__inherit' ? ' selected' : '') + '>Use global default (' + (TRANSITION_OPTIONS.find(function(x){return x.v===globalTrans})||{l:globalTrans}).l + ')</option>';
   TRANSITION_OPTIONS.forEach(function(t){
     h += '<option value="'+t.v+'"' + (slideTrans === t.v ? ' selected' : '') + '>'+t.l+'</option>';
+  });
+  h += '</select>';
+  h += '</div>';
+
+  // v1.0.19: per-slide reveal animation override. Drives the animation that
+  // plays when an element on this slide gets revealed (manually-stepped
+  // reveals, sequential reveals, etc.). Falls back to the global default
+  // when set to "Use global default". Per-element overrides on individual
+  // elements (set in their props panel) still take precedence over this.
+  var slideRevealAnim = slide.revealAnim || '__inherit';
+  h += '<div class="ps"><div class="ps-t">Reveal Animation</div>';
+  h += '<div style="font-size:10px;color:var(--muted);margin-bottom:6px;line-height:1.4">Animation for elements revealed on this slide. Per-element overrides still win.</div>';
+  h += '<select class="pr-i" style="width:100%" onchange="setSlideRevealAnim(this.value)">';
+  h += '<option value="__inherit"' + (slideRevealAnim === '__inherit' ? ' selected' : '') + '>Use global default (' + (REVEAL_ANIM_OPTIONS.find(function(x){return x.v===globalReveal})||{l:globalReveal}).l + ')</option>';
+  REVEAL_ANIM_OPTIONS.forEach(function(t){
+    h += '<option value="'+t.v+'"' + (slideRevealAnim === t.v ? ' selected' : '') + '>'+t.l+'</option>';
   });
   h += '</select>';
   h += '</div>';
@@ -18011,20 +19692,35 @@ function renderAddListPopover(){
   if(!S.popPos) return '';
   var left = S.popPos.left, top = S.popPos.top;
   var h = '<div class="popover-backdrop" onclick="closePopover()"></div>';
-  h += '<div class="popover" style="left:'+left+'px;top:'+top+'px;transform:translateX(-50%);min-width:320px" onclick="event.stopPropagation()">';
+  // v1.0.19 polish: slimmer popover. With 7 styles a tighter 3-column grid
+  // is more browseable than 4 rows of large 2-column tiles. Tile padding,
+  // icon dimensions, and font sizes are all dialed back.
+  h += '<div class="popover" style="left:'+left+'px;top:'+top+'px;transform:translateX(-50%);min-width:340px;max-width:380px" onclick="event.stopPropagation()">';
   h += '<div class="pop-title">Lists &amp; Tables</div>';
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">';
   var styles = [
-    {key:'stacked-card', label:'Stacked Cards', desc:'Numbered cards with accent colors', icon:I.card},
-    {key:'table', label:'Table', desc:'Rows & columns with headers', icon:I.tableIcon},
-    {key:'checklist', label:'Checklist', desc:'Togglable during presenting', icon:I.check},
-    {key:'timeline', label:'Timeline', desc:'Vertical milestones', icon:I.timelineIcon}
+    {key:'stacked-card',        label:'Stacked Cards',       desc:'Numbered cards',        icon:I.card},
+    {key:'table',               label:'Table',               desc:'Rows & columns',        icon:I.tableIcon},
+    {key:'checklist',           label:'Checklist',           desc:'Togglable items',       icon:I.check},
+    {key:'timeline',            label:'Timeline',            desc:'Vertical milestones',   icon:I.timelineIcon},
+    {key:'horizontal-timeline', label:'H. Timeline',         desc:'Left → right flow',     icon:I.hTimelineIcon},
+    {key:'numbered-process',    label:'Process',             desc:'Steps with arrows',     icon:I.numberedProcessIcon},
+    {key:'stats-grid',          label:'Stats Grid',          desc:'Metric cards',          icon:I.statsGridIcon},
+    // Phase 5b additions
+    {key:'pyramid',             label:'Pyramid',             desc:'Hierarchical tiers',    icon:I.pyramidIcon},
+    {key:'pros-cons',           label:'Pros & Cons',         desc:'Two-column compare',    icon:I.prosConsIcon},
+    {key:'icon-list',           label:'Icon List',           desc:'Icon + title + desc',   icon:I.iconListIcon}
   ];
+  // Inject explicit width/height on each icon SVG so it doesn't render at the
+  // browser's default intrinsic size (which made tiles look oversized).
+  function _slimIcon(svgStr){
+    return svgStr.replace(/^<svg/, '<svg width="26" height="26"');
+  }
   styles.forEach(function(s){
-    h += '<div onclick="addList(\''+s.key+'\')" style="padding:14px;border:1.5px solid var(--brd);border-radius:10px;cursor:pointer;transition:all 0.15s;text-align:center" onmouseover="this.style.borderColor=\'var(--g)\';this.style.background=\'rgba(126,217,87,0.08)\'" onmouseout="this.style.borderColor=\'var(--brd)\';this.style.background=\'transparent\'">';
-    h += '<div style="color:var(--g);display:flex;justify-content:center;margin-bottom:6px">'+s.icon+'</div>';
-    h += '<div style="font-size:13px;font-weight:600;color:var(--w);margin-bottom:3px">'+s.label+'</div>';
-    h += '<div style="font-size:10px;color:var(--gray);line-height:1.3">'+s.desc+'</div>';
+    h += '<div onclick="addList(\''+s.key+'\')" style="padding:9px 6px;border:1px solid var(--brd);border-radius:7px;cursor:pointer;transition:all 0.15s;text-align:center" onmouseover="this.style.borderColor=\'var(--g)\';this.style.background=\'rgba(126,217,87,0.06)\'" onmouseout="this.style.borderColor=\'var(--brd)\';this.style.background=\'transparent\'">';
+    h += '<div style="color:var(--g);display:flex;justify-content:center;align-items:center;height:30px;margin-bottom:4px">'+_slimIcon(s.icon)+'</div>';
+    h += '<div style="font-size:11px;font-weight:600;color:var(--w);margin-bottom:1px;line-height:1.15">'+s.label+'</div>';
+    h += '<div style="font-size:9px;color:var(--gray);line-height:1.2">'+s.desc+'</div>';
     h += '</div>';
   });
   h += '</div></div>';
@@ -18894,8 +20590,11 @@ function renderPres(){
 
   // Determine effective transition + reveal animation classes for this slide.
   // We add a key prop to the stage so animation re-runs on every slide change.
+  // Reveal animation cascade (lowest precedence first): global → per-slide
+  // (slide.revealAnim) → per-element (el.revealAnim, applied at the element
+  // level in renderElsHtml). Mirrors the slide-transition cascade pattern.
   var effTrans = getEffectiveTransition(slide);
-  var effReveal = S.globalRevealAnim || 'fade';
+  var effReveal = slide.revealAnim || S.globalRevealAnim || 'fade';
   var transClass = ' ep-trans-' + effTrans;
   var revealClass = ' ep-anim-' + effReveal;
   // Animation triggers — bump these every slide change / reveal step for re-render
