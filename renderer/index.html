@@ -17797,7 +17797,13 @@ function render(){
   var app = document.getElementById('app');
   var windowH = window.innerHeight;
   var panelW = S.showPanel ? 170 : 0;
-  var propsW = (S.selIds.length && S.tool==='select') ? 240 : 0;
+  // v1.0.22: lasso tool now shares the same right-side properties panel as
+  // the select tool, so reserve panel width whenever either tool has any
+  // selection (elements OR ink strokes).
+  var propsW = (
+    (S.tool === 'select' && S.selIds.length) ||
+    (S.tool === 'lasso' && (S.selIds.length || (S.lassoIds || []).length))
+  ) ? 240 : 0;
   var stageAreaW = window.innerWidth - panelW - propsW;
   var stageAreaH = windowH - 56;
   S.stageScale = Math.max(0.1, Math.min((stageAreaW - 40) / STAGE_W, (stageAreaH - 40) / STAGE_H));
@@ -17923,7 +17929,10 @@ function render(){
   h += '<canvas id="drawCanvas" class="draw-canvas'+(isDrawTool?' active':'')+(S.tool === 'lasso' ? ' lasso' : '')+'"></canvas>';
   // Drawing sub-toolbar (Notability-style): appears when any drawing tool is active.
   // Lives ABOVE the canvas in z-order, so it doesn't capture canvas events.
-  if(isDrawTool){
+  // v1.0.22: skip for lasso — its selection properties moved to the right-side
+  // panel for visual consistency with the select tool. The lasso branch of
+  // renderDrawSubToolbar is left in place as a fallback but is no longer reached.
+  if(isDrawTool && S.tool !== 'lasso'){
     h += renderDrawSubToolbar();
   } else {
     // Reset the animation suppressor so the subbar pops in next time the
@@ -17949,11 +17958,21 @@ function render(){
   h += '</div>'; // close the stage+notes column
 
   // PROPERTIES
-  if(S.tool === 'select'){
-    if(S.selIds.length === 1){
+  // v1.0.22: lasso tool now uses the same side panel as the select tool so
+  // there's one consistent place for selection properties. The lasso also
+  // selects ink strokes (S.lassoIds) which the select tool can't, so when
+  // strokes are part of the selection we route to renderLassoMixedPanel
+  // which extends the multi-select layout with stroke-aware count + delete.
+  if(S.tool === 'select' || S.tool === 'lasso'){
+    var nInkSel = S.tool === 'lasso' ? (S.lassoIds || []).length : 0;
+    var nElSel = S.selIds.length;
+    if(nInkSel > 0){
+      // Lasso with ink strokes (with or without elements) — dedicated panel
+      h += renderLassoMixedPanel();
+    } else if(nElSel === 1){
       var el = gEl(S.selIds[0]);
       if(el) h += renderPropsPanel(el);
-    } else if(S.selIds.length >= 2){
+    } else if(nElSel >= 2){
       h += renderMultiSelectPanel();
     } else {
       // Nothing selected → show slide-level properties (transition, etc.)
@@ -19819,6 +19838,152 @@ function renderMultiSelectPanel(){
   return h;
 }
 
+// =========================================================
+// v1.0.22: LASSO MIXED PANEL (elements + ink strokes)
+// =========================================================
+// Used when the lasso has any ink strokes selected (with or without elements).
+// For lasso selections of pure elements, renderPropsPanel/renderMultiSelectPanel
+// are reused — only the ink-included cases need this dedicated layout.
+// Mirrors renderMultiSelectPanel's structure so the visual language stays
+// consistent across the select tool and lasso tool, then adds a stroke-count
+// row and routes Delete to deleteLassoSelection (removes both els and ink).
+function renderLassoMixedPanel(){
+  var nInk = (S.lassoIds || []).length;
+  var nEls = (S.selIds || []).length;
+  var slide = cs();
+
+  var labelParts = [];
+  if(nEls) labelParts.push(nEls + ' element' + (nEls !== 1 ? 's' : ''));
+  if(nInk) labelParts.push(nInk + ' stroke' + (nInk !== 1 ? 's' : ''));
+
+  var h = '<div class="pp">';
+  h += '<div class="pp-t">' + labelParts.join(' + ') + ' selected</div>';
+
+  // Element-aware sections (group/reveal/anim/align) only render when
+  // elements are part of the selection. Strokes can't be grouped or revealed.
+  if(nEls > 0){
+    var gids = {};
+    var firstReveal = null, allSameReveal = true;
+    var firstAnim = null, allSameAnim = true, anyHasAnimOverride = false;
+    if(slide){
+      S.selIds.forEach(function(id){
+        var el = gEl(id);
+        if(el && el.gid) gids[el.gid] = true;
+        if(el){
+          var rev = el.reveal || 0;
+          if(firstReveal === null) firstReveal = rev;
+          else if(firstReveal !== rev) allSameReveal = false;
+          var anim = el.revealAnim || '__inherit';
+          if(el.revealAnim) anyHasAnimOverride = true;
+          if(firstAnim === null) firstAnim = anim;
+          else if(firstAnim !== anim) allSameAnim = false;
+        }
+      });
+    }
+    var groupCount = Object.keys(gids).length;
+    var allInOneGroup = (groupCount === 1) && S.selIds.every(function(id){
+      var el = gEl(id);
+      return el && el.gid && gids[el.gid];
+    });
+
+    // Group section — only meaningful with 2+ elements
+    if(nEls >= 2){
+      h += '<div class="ps"><div class="ps-t">Group</div>';
+      if(allInOneGroup){
+        h += '<div style="background:rgba(255,165,0,0.08);border:1px solid rgba(255,165,0,0.25);border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:11px;color:#ffd596;display:flex;align-items:center;gap:6px"><span style="color:#ffa500">●</span> Grouped (' + nEls + ' members)</div>';
+        h += '<button class="sp-btn" style="width:100%" onclick="ungroupSelection()">Break Apart (Ctrl+Shift+G)</button>';
+      } else {
+        h += '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.4">Treat these elements as one — drag, reveal, and lock together.</div>';
+        h += '<button class="sp-btn" style="width:100%;border-color:var(--g);color:var(--g)" onclick="groupSelection()">+ Group (Ctrl+G)</button>';
+      }
+      h += '</div>';
+    }
+
+    // Reveal-on-click + Animation
+    h += '<div class="ps"><div class="ps-t">Reveal on Click</div>';
+    h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:6px">Same step on every selected element — they reveal together</div>';
+    var revVal = (allSameReveal && firstReveal !== null) ? firstReveal : 0;
+    h += '<div style="display:flex;gap:5px;align-items:center;margin-bottom:6px">';
+    h += '<span class="pr-l" style="width:auto">Step</span>';
+    h += '<input type="number" min="0" max="20" value="'+revVal+'" class="pr-i" style="flex:1" onchange="setSelectionReveal(+this.value)" placeholder="'+(allSameReveal?'':'mixed')+'">';
+    h += '<button class="sp-btn" style="padding:5px 10px;font-size:11px" onclick="lassoRevealNext()" title="Set to next available reveal step on this slide">Next</button>';
+    h += '</div>';
+    var showAnimPicker = revVal > 0 || anyHasAnimOverride || (!allSameReveal && firstReveal !== 0);
+    if(showAnimPicker){
+      var currentAnim = (allSameAnim && firstAnim !== null) ? firstAnim : '__mixed';
+      h += '<div style="margin-top:4px">';
+      h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Animation</div>';
+      h += '<select class="pr-i" style="width:100%" onchange="setSelectionRevealAnim(this.value)">';
+      if(!allSameAnim){
+        h += '<option value="__mixed" selected disabled>Mixed — pick to apply to all</option>';
+      }
+      h += '<option value="__inherit"' + (currentAnim === '__inherit' ? ' selected' : '') + '>Use global default ('+(REVEAL_ANIM_OPTIONS.find(function(x){return x.v===(S.globalRevealAnim||'fade')})||{l:'Fade'}).l+')</option>';
+      REVEAL_ANIM_OPTIONS.forEach(function(t){
+        h += '<option value="'+t.v+'"' + (currentAnim === t.v ? ' selected' : '') + '>'+t.l+'</option>';
+      });
+      h += '</select>';
+      h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-top:4px">Applied to every selected element.</div>';
+      h += '</div>';
+    }
+    h += '</div>';
+
+    // Align — only with 2+ elements (single element has nothing to align against)
+    if(nEls >= 2){
+      h += '<div class="ps"><div class="ps-t">Align</div>';
+      if(allInOneGroup){
+        h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:6px">Moves the whole group to that edge of the slide. Children keep their relative positions.</div>';
+      } else {
+        h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:6px">Aligns the edges/centers of selected items to each other.</div>';
+      }
+      h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:8px">';
+      h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'left\')" title="Align Left edges">'+I.alignLeft+'</button>';
+      h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'hcenter\')" title="Center horizontally">'+I.alignCenter+'</button>';
+      h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'right\')" title="Align Right edges">'+I.alignRight+'</button>';
+      h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'top\')" title="Align Top edges">'+I.alignTop+'</button>';
+      h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'vcenter\')" title="Center vertically">'+I.alignMiddle+'</button>';
+      h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'bottom\')" title="Align Bottom edges">'+I.alignBottom+'</button>';
+      h += '</div></div>';
+
+      if(nEls >= 3 && !allInOneGroup){
+        h += '<div class="ps"><div class="ps-t">Distribute</div>';
+        h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:6px">Equal spacing between selected items.</div>';
+        h += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px">';
+        h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'dist-h\')" title="Equal horizontal spacing">'+I.distH+'</button>';
+        h += '<button class="sp-btn" style="padding:8px 0" onclick="alignSelection(\'dist-v\')" title="Equal vertical spacing">'+I.distV+'</button>';
+        h += '</div></div>';
+      }
+    }
+  }
+
+  // Stroke summary — when ink is part of the selection, surface it explicitly
+  // so the user knows what Delete will remove.
+  if(nInk > 0){
+    h += '<div class="ps"><div class="ps-t">Ink Strokes</div>';
+    h += '<div style="font-size:11px;color:var(--gray);line-height:1.5">' + nInk + ' stroke' + (nInk !== 1 ? 's' : '') + ' selected. Drag inside the bounding box to move them; Delete to remove.</div>';
+    h += '</div>';
+  }
+
+  // Actions — uses lasso-aware delete so both els and ink go in one click
+  h += '<div class="ps"><div class="ps-t">Actions</div>';
+  if(nEls >= 1){
+    h += '<button class="sp-btn" style="width:100%;margin-bottom:5px" onclick="duplicateSelection()">Duplicate Elements (Ctrl+D)</button>';
+  }
+  h += '<button class="sp-btn" style="width:100%;margin-bottom:5px" onclick="clearLassoSelection()">Clear Selection (Esc)</button>';
+  var deleteLabel;
+  if(nInk && nEls) deleteLabel = 'Delete All (' + (nInk + nEls) + ')';
+  else if(nInk) deleteLabel = 'Delete Stroke' + (nInk !== 1 ? 's' : '');
+  else deleteLabel = 'Delete Element' + (nEls !== 1 ? 's' : '');
+  h += '<button class="sp-btn del" style="width:100%" onclick="deleteLassoSelection()">' + deleteLabel + '</button>';
+  h += '</div>';
+
+  h += '<div class="ps"><div class="ps-t" style="color:var(--muted)">Tip</div>';
+  h += '<div style="font-size:11px;color:var(--gray);line-height:1.5">Drag inside the bounding box to move everything together. Press Esc to clear.</div>';
+  h += '</div>';
+
+  h += '</div>';
+  return h;
+}
+
 // Apply the same reveal step to every element in the current selection.
 window.setSelectionReveal = function(step){
   if(!S.selIds.length) return;
@@ -20681,14 +20846,23 @@ function renderDrawSubToolbar(){
       // Reveal-on-click — shown when at least 1 element is selected (ink can't reveal)
       if(nEls >= 1){
         // Compute current shared reveal step (or "mixed")
+        // v1.0.22: also scan revealAnim so the lasso sub-toolbar can offer the
+        // animation picker — previously this was only present in the
+        // shift-click multi-select properties panel, so users who selected via
+        // lasso had no way to pick a reveal style.
         var slide2 = cs();
         var firstReveal = null, allSameReveal = true;
+        var firstAnim = null, allSameAnim = true, anyHasAnimOverride = false;
         if(slide2 && slide2.els){
           slide2.els.forEach(function(e){
             if(S.selIds.indexOf(e.id) < 0) return;
             var r = e.reveal || 0;
             if(firstReveal === null) firstReveal = r;
             else if(r !== firstReveal) allSameReveal = false;
+            var a = e.revealAnim || '__inherit';
+            if(e.revealAnim) anyHasAnimOverride = true;
+            if(firstAnim === null) firstAnim = a;
+            else if(a !== firstAnim) allSameAnim = false;
           });
         }
         var revVal = allSameReveal && firstReveal !== null ? firstReveal : '';
@@ -20701,6 +20875,26 @@ function renderDrawSubToolbar(){
           h += '<button class="draw-action-btn" onclick="setSelectionReveal(0)" title="Make always visible (no reveal)">Clear</button>';
         }
         h += '</div>';
+
+        // v1.0.22: Animation picker for lasso multi-select. Show whenever any
+        // selected element has a reveal step or an animation override —
+        // matches the trigger used by the single-element + shift-multi panels.
+        var showAnimPicker = (revVal !== '' && revVal > 0) || anyHasAnimOverride || !allSameReveal;
+        if(showAnimPicker){
+          var currentAnim = (allSameAnim && firstAnim !== null) ? firstAnim : '__mixed';
+          h += '<div class="draw-subbar-grp">';
+          h += '<div class="draw-subbar-label">Animation</div>';
+          h += '<select class="draw-reveal-input" style="min-width:130px" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" onchange="setSelectionRevealAnim(this.value)">';
+          if(!allSameAnim){
+            h += '<option value="__mixed" selected disabled>Mixed</option>';
+          }
+          h += '<option value="__inherit"' + (currentAnim === '__inherit' ? ' selected' : '') + '>Default ('+(REVEAL_ANIM_OPTIONS.find(function(x){return x.v===(S.globalRevealAnim||'fade')})||{l:'Fade'}).l+')</option>';
+          REVEAL_ANIM_OPTIONS.forEach(function(t){
+            h += '<option value="'+t.v+'"' + (currentAnim === t.v ? ' selected' : '') + '>'+t.l+'</option>';
+          });
+          h += '</select>';
+          h += '</div>';
+        }
       }
 
       h += '<div class="draw-subbar-grp" style="border-right:none">';
