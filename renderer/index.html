@@ -19701,6 +19701,13 @@ function renderMultiSelectPanel(){
   var gids = {};
   var firstReveal = null;
   var allSameReveal = true;
+  // v1.0.21: also track per-element revealAnim so the multi-select picker can
+  // show the current value (or 'mixed' when items differ). Without this the
+  // picker never appeared for grouped/lassoed items, so users couldn't pick
+  // a reveal style without ungrouping first.
+  var firstAnim = null;
+  var allSameAnim = true;
+  var anyHasAnimOverride = false;
   if(slide){
     S.selIds.forEach(function(id){
       var el = gEl(id);
@@ -19709,6 +19716,10 @@ function renderMultiSelectPanel(){
         var rev = el.reveal || 0;
         if(firstReveal === null) firstReveal = rev;
         else if(firstReveal !== rev) allSameReveal = false;
+        var anim = el.revealAnim || '__inherit';
+        if(el.revealAnim) anyHasAnimOverride = true;
+        if(firstAnim === null) firstAnim = anim;
+        else if(firstAnim !== anim) allSameAnim = false;
       }
     });
   }
@@ -19742,10 +19753,31 @@ function renderMultiSelectPanel(){
   h += '<div class="ps"><div class="ps-t">Reveal on Click</div>';
   h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:6px">Same step on every selected element \u2014 they reveal together</div>';
   var revVal = (allSameReveal && firstReveal !== null) ? firstReveal : 0;
-  h += '<div style="display:flex;gap:5px;align-items:center">';
+  h += '<div style="display:flex;gap:5px;align-items:center;margin-bottom:6px">';
   h += '<span class="pr-l" style="width:auto">Step</span>';
   h += '<input type="number" min="0" max="20" value="'+revVal+'" class="pr-i" style="flex:1" onchange="setSelectionReveal(+this.value)" placeholder="'+(allSameReveal?'':'mixed')+'">';
   h += '</div>';
+  // v1.0.21: animation picker for the whole selection. Shown whenever any
+  // selected item has a reveal step (revVal > 0) OR already has an explicit
+  // revealAnim override \u2014 same trigger logic as the single-element panel,
+  // extended for groups + lasso multi-select.
+  var showAnimPicker = revVal > 0 || anyHasAnimOverride || (!allSameReveal && firstReveal !== 0);
+  if(showAnimPicker){
+    var currentAnim = (allSameAnim && firstAnim !== null) ? firstAnim : '__mixed';
+    h += '<div style="margin-top:4px">';
+    h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Animation</div>';
+    h += '<select class="pr-i" style="width:100%" onchange="setSelectionRevealAnim(this.value)">';
+    if(!allSameAnim){
+      h += '<option value="__mixed" selected disabled>Mixed \u2014 pick to apply to all</option>';
+    }
+    h += '<option value="__inherit"' + (currentAnim === '__inherit' ? ' selected' : '') + '>Use global default ('+(REVEAL_ANIM_OPTIONS.find(function(x){return x.v===(S.globalRevealAnim||'fade')})||{l:'Fade'}).l+')</option>';
+    REVEAL_ANIM_OPTIONS.forEach(function(t){
+      h += '<option value="'+t.v+'"' + (currentAnim === t.v ? ' selected' : '') + '>'+t.l+'</option>';
+    });
+    h += '</select>';
+    h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-top:4px">Applied to every selected item.</div>';
+    h += '</div>';
+  }
   h += '</div>';
 
   // Align section — different behaviour for whole-group vs ungrouped multi-select
@@ -19796,6 +19828,26 @@ window.setSelectionReveal = function(step){
       if(ids.indexOf(e.id) >= 0){
         if(step > 0) e.reveal = step;
         else delete e.reveal;
+      }
+    });
+    return s;
+  });
+};
+
+// v1.0.21: Apply the same reveal animation override to every element in the
+// current selection. Mirrors the single-element panel writer at line ~19369:
+//   '__inherit' → drop the field so the slide/global default applies
+//   '__mixed'   → no-op (sentinel option that is disabled in the UI)
+//   anything else → set el.revealAnim to that value
+window.setSelectionRevealAnim = function(value){
+  if(!S.selIds.length) return;
+  if(value === '__mixed') return;
+  var ids = S.selIds.slice();
+  updateSlide(function(s){
+    s.els.forEach(function(e){
+      if(ids.indexOf(e.id) >= 0){
+        if(value === '__inherit') delete e.revealAnim;
+        else e.revealAnim = value;
       }
     });
     return s;
