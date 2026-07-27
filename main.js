@@ -27,6 +27,40 @@ autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
 
 // ---------------------------------------------------------
+// FORCE DISCRETE GPU (hybrid-graphics laptops)
+// ---------------------------------------------------------
+// Confirmed via WEBGL_debug_renderer_info that Electron was binding to the
+// Intel UHD integrated GPU while an RTX 4060 sat idle. On hybrid laptops
+// Windows hands Chromium the power-saving adapter by default. The iGPU shares
+// system memory and cannot keep up with compositing a 2561x1601 capture into a
+// 2560x1440 canvas at 30fps — which surfaced as recording lag, plus
+// 'GPU state invalid after WaitForGetOffsetInRange' and the WGC
+// 'ProcessFrame failed' flood. All three are the same overloaded adapter.
+//
+// force_high_performance_gpu asks Chromium for the discrete adapter directly,
+// so this does not depend on NVIDIA Control Panel or Windows Graphics settings
+// being configured on every machine the app is installed on.
+app.commandLine.appendSwitch('force_high_performance_gpu');
+
+// Verify after launch with, in DevTools:
+//   (function(){var g=document.createElement('canvas').getContext('webgl');
+//    var d=g.getExtension('WEBGL_debug_renderer_info');
+//    console.log(g.getParameter(d.UNMASKED_RENDERER_WEBGL));})()
+// It should now report NVIDIA rather than Intel.
+
+// Hardware acceleration stays ON — disabling it was only ever a diagnostic and
+// costs rendering performance everywhere in the app.
+// app.disableHardwareAcceleration();
+
+// WGC (Windows Graphics Capture) workaround — currently DISABLED.
+// It was needed only while Electron was stuck on the Intel iGPU, which could
+// not keep up and made WGC fail with 'ProcessFrame failed'. On the discrete
+// GPU, WGC works and is more efficient than the DXGI fallback.
+// If 'ProcessFrame failed' ever floods the terminal again, remove the // from
+// the single line below. Keep it on ONE line — splitting it breaks the file.
+// app.commandLine.appendSwitch('disable-features', 'AllowWgcScreenCapturer,AllowWgcWindowCapturer');
+
+// ---------------------------------------------------------
 // FFmpeg binary resolution
 // ---------------------------------------------------------
 // In dev: ffmpeg-static returns the path inside node_modules.

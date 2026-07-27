@@ -675,6 +675,30 @@ select option:hover{background:#22272e}
 var STAGE_W = 1440;
 var STAGE_H = 810;
 
+// Recording output multiplier. The stage is 1440x810 in layout units; this
+// scales it to the final encoded resolution.
+//   1.333 → 1920x1080  (1080p)
+//   1.778 → 2560x1440  (1440p)
+//   2.667 → 3840x2160  (4K)
+// Screen shares are captured at the monitor's native size, so if the monitor
+// is larger than the output the surplus pixels are thrown away. A 2561x1601
+// desktop squeezed into 1920 wide loses 25% of its horizontal detail before
+// the encoder ever sees it — that loss is arithmetic and no bitrate or
+// smoothing setting recovers it. Matching the output to the capture is the
+// only way to get screen shares that look as crisp as a native recorder.
+var REC_SCALE = 1.778;
+
+// Runtime switcher — call from DevTools, e.g. epRecQuality('1440p').
+// Takes effect on the NEXT recording; stop and restart if one is running.
+window.epRecQuality = function(preset){
+  var map = { '1080p': 1.333, '1440p': 1.778, '4k': 2.667 };
+  var s = map[String(preset).toLowerCase()];
+  if(!s){ console.warn('[EP] Use 1080p, 1440p or 4k'); return; }
+  REC_SCALE = s;
+  console.log('[EP] Recording output set to ' + Math.round(STAGE_W * s) +
+              'x' + Math.round(STAGE_H * s) + ' (' + preset + ')');
+};
+
 // Set the stage dimensions to match a given aspect. Called when a deck is
 // created, loaded, or its aspect is otherwise determined.
 function setStageAspect(aspect){
@@ -5757,7 +5781,7 @@ async function getSlideBitmap(slide){
   });
   var drawsCopy = (slide.draws || []).slice(); // snapshot to avoid mid-render mutation
   var slideClone = { id: slide.id, bg: slide.bg, els: visibleEls, draws: drawsCopy };
-  var cv = await renderSlideToCanvas(slideClone, 1.333); // 1440*1.333 ≈ 1920
+  var cv = await renderSlideToCanvas(slideClone, REC_SCALE); // REC_SCALE drives output res
   // Only update cache when not skipping — storing a live-stream / animated
   // snapshot would be stale immediately
   if(!skipCache){
@@ -5773,9 +5797,147 @@ async function getSlideBitmap(slide){
   return cv;
 }
 
+// =========================================================
+// LAYERED RECORDING COMPOSITOR
+// =========================================================
+// The problem this solves: when a slide has a live screen share,
+// getSlideBitmap sets skipCache and re-renders the ENTIRE slide — every text
+// block, chart, list, border and ink stroke — from scratch at the full output
+// resolution, 30 times a second. At 2560x1440 that is 3.7M pixels of mostly
+// STATIC content rebuilt per frame, which blew recComposeFrame past its 33ms
+// budget and starved the UI thread (the '[Violation] setInterval handler took
+// <N>ms' warnings, and the lag when moving the mouse or annotating).
+//
+// Only the video pixels actually change between frames. So we split the slide
+// into three parts:
+//   below  — static elements painted UNDER the share (cached, incl. background)
+//   share  — the live video (drawn fresh each frame, the only real work)
+//   above  — static elements painted OVER the share, plus ink (cached, transparent)
+// Per frame the compositor becomes: blit below -> draw video -> blit above.
+//
+// Z-ORDER: elements render in array order. We cut the array at the first and
+// last share so anything layered above the share stays above it. A non-share
+// element sitting BETWEEN two shares is promoted to the 'above' layer — the
+// only case where stacking can differ, and it needs two shares plus an element
+// wedged between them to occur at all.
+//
+// SAFETY: this path is used ONLY when a screen share is the sole live content
+// and the share carries no shadow/lift. Anything else (animated stickers, live
+// webcams, animating charts, animated borders, in-flight reveals, media
+// effects) falls back to the original full re-render, so nothing regresses.
+var _recLayerCache = { slideId:null, revealStep:-1, drawsRef:null, drawsLen:-1,
+                       generation:-1, below:null, above:null, shares:null };
+var _recLayerReady   = null;   // last successfully built layer set
+var _recLayerPending = false;  // guards against stacking async rebuilds per frame
+var _recLayerFailed  = false;  // sticky: once layering errors, stay on the safe path
+
+function _shareEligibleForLayering(el){
+  if(el.type !== 'screenshare') return false;
+  // NOTE: el.shadow is an OBJECT ({on:bool}) and el.effect3d is an object too,
+  // so testing them for truthiness excluded every share whether or not the
+  // effect was actually enabled. Read the flags, exactly as
+  // drawMediaElementWithEffects does.
+  var sh = el.shadow, fx = el.effect3d;
+  if(sh && sh.on) return false;
+  if(fx && fx.style === 'lift') return false;
+  return true;
+}
+
+var _layerDeclineLogged = {};
+var _layerActiveLogged = false;
+function _layerDecline(reason){
+  if(!_layerDeclineLogged[reason]){
+    _layerDeclineLogged[reason] = true;
+    console.log('[EP] Layered compositor NOT used — ' + reason +
+                ' (falling back to full per-frame render)');
+  }
+  return false;
+}
+function slideEligibleForLayering(slide){
+  if(!slideHasLiveScreenShare(slide)) return false; // silent: no share, normal
+  if(slideHasAnimatedSticker(slide))  return _layerDecline('slide has an animated sticker');
+  if(slideHasConnectedWebcam(slide))  return _layerDecline('slide has a connected webcam');
+  if(slideHasAnimatingChart(slide))   return _layerDecline('a chart is mid-animation');
+  if(slideHasAnimatedBorder(slide))   return _layerDecline('an animated gradient border is active');
+  if(slideHasInProgressReveal(slide)) return false; // transient, do not spam
+  var shares = slide.els.filter(function(e){ return e.type === 'screenshare'; });
+  if(shares.length === 0) return false;
+  if(!shares.every(_shareEligibleForLayering))
+    return _layerDecline('the screen share has a drop shadow or 3D lift enabled');
+  return true;
+}
+
+// Returns { below, above, shares } or null. Layers are cached; only the video
+// is redrawn per frame by recComposeFrame.
+async function getLayeredRecBitmaps(slide){
+  if(!slideEligibleForLayering(slide)) return null;
+
+  if(_recLayerCache.below &&
+     _recLayerCache.slideId === slide.id &&
+     _recLayerCache.revealStep === S.revealStep &&
+     _recLayerCache.drawsRef === slide.draws &&
+     _recLayerCache.drawsLen === (slide.draws ? slide.draws.length : 0) &&
+     _recLayerCache.generation === _recCacheGeneration){
+    return _recLayerCache;
+  }
+
+  var visibleEls = slide.els.filter(function(el){
+    if(S.pres && el.reveal && el.reveal > S.revealStep) return false;
+    return true;
+  });
+  var shareIdx = [];
+  visibleEls.forEach(function(el, i){ if(el.type === 'screenshare') shareIdx.push(i); });
+  if(shareIdx.length === 0) return null;
+
+  var first = shareIdx[0], last = shareIdx[shareIdx.length - 1];
+  var belowEls = visibleEls.slice(0, first);
+  var aboveEls = [];
+  for(var i = first + 1; i <= last; i++){
+    if(visibleEls[i].type !== 'screenshare') aboveEls.push(visibleEls[i]);
+  }
+  aboveEls = aboveEls.concat(visibleEls.slice(last + 1));
+  var shares = shareIdx.map(function(i){ return visibleEls[i]; });
+  var drawsCopy = (slide.draws || []).slice();
+
+  var below = await renderSlideToCanvas(
+    { id: slide.id, bg: slide.bg, els: belowEls, draws: [] }, REC_SCALE);
+  var above = await renderSlideToCanvas(
+    { id: slide.id, bg: slide.bg, els: aboveEls, draws: drawsCopy, _noBg: true }, REC_SCALE);
+
+  _recLayerCache = {
+    slideId: slide.id, revealStep: S.revealStep,
+    drawsRef: slide.draws, drawsLen: drawsCopy.length,
+    generation: _recCacheGeneration,
+    below: below, above: above, shares: shares
+  };
+  if(!_layerActiveLogged){
+    _layerActiveLogged = true;
+    console.log('[EP] Layered compositor active — ' + belowEls.length + ' below, ' +
+                shares.length + ' share(s), ' + aboveEls.length + ' above');
+  }
+  return _recLayerCache;
+}
+
+// Paints the live video for each share directly onto the recording canvas,
+// in element units scaled up to output resolution.
+function drawLiveSharesToRec(ctx, shares){
+  for(var i=0; i<shares.length; i++){
+    var el = shares[i];
+    var stream = _screenShareStreams[el.id];
+    var vid = stream ? document.getElementById('ss-video-' + el.id) : null;
+    ctx.save();
+    ctx.scale(REC_SCALE, REC_SCALE);
+    ctx.translate(el.x, el.y);
+    ssDrawContent(ctx, el.w, el.h, el, vid);
+    ctx.restore();
+  }
+}
+
 function invalidateRecCache(){
   _recCacheGeneration++;
   _recSlideCache = { slideId:null, revealStep:-1, drawsRef:null, drawsLen:-1, canvas:null, generation:-1 };
+  _recLayerCache = { slideId:null, revealStep:-1, drawsRef:null, drawsLen:-1,
+                     generation:-1, below:null, above:null, shares:null };
   // Don't null _lastRecBitmap — the old bitmap is better than no bitmap. Next
   // recComposeFrame kicks an async re-render that updates _lastRecBitmap when
   // ready. Without keeping the old one, the recording would draw a solid
@@ -5792,101 +5954,10 @@ function invalidateRecCache(){
 // window being behind a presenter view — RAF would stop firing and the canvas
 // would emit no new frames, producing a blob with audio but a static frozen
 // video stream (length reported as 00:00 because the encoder never sees motion).
-function recComposeFrame(){
-  if(!S.recActive || !S.recCanvas){
-    if(S.recInterval){ clearInterval(S.recInterval); S.recInterval = null; }
-    return;
-  }
-  if(S.recPaused) return; // setInterval keeps ticking; just skip drawing
-  var cv = S.recCanvas;
-  var ctx = cv.getContext('2d');
-  var W = cv.width, H = cv.height;
-
-  // 1. Draw slide bitmap. Fire render to keep the "latest bitmap" always fresh.
-  var slide = S.slides[S.presSlide];
-  if(slide){
-    // Kick off async render; updates _lastRecBitmap when done
-    getSlideBitmap(slide).then(function(bm){
-      _lastRecBitmap = bm;
-    }).catch(function(){});
-    // v1.0.19: composite a slide transition between the previous slide's
-    // bitmap and the current one for ~animation duration after a slide
-    // change. Maps the chosen transition kind (fade / slide-left / etc.)
-    // into a per-frame composition. Cache is invalidated on slide change
-    // (presNext/presPrev), so _lastRecBitmap is the CURRENT slide's bitmap
-    // (or the prev one until the new render completes). _prevSlideBitmap
-    // holds a snapshot of the bitmap from BEFORE the change.
-    var transOn = slideTransitionInProgress() && _prevSlideBitmap;
-    if(transOn){
-      var transElapsed = performance.now() - _slideTransitionTime;
-      var transDur = _slideTransitionDurationMs();
-      var transProg = _easeOutCubic(Math.min(1, transElapsed / transDur));
-      var transKind = (_prevSlideForTransition && _prevSlideForTransition.transition)
-                       || S.globalTransition || 'fade';
-      // Draw the previous slide first
-      ctx.save();
-      switch(transKind){
-        case 'slide-left':
-          // Previous moves OFF to the left; new moves IN from the right
-          ctx.drawImage(_prevSlideBitmap, -W * transProg, 0, W, H);
-          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, W * (1 - transProg), 0, W, H);
-          break;
-        case 'slide-right':
-          ctx.drawImage(_prevSlideBitmap, W * transProg, 0, W, H);
-          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, -W * (1 - transProg), 0, W, H);
-          break;
-        case 'slide-up':
-          ctx.drawImage(_prevSlideBitmap, 0, -H * transProg, W, H);
-          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, 0, H * (1 - transProg), W, H);
-          break;
-        case 'slide-down':
-          ctx.drawImage(_prevSlideBitmap, 0, H * transProg, W, H);
-          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, 0, -H * (1 - transProg), W, H);
-          break;
-        case 'zoom':
-          // Prev fades + scales up, new fades + scales from below
-          ctx.globalAlpha = 1 - transProg;
-          var ps = 1 + 0.1 * transProg;
-          ctx.translate(W/2, H/2); ctx.scale(ps, ps); ctx.translate(-W/2, -H/2);
-          ctx.drawImage(_prevSlideBitmap, 0, 0, W, H);
-          ctx.setTransform(1, 0, 0, 1, 0, 0);
-          ctx.globalAlpha = transProg;
-          var ns = 0.95 + 0.05 * transProg;
-          ctx.translate(W/2, H/2); ctx.scale(ns, ns); ctx.translate(-W/2, -H/2);
-          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, 0, 0, W, H);
-          break;
-        case 'none':
-          // No transition — just draw current
-          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, 0, 0, W, H);
-          else { ctx.fillStyle = slide.bg || '#111113'; ctx.fillRect(0, 0, W, H); }
-          break;
-        case 'fade':
-        default:
-          // Cross-fade: prev at 1-progress, new at progress
-          ctx.globalAlpha = 1 - transProg;
-          ctx.drawImage(_prevSlideBitmap, 0, 0, W, H);
-          ctx.globalAlpha = transProg;
-          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, 0, 0, W, H);
-          break;
-      }
-      ctx.restore();
-      // When transition completes, drop the snapshot to free memory.
-      if(transProg >= 1){
-        _prevSlideBitmap = null;
-        _prevSlideForTransition = null;
-        _slideTransitionTime = 0;
-      }
-    } else {
-      // Normal path: draw whatever's currently latest
-      if(_lastRecBitmap){
-        ctx.drawImage(_lastRecBitmap, 0, 0, W, H);
-      } else {
-        ctx.fillStyle = slide.bg || '#111113';
-        ctx.fillRect(0, 0, W, H);
-      }
-    }
-  }
-
+// Shared overlay pass: live ink, webcam and pointer. Called by BOTH the
+// layered fast path and the original full-render path so the two produce
+// identical output above the slide content.
+function recDrawOverlays(ctx, W, H, slide){
   // 1b. Live ink overlay (drawCanvas). The slide bitmap above only contains
   // strokes that have already been COMMITTED to slide.draws (i.e., after the
   // user lifts the mouse) AND that the cached bitmap has been re-rendered
@@ -6016,6 +6087,132 @@ function recComposeFrame(){
     drawPointerOnCtx(ctx, W, H, _pointerPos, pointerScale);
   } catch(e){ /* never let pointer rendering break the recording loop */ }
   // Note: no RAF reschedule — setInterval handles the next tick.
+}
+
+function recComposeFrame(){
+  if(!S.recActive || !S.recCanvas){
+    if(S.recInterval){ clearInterval(S.recInterval); S.recInterval = null; }
+    return;
+  }
+  if(S.recPaused) return; // setInterval keeps ticking; just skip drawing
+  var cv = S.recCanvas;
+  var ctx = cv.getContext('2d');
+  var W = cv.width, H = cv.height;
+
+  // 1. Draw slide bitmap. Fire render to keep the "latest bitmap" always fresh.
+  var slide = S.slides[S.presSlide];
+  if(slide){
+    // LAYERED FAST PATH: eligible slides (live screen share, no other animated
+    // content) composite from two CACHED static layers plus the live video,
+    // instead of rebuilding the whole slide every frame. This is what keeps
+    // recComposeFrame inside its 33ms budget at 2560x1440.
+    if(slideEligibleForLayering(slide)){
+      if(!_recLayerPending){
+        _recLayerPending = true;
+        getLayeredRecBitmaps(slide).then(function(L){
+          _recLayerPending = false;
+          if(L) _recLayerReady = L;
+        }).catch(function(e){
+          _recLayerPending = false;
+          console.warn('[EP] Layered compositor failed, falling back:', e);
+          _recLayerFailed = true;
+        });
+      }
+      var LR = _recLayerReady;
+      if(!_recLayerFailed && LR && LR.below && LR.slideId === slide.id &&
+         LR.generation === _recCacheGeneration){
+        ctx.drawImage(LR.below, 0, 0, W, H);
+        drawLiveSharesToRec(ctx, LR.shares);
+        ctx.drawImage(LR.above, 0, 0, W, H);
+        recDrawOverlays(ctx, W, H, slide);
+        return;
+      }
+      // Layers not built yet — fall through to the full-render path for this
+      // frame so the recording never shows an empty canvas.
+    }
+    // Kick off async render; updates _lastRecBitmap when done
+    getSlideBitmap(slide).then(function(bm){
+      _lastRecBitmap = bm;
+    }).catch(function(){});
+    // v1.0.19: composite a slide transition between the previous slide's
+    // bitmap and the current one for ~animation duration after a slide
+    // change. Maps the chosen transition kind (fade / slide-left / etc.)
+    // into a per-frame composition. Cache is invalidated on slide change
+    // (presNext/presPrev), so _lastRecBitmap is the CURRENT slide's bitmap
+    // (or the prev one until the new render completes). _prevSlideBitmap
+    // holds a snapshot of the bitmap from BEFORE the change.
+    var transOn = slideTransitionInProgress() && _prevSlideBitmap;
+    if(transOn){
+      var transElapsed = performance.now() - _slideTransitionTime;
+      var transDur = _slideTransitionDurationMs();
+      var transProg = _easeOutCubic(Math.min(1, transElapsed / transDur));
+      var transKind = (_prevSlideForTransition && _prevSlideForTransition.transition)
+                       || S.globalTransition || 'fade';
+      // Draw the previous slide first
+      ctx.save();
+      switch(transKind){
+        case 'slide-left':
+          // Previous moves OFF to the left; new moves IN from the right
+          ctx.drawImage(_prevSlideBitmap, -W * transProg, 0, W, H);
+          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, W * (1 - transProg), 0, W, H);
+          break;
+        case 'slide-right':
+          ctx.drawImage(_prevSlideBitmap, W * transProg, 0, W, H);
+          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, -W * (1 - transProg), 0, W, H);
+          break;
+        case 'slide-up':
+          ctx.drawImage(_prevSlideBitmap, 0, -H * transProg, W, H);
+          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, 0, H * (1 - transProg), W, H);
+          break;
+        case 'slide-down':
+          ctx.drawImage(_prevSlideBitmap, 0, H * transProg, W, H);
+          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, 0, -H * (1 - transProg), W, H);
+          break;
+        case 'zoom':
+          // Prev fades + scales up, new fades + scales from below
+          ctx.globalAlpha = 1 - transProg;
+          var ps = 1 + 0.1 * transProg;
+          ctx.translate(W/2, H/2); ctx.scale(ps, ps); ctx.translate(-W/2, -H/2);
+          ctx.drawImage(_prevSlideBitmap, 0, 0, W, H);
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.globalAlpha = transProg;
+          var ns = 0.95 + 0.05 * transProg;
+          ctx.translate(W/2, H/2); ctx.scale(ns, ns); ctx.translate(-W/2, -H/2);
+          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, 0, 0, W, H);
+          break;
+        case 'none':
+          // No transition — just draw current
+          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, 0, 0, W, H);
+          else { ctx.fillStyle = slide.bg || '#111113'; ctx.fillRect(0, 0, W, H); }
+          break;
+        case 'fade':
+        default:
+          // Cross-fade: prev at 1-progress, new at progress
+          ctx.globalAlpha = 1 - transProg;
+          ctx.drawImage(_prevSlideBitmap, 0, 0, W, H);
+          ctx.globalAlpha = transProg;
+          if(_lastRecBitmap) ctx.drawImage(_lastRecBitmap, 0, 0, W, H);
+          break;
+      }
+      ctx.restore();
+      // When transition completes, drop the snapshot to free memory.
+      if(transProg >= 1){
+        _prevSlideBitmap = null;
+        _prevSlideForTransition = null;
+        _slideTransitionTime = 0;
+      }
+    } else {
+      // Normal path: draw whatever's currently latest
+      if(_lastRecBitmap){
+        ctx.drawImage(_lastRecBitmap, 0, 0, W, H);
+      } else {
+        ctx.fillStyle = slide.bg || '#111113';
+        ctx.fillRect(0, 0, W, H);
+      }
+    }
+  }
+
+  recDrawOverlays(ctx, W, H, slide);
 }
 
 function formatRecTime(ms){
@@ -6450,12 +6647,17 @@ window.startRecording = async function(){
   try {
     // 1. Create canvas matching deck aspect (landscape: 1920×1080, portrait: 1080×1920)
     var cv = document.createElement('canvas');
-    cv.width = Math.round(STAGE_W * 1.333);
-    cv.height = Math.round(STAGE_H * 1.333);
+    cv.width = Math.round(STAGE_W * REC_SCALE);
+    cv.height = Math.round(STAGE_H * REC_SCALE);
     S.recCanvas = cv;
 
     // Force-clear the canvas pixels (defensive: new canvases default transparent, but be explicit)
     var primeCtx = cv.getContext('2d');
+    // SHARPNESS FIX (v1.0.23): getContext('2d') returns the SAME context object
+    // every call, so setting this once here persists for every recComposeFrame
+    // tick for the life of the recording.
+    primeCtx.imageSmoothingEnabled = true;
+    primeCtx.imageSmoothingQuality = 'high';
     primeCtx.fillStyle = '#000';
     primeCtx.fillRect(0, 0, cv.width, cv.height);
 
@@ -6472,7 +6674,13 @@ window.startRecording = async function(){
     // both mic and slide-audio tracks can feed into.
     var videoStream = cv.captureStream(30);
     var combinedStream = new MediaStream();
-    videoStream.getVideoTracks().forEach(function(t){ combinedStream.addTrack(t); });
+    videoStream.getVideoTracks().forEach(function(t){
+      // SHARPNESS FIX (v1.0.23): slides and screen shares are detail content,
+      // not motion content. This flips the VP9 encoder's rate-distortion
+      // tradeoff toward preserving text edges instead of temporal smoothness.
+      try { t.contentHint = 'detail'; } catch(e){}
+      combinedStream.addTrack(t);
+    });
 
     // AudioContext-based mixer (only created when needed)
     if(S.recAudio || includeAudio){
@@ -6561,7 +6769,19 @@ window.startRecording = async function(){
       return;
     }
     S.recChunks = [];
-    var rec = new MediaRecorder(combinedStream, { mimeType: mimeType, videoBitsPerSecond: 5000000 });
+    // SHARPNESS FIX (v1.0.23): 5 Mbps is thin for 1080p30 screen content —
+    // fine text is exactly what a starved encoder throws away first. Scale the
+    // budget with the canvas so portrait decks and any future higher-res
+    // output get a proportionate allowance. 1920x1080 lands at ~12.4 Mbps.
+    var _recPixels = cv.width * cv.height;
+    var _recBitrate = Math.round(Math.min(24000000, Math.max(8000000, _recPixels * 30 * 0.20)));
+    console.log('[EP] Recording ' + cv.width + 'x' + cv.height + ' @ ' +
+                (_recBitrate / 1000000).toFixed(1) + ' Mbps, codec=' + mimeType);
+    var rec = new MediaRecorder(combinedStream, {
+      mimeType: mimeType,
+      videoBitsPerSecond: _recBitrate,
+      audioBitsPerSecond: 128000
+    });
     rec.ondataavailable = function(e){
       if(e.data && e.data.size > 0) S.recChunks.push(e.data);
     };
@@ -7657,7 +7877,16 @@ document.addEventListener('mouseup', function(){
 });
 
 // Pen cursor
+var _lastPenPt = { clientX: 0, clientY: 0 };
 function updatePenCursor(evt){
+  // refreshPresToolbar -> setPresTool calls this with no event, which threw
+  // 'Cannot read properties of undefined (reading clientX)' and aborted the
+  // toolbar refresh mid-way. Fall back to the last known pointer position.
+  if(evt && typeof evt.clientX === 'number'){
+    _lastPenPt = { clientX: evt.clientX, clientY: evt.clientY };
+  } else {
+    evt = _lastPenPt;
+  }
   if(!penCursorEl){
     penCursorEl = document.createElement('div');
     penCursorEl.className = 'pen-cursor';
@@ -7984,11 +8213,21 @@ window.connectScreenShare = async function(id, evt){
       // Build constraints. For audio, Electron supports system loopback via
       // chromeMediaSource: 'desktop' on Windows. The id field is not needed
       // for audio (Windows captures system audio, not per-source).
+      // SHARPNESS FIX (v1.0.23): Chromium's `chromeMediaSource: 'desktop'`
+      // pipeline caps capture at 640x480 when no size constraints are given.
+      // That undersized frame was then upscaled ~3x onto the 1920x1080 stage,
+      // which is the single biggest cause of blurry screen shares in exports.
+      // We only set MAX bounds (never MIN) — a min constraint would throw
+      // OverconstrainedError when sharing a window smaller than the minimum.
+      var _ssMaxW = Math.max(1920, Math.round((window.screen && window.screen.width  || 1920) * (window.devicePixelRatio || 1)));
+      var _ssMaxH = Math.max(1080, Math.round((window.screen && window.screen.height || 1080) * (window.devicePixelRatio || 1)));
       var constraints = {
         video: {
           mandatory: {
             chromeMediaSource: 'desktop',
             chromeMediaSourceId: source.id,
+            maxWidth: _ssMaxW,
+            maxHeight: _ssMaxH,
             maxFrameRate: 30
           }
         }
@@ -8023,8 +8262,17 @@ window.connectScreenShare = async function(id, evt){
       var savedAudio = localStorage.getItem('ep-sp-include-audio');
       includeAudio = savedAudio === null ? true : savedAudio === 'true';
       try {
+        // SHARPNESS FIX (v1.0.23): without explicit size hints Chrome often
+        // negotiates 720p or lower. `resizeMode: 'none'` tells it to hand back
+        // the native surface instead of rescaling it. Both are non-exact
+        // (ideal/max), so an unsupported field is ignored rather than throwing.
         stream = await navigator.mediaDevices.getDisplayMedia({
-          video: { frameRate: { ideal: 30, max: 60 } },
+          video: {
+            frameRate: { ideal: 30, max: 60 },
+            width:  { ideal: 1920, max: 3840 },
+            height: { ideal: 1080, max: 2160 },
+            resizeMode: 'none'
+          },
           audio: includeAudio
         });
         // Some browsers accept the audio:true request but return no audio track
@@ -8042,6 +8290,23 @@ window.connectScreenShare = async function(id, evt){
     }
 
     if(!stream) return;
+
+    // SHARPNESS FIX (v1.0.23): `contentHint = 'detail'` tells every downstream
+    // consumer (the compositor and, critically, the VP9 encoder) that this is
+    // screen content where crisp text matters more than smooth motion. Without
+    // it the encoder optimises for motion and smears fine glyphs.
+    // The console line reports what Chromium ACTUALLY negotiated — if this
+    // prints 640x480 the constraints above were rejected, which is the first
+    // thing to check if shares still look soft.
+    try {
+      var _ssTrack = stream.getVideoTracks()[0];
+      if(_ssTrack){
+        _ssTrack.contentHint = 'detail';
+        var _ssSet = (typeof _ssTrack.getSettings === 'function') ? _ssTrack.getSettings() : {};
+        console.log('[EP] Screen share capture: ' + (_ssSet.width || '?') + 'x' + (_ssSet.height || '?') +
+                    ' @ ' + (_ssSet.frameRate || '?') + 'fps, contentHint=' + _ssTrack.contentHint);
+      }
+    } catch(e){ console.warn('[EP] contentHint/settings unavailable:', e); }
 
     // Tag the stream with audio capture state so we can read it later
     // (e.g., in props panel rendering, recording pipeline)
@@ -11919,15 +12184,111 @@ window.handlePptxImport = async function(evt){
 };
 
 // Render a single slide to a canvas (shared between PNG, PDF, PPTX exports)
+// LAYERED COMPOSITOR SUPPORT
+// Draws a screen-share element's visual content into a context whose origin is
+// the element's top-left, working in element (stage) units. Called from BOTH
+// the full slide renderer and the per-frame recording compositor — keep it
+// shared, since duplicating this logic is how the canvas and DOM paths drift.
+function ssDrawContent(octx, ow, oh, el, ssVideo){
+  var ssBr = el.br || 10;
+  var ssBw = el.bw || 0;
+  var ssBStyle = el.borderStyle || 'solid';
+  var ssBC1 = el.bc || '#7ed957';
+  var ssBC2 = el.bc2 || '#9b59ff';
+
+  function ssRoundedPath(c, px, py, pw, ph, pr){
+    var r = Math.min(pr, pw/2, ph/2);
+    c.beginPath();
+    c.moveTo(px + r, py);
+    c.lineTo(px + pw - r, py);
+    c.quadraticCurveTo(px + pw, py, px + pw, py + r);
+    c.lineTo(px + pw, py + ph - r);
+    c.quadraticCurveTo(px + pw, py + ph, px + pw - r, py + ph);
+    c.lineTo(px + r, py + ph);
+    c.quadraticCurveTo(px, py + ph, px, py + ph - r);
+    c.lineTo(px, py + r);
+    c.quadraticCurveTo(px, py, px + r, py);
+    c.closePath();
+  }
+
+  octx.save();
+  if(ssBr > 0) ssRoundedPath(octx, 0, 0, ow, oh, ssBr);
+  else { octx.beginPath(); octx.rect(0, 0, ow, oh); }
+  octx.clip();
+  octx.fillStyle = '#0a0a0c';
+  octx.fillRect(0, 0, ow, oh);
+  if(ssVideo && ssVideo.readyState >= 2){
+    // Preserve source aspect and letterbox — drawing edge-to-edge squashed a
+    // 16:10 desktop into a 16:9 box, distorting every glyph vertically.
+    try {
+      var _svW = ssVideo.videoWidth  || ow;
+      var _svH = ssVideo.videoHeight || oh;
+      var _svScale = Math.min(ow / _svW, oh / _svH);
+      var _svDW = _svW * _svScale, _svDH = _svH * _svScale;
+      octx.drawImage(ssVideo, (ow - _svDW) / 2, (oh - _svDH) / 2, _svDW, _svDH);
+    } catch(e){}
+  } else {
+    octx.fillStyle = '#1a1a22';
+    octx.fillRect(0, 0, ow, oh);
+    octx.fillStyle = '#66667a';
+    octx.font = '500 18px Outfit, sans-serif';
+    octx.textAlign = 'center';
+    octx.textBaseline = 'middle';
+    octx.fillText(el.label || 'Screen Share (not connected)', ow/2, oh/2);
+  }
+  octx.restore();
+
+  if(ssBw > 0){
+    if(ssBStyle === 'solid'){
+      octx.strokeStyle = ssBC1;
+    } else {
+      var cx = ow/2, cy = oh/2;
+      var rad = Math.max(ow, oh);
+      var angle;
+      if(ssBStyle === 'animated'){
+        angle = ((performance.now() / 3000) % 1) * Math.PI * 2;
+      } else {
+        angle = Math.PI * 0.75;
+      }
+      var grad = octx.createLinearGradient(
+        cx - Math.cos(angle) * rad, cy - Math.sin(angle) * rad,
+        cx + Math.cos(angle) * rad, cy + Math.sin(angle) * rad
+      );
+      grad.addColorStop(0, ssBC1);
+      grad.addColorStop(0.5, ssBC2);
+      grad.addColorStop(1, ssBC1);
+      octx.strokeStyle = grad;
+    }
+    octx.lineWidth = ssBw;
+    var inset = ssBw / 2;
+    if(ssBr > 0){
+      ssRoundedPath(octx, inset, inset, ow - ssBw, oh - ssBw, Math.max(0, ssBr - inset));
+      octx.stroke();
+    } else {
+      octx.strokeRect(inset, inset, ow - ssBw, oh - ssBw);
+    }
+  }
+}
+
 async function renderSlideToCanvas(s, scale){
   scale = scale || 2;
   var cv = document.createElement('canvas');
   cv.width = STAGE_W * scale;
   cv.height = STAGE_H * scale;
   var x = cv.getContext('2d');
+  // SHARPNESS FIX (v1.0.23): Chromium defaults imageSmoothingQuality to 'low'
+  // (cheap bilinear). 'high' switches to a proper multi-tap filter, which
+  // visibly cleans up every scaled bitmap on the slide — screen shares,
+  // webcams, images and chart rasters alike.
+  x.imageSmoothingEnabled = true;
+  x.imageSmoothingQuality = 'high';
   x.scale(scale, scale);
-  x.fillStyle = s.bg;
-  x.fillRect(0, 0, STAGE_W, STAGE_H);
+  // LAYERED COMPOSITOR: the "above" layer must be transparent so the static
+  // content below it and the live video between them show through.
+  if(!s._noBg){
+    x.fillStyle = s.bg;
+    x.fillRect(0, 0, STAGE_W, STAGE_H);
+  }
   for(var i=0; i<s.els.length; i++){
     var el = s.els[i];
     // v1.0.19: apply per-element reveal animation transform/alpha for the
@@ -12283,93 +12644,10 @@ async function renderSlideToCanvas(s, scale){
       }
     }
     if(el.type === 'screenshare'){
-      // Phase 3b: route through drawMediaElementWithEffects so drop-shadow
-      // and lift render in the recording. Also adds gradient/animated border
-      // support (the canvas path was solid-only before — that's why animated
-      // gradient never showed up in MP4 exports).
       var ssStream = _screenShareStreams[el.id];
       var ssVideo = ssStream ? document.getElementById('ss-video-' + el.id) : null;
-      var ssBr = el.br || 10;
-      var ssBw = el.bw || 0;
-      var ssBStyle = el.borderStyle || 'solid';
-      var ssBC1 = el.bc || '#7ed957';
-      var ssBC2 = el.bc2 || '#9b59ff';
       drawMediaElementWithEffects(x, el, el.x, el.y, el.w, el.h, function(octx, ow, oh){
-        // Build rounded-corner clip path (used for both video clip and border stroke)
-        function ssRoundedPath(c, px, py, pw, ph, pr){
-          var r = Math.min(pr, pw/2, ph/2);
-          c.beginPath();
-          c.moveTo(px + r, py);
-          c.lineTo(px + pw - r, py);
-          c.quadraticCurveTo(px + pw, py, px + pw, py + r);
-          c.lineTo(px + pw, py + ph - r);
-          c.quadraticCurveTo(px + pw, py + ph, px + pw - r, py + ph);
-          c.lineTo(px + r, py + ph);
-          c.quadraticCurveTo(px, py + ph, px, py + ph - r);
-          c.lineTo(px, py + r);
-          c.quadraticCurveTo(px, py, px + r, py);
-          c.closePath();
-        }
-
-        // Background fill (visible behind video letterbox bars + placeholder)
-        octx.save();
-        if(ssBr > 0) ssRoundedPath(octx, 0, 0, ow, oh, ssBr);
-        else { octx.beginPath(); octx.rect(0, 0, ow, oh); }
-        octx.clip();
-        octx.fillStyle = '#0a0a0c';
-        octx.fillRect(0, 0, ow, oh);
-        // Video or placeholder
-        if(ssVideo && ssVideo.readyState >= 2){
-          try { octx.drawImage(ssVideo, 0, 0, ow, oh); } catch(e){}
-        } else {
-          octx.fillStyle = '#1a1a22';
-          octx.fillRect(0, 0, ow, oh);
-          octx.fillStyle = '#66667a';
-          octx.font = '500 18px Outfit, sans-serif';
-          octx.textAlign = 'center';
-          octx.textBaseline = 'middle';
-          octx.fillText(el.label || 'Screen Share (not connected)', ow/2, oh/2);
-        }
-        octx.restore();
-
-        // Border — solid / gradient / animated
-        if(ssBw > 0){
-          if(ssBStyle === 'solid'){
-            octx.strokeStyle = ssBC1;
-          } else {
-            // Gradient or animated. Animated rotates the gradient angle over
-            // time (3-second cycle) so colors sweep around the border. Cache
-            // is bypassed for animated borders via slideHasAnimatedBorder.
-            var cx = ow/2, cy = oh/2;
-            var rad = Math.max(ow, oh);
-            var angle;
-            if(ssBStyle === 'animated'){
-              var phase = (performance.now() / 3000) % 1;
-              angle = phase * Math.PI * 2;
-            } else {
-              angle = Math.PI * 0.75; // 135deg, matches CSS
-            }
-            var grad = octx.createLinearGradient(
-              cx - Math.cos(angle) * rad,
-              cy - Math.sin(angle) * rad,
-              cx + Math.cos(angle) * rad,
-              cy + Math.sin(angle) * rad
-            );
-            grad.addColorStop(0,   ssBC1);
-            grad.addColorStop(0.5, ssBC2);
-            grad.addColorStop(1,   ssBC1);
-            octx.strokeStyle = grad;
-          }
-          octx.lineWidth = ssBw;
-          // Inset the stroke by half its width so it sits inside the shape
-          var inset = ssBw / 2;
-          if(ssBr > 0){
-            ssRoundedPath(octx, inset, inset, ow - ssBw, oh - ssBw, Math.max(0, ssBr - inset));
-            octx.stroke();
-          } else {
-            octx.strokeRect(inset, inset, ow - ssBw, oh - ssBw);
-          }
-        }
+        ssDrawContent(octx, ow, oh, el, ssVideo);
       });
     }
     if(el.type === 'webcam'){
@@ -17301,19 +17579,46 @@ function drawMediaElementWithEffects(mainCtx, el, x, y, w, h, drawClippedFn){
   // bounding rectangle) and stacks all shadow layers into a single
   // drawImage call. Cache the offscreen and the filter string to avoid
   // per-frame allocation + concat work.
-  var ow = Math.max(1, Math.round(w));
-  var oh = Math.max(1, Math.round(h));
+  // SHARPNESS FIX (v1.0.23): the offscreen used to be allocated at raw element
+  // size (e.g. 1440x810 stage units) and then blitted into a mainCtx already
+  // scaled by 1.333 for the 1920x1080 recording canvas — a permanent 1.333x
+  // upscale baked into every screen share, webcam and image that had a drop
+  // shadow or lift enabled. We now allocate the offscreen at the DEVICE
+  // resolution mainCtx is actually drawing at, run the callback in element
+  // units via a matching transform (so border widths and corner radii are
+  // untouched), then downsample once on composite.
+  var _mfxW = Math.max(1, Math.round(w));
+  var _mfxH = Math.max(1, Math.round(h));
+  var _mfxScale = 1;
+  try {
+    if(typeof mainCtx.getTransform === 'function'){
+      var _mfxT = mainCtx.getTransform();
+      _mfxScale = Math.hypot(_mfxT.a, _mfxT.b) || 1;
+    }
+  } catch(e){ _mfxScale = 1; }
+  // Clamp: below 1 there is nothing to gain, above 4 the allocation cost per
+  // frame outweighs any visible benefit.
+  _mfxScale = Math.max(1, Math.min(4, _mfxScale));
+  var ow = Math.max(1, Math.round(_mfxW * _mfxScale));
+  var oh = Math.max(1, Math.round(_mfxH * _mfxScale));
   if(!_mediaFxOffscreen){
     _mediaFxOffscreen = document.createElement('canvas');
   }
   var oc = _mediaFxOffscreen;
+  var octx = oc.getContext('2d');
   if(oc.width !== ow || oc.height !== oh){
+    // Assigning width/height resets the transform to identity and clears.
     oc.width = ow; oc.height = oh;
   } else {
-    oc.getContext('2d').clearRect(0, 0, ow, oh);
+    octx.setTransform(1, 0, 0, 1, 0, 0);
+    octx.clearRect(0, 0, ow, oh);
   }
-  var octx = oc.getContext('2d');
-  drawClippedFn(octx, ow, oh);
+  octx.imageSmoothingEnabled = true;
+  octx.imageSmoothingQuality = 'high';
+  // Callback keeps working in element units — it never has to know about DPR.
+  octx.setTransform(_mfxScale, 0, 0, _mfxScale, 0, 0);
+  drawClippedFn(octx, _mfxW, _mfxH);
+  octx.setTransform(1, 0, 0, 1, 0, 0);
 
   // Cached filter string (rebuild only when shadow/effect3d fields change)
   var cacheKey = el.id || '__floatingWebcam';
@@ -17326,7 +17631,9 @@ function drawMediaElementWithEffects(mainCtx, el, x, y, w, h, drawClippedFn){
 
   mainCtx.save();
   mainCtx.filter = entry.filter;
-  mainCtx.drawImage(oc, x, y);
+  // Explicit dest width/height — the offscreen is now larger than the element
+  // box, so drawing it at natural size would blow the element up.
+  mainCtx.drawImage(oc, x, y, _mfxW, _mfxH);
   mainCtx.restore();
 }
 
