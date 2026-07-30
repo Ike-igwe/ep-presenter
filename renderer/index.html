@@ -587,6 +587,70 @@ body.ep-speed-slow{--ep-trans-dur:1.1s;--ep-reveal-dur:0.85s}
 .ss-controls button:hover{background:rgba(126,217,87,0.4)}
 .ss-controls button.disconnect{background:rgba(255,40,40,0.2);color:#ff6b6b;border-color:rgba(255,40,40,0.35)}
 .ss-controls button.disconnect:hover{background:rgba(255,40,40,0.35)}
+/* ---- Crop mode (Phase 2) ---- */
+.ss-crop-ov{position:absolute;inset:0;z-index:6;visibility:hidden}
+.ss-crop-ov.ready{visibility:visible}
+.ss-crop-rect{position:absolute;box-sizing:border-box;border:1.5px solid #7ed957;box-shadow:0 0 0 9999px rgba(0,0,0,0.60);cursor:move}
+.ss-crop-thirds{position:absolute;inset:0;pointer-events:none;opacity:0.5}
+.ss-crop-thirds i{position:absolute;background:rgba(255,255,255,0.35)}
+.ss-crop-thirds i.v{top:0;bottom:0;width:1px}
+.ss-crop-thirds i.h{left:0;right:0;height:1px}
+.ss-crop-h{position:absolute;width:12px;height:12px;background:#7ed957;border:2px solid #0a0a0c;border-radius:2px;z-index:2}
+.ss-crop-h[data-h="nw"]{left:-7px;top:-7px;cursor:nwse-resize}
+.ss-crop-h[data-h="ne"]{right:-7px;top:-7px;cursor:nesw-resize}
+.ss-crop-h[data-h="sw"]{left:-7px;bottom:-7px;cursor:nesw-resize}
+.ss-crop-h[data-h="se"]{right:-7px;bottom:-7px;cursor:nwse-resize}
+.ss-crop-h[data-h="n"]{left:50%;top:-7px;margin-left:-6px;cursor:ns-resize}
+.ss-crop-h[data-h="s"]{left:50%;bottom:-7px;margin-left:-6px;cursor:ns-resize}
+.ss-crop-h[data-h="w"]{left:-7px;top:50%;margin-top:-6px;cursor:ew-resize}
+.ss-crop-h[data-h="e"]{right:-7px;top:50%;margin-top:-6px;cursor:ew-resize}
+/* Toolbar is fixed-position on <body>, not inside .ss-el — otherwise
+   overflow:hidden clips it and slide zoom scales the buttons. */
+.ss-crop-bar{position:fixed;z-index:99999;display:flex;gap:6px;align-items:center;background:rgba(14,14,18,0.97);border:1px solid rgba(255,255,255,0.14);border-radius:8px;padding:6px 8px;font-family:Outfit,sans-serif;box-shadow:0 8px 28px rgba(0,0,0,0.55);visibility:hidden}
+.ss-crop-bar.ready{visibility:visible}
+.ss-crop-bar button{padding:5px 10px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.14);color:#f0f0f5;border-radius:5px;cursor:pointer;font-family:Outfit,sans-serif;font-size:11px;font-weight:600;letter-spacing:0.3px;white-space:nowrap}
+.ss-crop-bar button:hover{background:rgba(126,217,87,0.28);border-color:#7ed957}
+.ss-crop-bar button.on{background:#7ed957;border-color:#7ed957;color:#0a0a0c}
+.ss-crop-bar button.done{background:#7ed957;border-color:#7ed957;color:#0a0a0c}
+.ss-crop-bar .sep{width:1px;height:18px;background:rgba(255,255,255,0.14)}
+.ss-crop-bar .hint{color:#8a8a99;font-size:10px;letter-spacing:0.2px;padding:0 2px}
+.ss-crop-bar .rec{color:#ff6b6b;font-size:10px;font-weight:700;letter-spacing:0.4px}
+/* Presentation-mode style panel */
+.ss-style-pan{position:fixed;z-index:99999;width:272px;background:rgba(16,16,20,0.97);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,0.10);border-radius:12px;font-family:Outfit,sans-serif;box-shadow:0 18px 50px rgba(0,0,0,0.65),0 0 0 1px rgba(0,0,0,0.4);overflow:hidden;user-select:none}
+.ss-sp-head{display:flex;align-items:center;gap:8px;padding:9px 10px;background:rgba(255,255,255,0.04);border-bottom:1px solid rgba(255,255,255,0.07);cursor:grab}
+.ss-sp-head:active{cursor:grabbing}
+.ss-sp-grip{width:12px;height:12px;flex:none;background-image:radial-gradient(circle,rgba(255,255,255,0.42) 1px,transparent 1px);background-size:4px 4px}
+.ss-sp-title{flex:1;color:#e8e8ef;font-size:10px;font-weight:800;letter-spacing:1.1px}
+.ss-sp-x{background:transparent;border:0;color:#8a8a99;font-size:11px;cursor:pointer;padding:2px 4px;border-radius:4px;font-family:Outfit,sans-serif}
+.ss-sp-x:hover{background:rgba(255,60,60,0.22);color:#ff8080}
+.ss-sp-tabs{display:flex;gap:4px;padding:8px 10px 0}
+.ss-sp-tabs button{flex:1;padding:6px 0;background:transparent;border:0;border-bottom:2px solid transparent;color:#8a8a99;font-family:Outfit,sans-serif;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0.3px}
+.ss-sp-tabs button:hover{color:#d8d8e2}
+.ss-sp-tabs button.on{color:#7ed957;border-bottom-color:#7ed957}
+.ss-sp-body{padding:10px;max-height:56vh;overflow-y:auto}
+.ss-sp-body::-webkit-scrollbar{width:7px}
+.ss-sp-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.14);border-radius:4px}
+.ss-sp-lab{color:#7a7a88;font-size:9px;font-weight:800;letter-spacing:0.9px;margin:10px 0 6px}
+.ss-sp-lab:first-child{margin-top:0}
+.ss-sp-seg{display:flex;gap:4px;margin-bottom:2px}
+.ss-sp-seg button{flex:1;padding:6px 4px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);color:#d8d8e2;border-radius:6px;cursor:pointer;font-family:Outfit,sans-serif;font-size:10px;font-weight:600;white-space:nowrap}
+.ss-sp-seg button:hover{background:rgba(126,217,87,0.16);border-color:rgba(126,217,87,0.5)}
+.ss-sp-seg button.on{background:#7ed957;border-color:#7ed957;color:#0a0a0c}
+.ss-sp-sw{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.ss-sp-sw .sw{width:19px;height:19px;border-radius:50%;border:2px solid rgba(255,255,255,0.16);cursor:pointer;padding:0;transition:transform .1s}
+.ss-sp-sw .sw:hover{transform:scale(1.16)}
+.ss-sp-sw .sw.on{border-color:#fff;box-shadow:0 0 0 2px rgba(126,217,87,0.95)}
+.ss-sp-cust{width:22px;height:22px;padding:0;border:1px solid rgba(255,255,255,0.2);border-radius:5px;background:transparent;cursor:pointer}
+.ss-sp-sl{margin-top:11px}
+.ss-sp-sl label{display:flex;justify-content:space-between;align-items:baseline;color:#a8a8b8;font-size:10px;font-weight:600;margin-bottom:5px}
+.ss-sp-sl label span{color:#7ed957;font-size:10px;font-weight:700;font-variant-numeric:tabular-nums}
+.ss-sp-sl input[type=range]{width:100%;-webkit-appearance:none;height:4px;border-radius:3px;background:rgba(255,255,255,0.13);outline:none;cursor:pointer}
+.ss-sp-sl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#7ed957;border:2px solid #101014;cursor:grab;box-shadow:0 1px 4px rgba(0,0,0,0.5)}
+.ss-sp-sl input[type=range]::-webkit-slider-thumb:active{cursor:grabbing;transform:scale(1.15)}
+.ss-sp-note{margin-top:12px;color:#6e6e7e;font-size:9.5px;line-height:1.5}
+.ss-sp-foot{padding:9px 10px;border-top:1px solid rgba(255,255,255,0.07);background:rgba(255,255,255,0.02)}
+.ss-sp-foot button{width:100%;padding:7px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#c8c8d4;border-radius:6px;cursor:pointer;font-family:Outfit,sans-serif;font-size:10px;font-weight:700;letter-spacing:0.4px}
+.ss-sp-foot button:hover{background:rgba(255,60,60,0.18);border-color:rgba(255,60,60,0.4);color:#ff9a9a}
 
 .pp-t{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px}
 /* Phase 4e: breadcrumb showing user is editing one member of a group. Click to
@@ -690,6 +754,36 @@ var REC_SCALE = 1.778;
 
 // Runtime switcher — call from DevTools, e.g. epRecQuality('1440p').
 // Takes effect on the NEXT recording; stop and restart if one is running.
+// Screen-share crop console helpers (Phase 1 — UI lands in Phase 2).
+//   epSetCrop('<elId>', 0.25, 0.25, 0.5, 0.5)  → centre quarter
+//   epGetCrop('<elId>')                        → current value
+//   epClearCrop('<elId>')                      → back to full frame
+//   epShareIds()                               → ids of live shares
+window.epSetCrop = function(id, x, y, w, h){
+  var el = ssFindEl(id);
+  if(!el){ console.warn('[crop] no element with id', id); return; }
+  el.ssCrop = { x:x, y:y, w:w, h:h };
+  console.log('[crop] set', id, el.ssCrop, '→ effective', ssGetCrop(el));
+  if(S.pres) renderPres(); else render();
+  return ssGetCrop(el);
+};
+window.epGetCrop = function(id){
+  var el = ssFindEl(id);
+  return el ? { raw: el.ssCrop || null, effective: ssGetCrop(el) } : null;
+};
+window.epClearCrop = function(id){
+  var el = ssFindEl(id);
+  if(!el){ console.warn('[crop] no element with id', id); return; }
+  delete el.ssCrop;
+  if(S.pres) renderPres(); else render();
+  console.log('[crop] cleared', id);
+};
+window.epShareIds = function(){
+  var out = Object.keys(_screenShareStreams);
+  console.log('[crop] live shares:', out);
+  return out;
+};
+
 window.epRecQuality = function(preset){
   var map = { '1080p': 1.333, '1440p': 1.778, '4k': 2.667 };
   var s = map[String(preset).toLowerCase()];
@@ -5743,7 +5837,10 @@ function slideHasAnimatedBorder(slide){
   if(!slide || !slide.els) return false;
   for(var i=0; i<slide.els.length; i++){
     var el = slide.els[i];
-    if((el.type === 'screenshare' || el.type === 'webcam') && el.borderStyle === 'animated' && (el.bw||0) > 0){
+    // Screen shares are exempt: ssDrawContent recomputes the gradient angle
+    // from performance.now() on every frame, and shares are painted live.
+    // Webcams sit in the cached layers, so theirs would freeze.
+    if(el.type === 'webcam' && el.borderStyle === 'animated' && (el.bw||0) > 0){
       return true;
     }
   }
@@ -5839,9 +5936,10 @@ function _shareEligibleForLayering(el){
   // so testing them for truthiness excluded every share whether or not the
   // effect was actually enabled. Read the flags, exactly as
   // drawMediaElementWithEffects does.
-  var sh = el.shadow, fx = el.effect3d;
-  if(sh && sh.on) return false;
-  if(fx && fx.style === 'lift') return false;
+  // Shadow and lift used to disqualify the share. They no longer do —
+  // drawLiveSharesToRec composites them per frame via
+  // drawMediaElementWithEffects, so the cached layers stay valid and the
+  // pen keeps up while recording.
   return true;
 }
 
@@ -5928,13 +6026,120 @@ async function getLayeredRecBitmaps(slide){
 
 // Paints the live video for each share directly onto the recording canvas,
 // in element units scaled up to output resolution.
+// A share is an OPAQUE rounded rect (or tilted quad), so its silhouette is
+// identical on every frame — and therefore so is its drop shadow. Render the
+// shadow once into a sprite and blit it, instead of running ctx.filter
+// drop-shadow over a full-size offscreen 30 times a second. That per-frame
+// filter was what made the pen lag on share slides while leaving plain
+// slides smooth.
+var _ssShadowSprites = {};
+
+// Rounded-rect perimeter as a point list, so a tilted silhouette can follow
+// the ACTUAL rounded outline. Projecting only the four sharp corners left the
+// shadow sticking out past the rounded corners of the share.
+function ssRoundedOutlinePts(w, h, r, seg){
+  r = Math.max(0, Math.min(r, w/2, h/2));
+  var pts = [], i;
+  var arcs = [
+    { cx: w-r, cy: r,   a0: -Math.PI/2, a1: 0 },
+    { cx: w-r, cy: h-r, a0: 0,          a1: Math.PI/2 },
+    { cx: r,   cy: h-r, a0: Math.PI/2,  a1: Math.PI },
+    { cx: r,   cy: r,   a0: Math.PI,    a1: Math.PI*1.5 }
+  ];
+  for(var k = 0; k < 4; k++){
+    var A = arcs[k];
+    for(i = 0; i <= seg; i++){
+      var t = A.a0 + (A.a1 - A.a0) * (i / seg);
+      pts.push({ x: A.cx + Math.cos(t) * r, y: A.cy + Math.sin(t) * r });
+    }
+  }
+  return pts;
+}
+
+function ssSilhouettePath(c, el, w, h, pad){
+  var fx = el.effect3d || {};
+  c.beginPath();
+  if(fx.tiltX || fx.tiltY){
+    var pr = ssTiltProjector(el, w, h);
+    var pts = ssRoundedOutlinePts(w, h, el.br != null ? el.br : 10, 6);
+    for(var i = 0; i < pts.length; i++){
+      var q = pr.project(pts[i].x / w, pts[i].y / h);
+      if(i === 0) c.moveTo(pad + q.x, pad + q.y);
+      else        c.lineTo(pad + q.x, pad + q.y);
+    }
+  } else {
+    var r = Math.min(el.br != null ? el.br : 10, w/2, h/2);
+    var x = pad, y = pad;
+    c.moveTo(x+r, y);
+    c.lineTo(x+w-r, y); c.quadraticCurveTo(x+w, y, x+w, y+r);
+    c.lineTo(x+w, y+h-r); c.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+    c.lineTo(x+r, y+h); c.quadraticCurveTo(x, y+h, x, y+h-r);
+    c.lineTo(x, y+r); c.quadraticCurveTo(x, y, x+r, y);
+  }
+  c.closePath();
+}
+
+function ssShadowSprite(el, w, h){
+  var sh = el.shadow || {}, fx = el.effect3d || {};
+  var filt = _buildMediaEffectFilter(el);
+  if(!filt) return null;
+
+  var key = [w, h, el.br, el.bw, sh.on, sh.x, sh.y, sh.blur, sh.color, sh.opacity,
+             fx.style, fx.depth, fx.tiltX, fx.tiltY, fx.persp].join('|');
+  var cur = _ssShadowSprites[el.id];
+  if(cur && cur.key === key) return cur;
+
+  var hasLift = fx.style === 'lift';
+  var blurMax = Math.max(sh.on ? (sh.blur || 0) : 0, hasLift ? 108 : 0);
+  var offMax  = Math.max(sh.on ? Math.abs(sh.x || 0) : 0,
+                         sh.on ? Math.abs(sh.y || 0) : 0, hasLift ? 56 : 0);
+  var pad = Math.ceil(blurMax + offMax + 24);
+  var cw = Math.ceil(w) + pad * 2, ch = Math.ceil(h) + pad * 2;
+  if(cw > 4096 || ch > 4096) return null;      // fall back rather than thrash
+
+  var sil = document.createElement('canvas');
+  sil.width = cw; sil.height = ch;
+  var sctx = sil.getContext('2d');
+  sctx.fillStyle = '#000';
+  ssSilhouettePath(sctx, el, w, h, pad);
+  sctx.fill();
+
+  var spr = document.createElement('canvas');
+  spr.width = cw; spr.height = ch;
+  var pctx = spr.getContext('2d');
+  pctx.filter = filt;
+  pctx.drawImage(sil, 0, 0);
+  pctx.filter = 'none';
+  // Punch the silhouette back out so the sprite is shadow ONLY — otherwise a
+  // black shape would sit under a tilted share and fringe its edges.
+  pctx.globalCompositeOperation = 'destination-out';
+  // Redraw the path with a stroke as well as a fill. drawImage(sil) removed
+  // only what the silhouette fully covered, leaving its antialiased rim
+  // behind as a thin dark outline around the share. The 3px stroke clears
+  // roughly 1.5px beyond the edge, which a blurred shadow never misses.
+  pctx.fillStyle = '#000';
+  pctx.strokeStyle = '#000';
+  pctx.lineWidth = 3;
+  pctx.lineJoin = 'round';
+  ssSilhouettePath(pctx, el, w, h, pad);
+  pctx.fill();
+  pctx.stroke();
+  pctx.globalCompositeOperation = 'source-over';
+
+  var out = { key: key, canvas: spr, pad: pad };
+  _ssShadowSprites[el.id] = out;
+  return out;
+}
+
 function drawLiveSharesToRec(ctx, shares){
   for(var i=0; i<shares.length; i++){
     var el = shares[i];
     var stream = _screenShareStreams[el.id];
-    var vid = stream ? document.getElementById('ss-video-' + el.id) : null;
+    var vid = stream ? ssVideoEl(el.id) : null;
     ctx.save();
     ctx.scale(REC_SCALE, REC_SCALE);
+    var sp = ssShadowSprite(el, el.w, el.h);
+    if(sp) ctx.drawImage(sp.canvas, el.x - sp.pad, el.y - sp.pad);
     ctx.translate(el.x, el.y);
     ssDrawContent(ctx, el.w, el.h, el, vid);
     ctx.restore();
@@ -5995,14 +6200,24 @@ function recDrawOverlays(ctx, W, H, slide){
   if(S.webcamActive && S.webcamStream){
     var v = document.getElementById('webcamVideo');
     if(v && v.readyState >= 2){
-      var size = Math.round(S.webcamSize * (W / window.innerWidth) * 1.2);
-      // Scale webcam size proportionally — 220px on 1400w screen ≈ ~300px on 1920 canvas
+      // The floating camera is position:fixed in the WINDOW, and webcamPosX/Y
+      // are fractions of window.innerWidth/Height. The recording canvas is the
+      // STAGE, which is letterboxed inside that window at a different aspect —
+      // so multiplying a window fraction by stage width put the camera in the
+      // wrong place, and objects that looked well spaced on screen came out
+      // crowded in the export. Convert through the stage's actual on-screen
+      // rect instead.
+      var _sr = ssStageViewportRect();
+      var _k  = _sr.w > 0 ? (W / _sr.w) : (W / window.innerWidth);
+      var size = Math.round(S.webcamSize * _k);
       size = Math.min(size, Math.floor(H * 0.35));
       var margin = Math.floor(size * 0.12);
       var px, py;
       if(S.webcamPosX !== null && S.webcamPosY !== null){
-        px = Math.round(S.webcamPosX * W);
-        py = Math.round(S.webcamPosY * H);
+        var _vpx = S.webcamPosX * window.innerWidth;
+        var _vpy = S.webcamPosY * window.innerHeight;
+        px = Math.round((_vpx - _sr.left) * _k);
+        py = Math.round((_vpy - _sr.top)  * (_sr.h > 0 ? (H / _sr.h) : _k));
         px = Math.max(0, Math.min(W - size, px));
         py = Math.max(0, Math.min(H - size, py));
       } else if(S.webcamCorner === 'tl'){ px = margin; py = margin; }
@@ -6015,10 +6230,10 @@ function recDrawOverlays(ctx, W, H, slide){
       var oBStyle = S.webcamBorderStyle || 'solid';
       var oBW = (typeof S.webcamBorderWidth === 'number') ? S.webcamBorderWidth : 4;
       // Scale border width proportionally to canvas size
-      oBW = Math.round(oBW * (W / window.innerWidth) * 1.2);
+      oBW = Math.round(oBW * _k);
       var oBC1 = S.webcamBorderColor || '#7ed957';
       var oBC2 = S.webcamBorderColor2 || '#9b59ff';
-      var oRR = (S.webcamRoundedRadius || 14) * (W / window.innerWidth) * 1.2;
+      var oRR = (S.webcamRoundedRadius || 14) * _k;
 
       // Phase 3b: route through drawMediaElementWithEffects so the floating
       // camera's drop-shadow and lift effects render in MP4 exports. The
@@ -6026,33 +6241,47 @@ function recDrawOverlays(ctx, W, H, slide){
       var floatFakeEl = { shadow: S.webcamShadow, effect3d: S.webcamEffect3d };
       drawMediaElementWithEffects(ctx, floatFakeEl, px, py, size, size, function(octx, ow, oh){
         // Helper: walk the shape's clip path on octx in offscreen-local coords
-        function walkOverlayPath(c){
+        // `ins` insets the path. The stroke is centred on the path, so without
+        // an inset of half the border width its outer half falls outside the
+        // offscreen buffer and gets clipped — which flattened the circle at
+        // top, bottom and sides.
+        function walkOverlayPath(c, ins){
+          ins = ins || 0;
+          var w = ow - ins*2, h = oh - ins*2;
           c.beginPath();
           if(oShape === 'circle'){
-            c.arc(ow/2, oh/2, Math.min(ow, oh)/2, 0, Math.PI*2);
+            c.arc(ow/2, oh/2, Math.max(0, Math.min(w, h)/2), 0, Math.PI*2);
           } else if(oShape === 'rounded'){
-            var rr = Math.min(oRR, ow/2, oh/2);
-            c.moveTo(rr, 0);
-            c.lineTo(ow - rr, 0);
-            c.quadraticCurveTo(ow, 0, ow, rr);
-            c.lineTo(ow, oh - rr);
-            c.quadraticCurveTo(ow, oh, ow - rr, oh);
-            c.lineTo(rr, oh);
-            c.quadraticCurveTo(0, oh, 0, oh - rr);
-            c.lineTo(0, rr);
-            c.quadraticCurveTo(0, 0, rr, 0);
+            var rr = Math.min(oRR, w/2, h/2);
+            var x0 = ins, y0 = ins, x1 = ins + w, y1 = ins + h;
+            c.moveTo(x0 + rr, y0);
+            c.lineTo(x1 - rr, y0);
+            c.quadraticCurveTo(x1, y0, x1, y0 + rr);
+            c.lineTo(x1, y1 - rr);
+            c.quadraticCurveTo(x1, y1, x1 - rr, y1);
+            c.lineTo(x0 + rr, y1);
+            c.quadraticCurveTo(x0, y1, x0, y1 - rr);
+            c.lineTo(x0, y0 + rr);
+            c.quadraticCurveTo(x0, y0, x0 + rr, y0);
             c.closePath();
           } else {
-            c.rect(0, 0, ow, oh);
+            c.rect(ins, ins, w, h);
           }
         }
-        // Clipped, mirrored video draw
+        // Clipped, mirrored video draw. Cover-fit to match the on-screen
+        // overlay, whose CSS is object-fit:cover — stretching to ow x oh
+        // squashed a 16:9 camera into a square in the export.
         octx.save();
-        walkOverlayPath(octx);
+        walkOverlayPath(octx, 0);
         octx.clip();
         octx.translate(ow, 0);
         octx.scale(-1, 1);
-        try { octx.drawImage(v, 0, 0, ow, oh); } catch(e){}
+        try {
+          var _vw = v.videoWidth || ow, _vh = v.videoHeight || oh;
+          var _cs = Math.max(ow / _vw, oh / _vh);
+          var _cdw = _vw * _cs, _cdh = _vh * _cs;
+          octx.drawImage(v, (ow - _cdw) / 2, (oh - _cdh) / 2, _cdw, _cdh);
+        } catch(e){}
         octx.restore();
 
         // Border — solid / gradient / animated
@@ -6081,8 +6310,9 @@ function recDrawOverlays(ctx, W, H, slide){
             octx.strokeStyle = oGrad;
           }
           octx.lineWidth = oBW;
-          // Stroke walks the same shape outline (inset is automatic via lineWidth)
-          walkOverlayPath(octx);
+          // Inset by half the border width so the whole stroke lands inside
+          // the buffer and the outer edge sits flush with the shape.
+          walkOverlayPath(octx, oBW / 2);
           octx.stroke();
         }
       });
@@ -8391,8 +8621,8 @@ window.connectScreenShare = async function(id, evt){
     if(S.pres) renderPres(); else render();
     // Attach stream to the newly-rendered video element
     setTimeout(function(){
-      var v = document.getElementById('ss-video-' + id);
-      if(v){ v.srcObject = stream; v.play().catch(function(){}); }
+      ssAttachStreamAll(id, stream);
+      applySsCropStyle(id);
     }, 50);
     showToast('Screen share connected');
   } catch(e){
@@ -12236,7 +12466,243 @@ window.handlePptxImport = async function(evt){
 // the element's top-left, working in element (stage) units. Called from BOTH
 // the full slide renderer and the per-frame recording compositor — keep it
 // shared, since duplicating this logic is how the canvas and DOM paths drift.
+// =========================================================
+// SCREEN SHARE CROP — geometry (Phase 1)
+// el.ssCrop = {x,y,w,h}, normalised 0-1 against the SOURCE video
+// dimensions. Absent, or a full frame, means "no crop".
+//
+// Normalised storage means a crop saved against a 2561-wide desktop is
+// still meaningful if the deck reopens against a 1920-wide one, but it
+// is not automatically CORRECT — so every read re-clamps into range
+// rather than trusting what was serialised.
+// =========================================================
+function ssGetCrop(el){
+  var c = el && el.ssCrop;
+  if(!c) return null;
+  var x = +c.x, y = +c.y, w = +c.w, h = +c.h;
+  if(!isFinite(x) || !isFinite(y) || !isFinite(w) || !isFinite(h)) return null;
+  x = Math.min(Math.max(x, 0), 0.99);
+  y = Math.min(Math.max(y, 0), 0.99);
+  w = Math.min(Math.max(w, 0.01), 1 - x);
+  h = Math.min(Math.max(h, 0.01), 1 - y);
+  // Full-frame crop is a no-op — fall back to the uncropped path so we
+  // don't pay for pointless arithmetic on every recorded frame.
+  if(x <= 0.0005 && y <= 0.0005 && w >= 0.9995 && h >= 0.9995) return null;
+  return { x:x, y:y, w:w, h:h };
+}
+
+// Convert a normalised crop into integer source-pixel coords for the
+// 9-arg drawImage. Returns null when there is no usable crop.
+function ssCropRect(el, svW, svH){
+  var c = ssGetCrop(el);
+  if(!c || !svW || !svH) return null;
+  var sw = Math.max(1, Math.round(svW * c.w));
+  var sh = Math.max(1, Math.round(svH * c.h));
+  var sx = Math.max(0, Math.min(Math.round(svW * c.x), svW - sw));
+  var sy = Math.max(0, Math.min(Math.round(svH * c.y), svH - sh));
+  return { sx:sx, sy:sy, sw:sw, sh:sh };
+}
+
+// Find a screenshare element by id across the whole deck. Presentation
+// mode renders S.presSlide rather than S.si, so a cs()-only lookup would
+// silently miss cropped shares while presenting.
+function ssFindEl(id){
+  if(!S || !S.slides) return null;
+  for(var i = 0; i < S.slides.length; i++){
+    var els = S.slides[i] && S.slides[i].els;
+    if(!els) continue;
+    for(var j = 0; j < els.length; j++){
+      if(els[j].id === id) return els[j];
+    }
+  }
+  return null;
+}
+
+// ---- 3D tilt on canvas ---------------------------------------------------
+// CSS perspective doesn't exist on a 2D canvas, so the tilt is reproduced by
+// rendering the share to an offscreen and mapping it through a mesh of
+// texture-mapped triangles. Only runs when a tilt is actually set, so the
+// untilted fast path is untouched.
+var _tiltCv = null;
+// Tunable at runtime so mesh cost can be measured against quality:
+//   epTiltMesh(4) -> cheaper/coarser, epTiltMesh(8) -> smoother/heavier
+var _tiltMeshN = 6;
+// Reports which recording path a slide is on and, if it's the slow one, why.
+// Run while recording: epRecDiag()
+window.epRecDiag = function(){
+  var slide = S.pres ? S.slides[S.presSlide] : cs();
+  if(!slide){ console.log('[diag] no slide'); return; }
+  var r = {
+    slide: slide.id,
+    recording: !!S.recActive,
+    liveShare:       typeof slideHasLiveScreenShare === 'function' ? slideHasLiveScreenShare(slide) : '?',
+    animatedSticker: slideHasAnimatedSticker(slide),
+    connectedWebcam: slideHasConnectedWebcam(slide),
+    animatingChart:  slideHasAnimatingChart(slide),
+    animatedBorder:  slideHasAnimatedBorder(slide),
+    eligible:        slideEligibleForLayering(slide)
+  };
+  console.log('[diag] layered compositor eligible:', r.eligible);
+  console.table ? console.table(r) : console.log(r);
+  if(!r.eligible){
+    console.warn('[diag] SLOW PATH — full slide re-render every frame. ' +
+                 'Blocking flag(s):',
+      Object.keys(r).filter(function(k){
+        return ['animatedSticker','connectedWebcam','animatingChart','animatedBorder'].indexOf(k) >= 0 && r[k];
+      }));
+  }
+  return r;
+};
+
+window.epTiltMesh = function(n){
+  _tiltMeshN = Math.max(1, Math.min(16, parseInt(n, 10) || 6));
+  console.log('[EP] tilt mesh =', _tiltMeshN + 'x' + _tiltMeshN,
+              '(' + (_tiltMeshN * _tiltMeshN * 2) + ' triangles/frame)');
+  return _tiltMeshN;
+};
+
+function ssDrawTriTex(ctx, im, x0,y0, x1,y1, x2,y2, u0,v0, u1,v1, u2,v2){
+  var den = u0*v1 + v0*u2 + u1*v2 - v1*u2 - v0*u1 - u0*v2;
+  if(!den) return;
+  var a = (x0*v1 + v0*x2 + x1*v2 - v1*x2 - v0*x1 - x0*v2) / den;
+  var b = (u0*x1 + x0*u2 + u1*x2 - x1*u2 - x0*u1 - u0*x2) / den;
+  var c = (u0*v1*x2 + v0*x1*u2 + x0*u1*v2 - x0*v1*u2 - v0*u1*x2 - u0*x1*v2) / den;
+  var d = (y0*v1 + v0*y2 + y1*v2 - v1*y2 - v0*y1 - y0*v2) / den;
+  var e = (u0*y1 + y0*u2 + u1*y2 - y1*u2 - y0*u1 - u0*y2) / den;
+  var f = (u0*v1*y2 + v0*y1*u2 + y0*u1*v2 - y0*v1*u2 - v0*u1*y2 - u0*y1*v2) / den;
+  ctx.save();
+  ctx.beginPath();
+  // Nudge each vertex out from the centroid by ~0.4px; without it the clip
+  // edges antialias against each other and leave hairline seams in the mesh.
+  var cx = (x0+x1+x2)/3, cy = (y0+y1+y2)/3;
+  function ex(px, py){
+    var dx = px-cx, dy = py-cy, L = Math.sqrt(dx*dx+dy*dy) || 1;
+    return [px + dx/L*0.4, py + dy/L*0.4];
+  }
+  var p0 = ex(x0,y0), p1 = ex(x1,y1), p2 = ex(x2,y2);
+  ctx.moveTo(p0[0],p0[1]); ctx.lineTo(p1[0],p1[1]); ctx.lineTo(p2[0],p2[1]);
+  ctx.closePath();
+  ctx.clip();
+  ctx.transform(a, d, b, e, c, f);
+  // Draw ONLY this triangle's source sub-rect. drawImage(im,0,0) pushed the
+  // whole supersampled texture through the pipeline once per triangle —
+  // 128 full-size blits a frame, which is what made the pen lag.
+  var sx = Math.min(u0, u1, u2), sy = Math.min(v0, v1, v2);
+  var sw = Math.max(u0, u1, u2) - sx, sh = Math.max(v0, v1, v2) - sy;
+  sx = Math.max(0, sx - 1); sy = Math.max(0, sy - 1);
+  sw = Math.min(im.width  - sx, sw + 2);
+  sh = Math.min(im.height - sy, sh + 2);
+  if(sw > 0 && sh > 0) ctx.drawImage(im, sx, sy, sw, sh, sx, sy, sw, sh);
+  ctx.restore();
+}
+
+// Shared projection. Perspective pushes the corners OUTSIDE the element
+// rectangle, and the canvas draw area is exactly that rectangle — which is
+// what sheared the corners off in the export. So the projected quad is
+// scaled to fit back inside the box, and the same factor is applied to the
+// CSS transform so editor and recording agree.
+// The stage's on-screen rectangle in viewport coordinates. Anything stored
+// as a window fraction has to come through here before it can be placed on
+// the recording canvas, which is in stage space.
+function ssStageViewportRect(){
+  var st = document.getElementById('presStage') || document.getElementById('stageContainer');
+  if(st){
+    var r = st.getBoundingClientRect();
+    if(r.width > 1 && r.height > 1){
+      return { left:r.left, top:r.top, w:r.width, h:r.height };
+    }
+  }
+  // Fallback: recompute the centred fit the renderer uses.
+  var winW = window.innerWidth, winH = window.innerHeight;
+  var sc = Math.min(winW / STAGE_W, winH / STAGE_H);
+  var dw = STAGE_W * sc, dh = STAGE_H * sc;
+  return { left:(winW - dw)/2, top:(winH - dh)/2, w:dw, h:dh };
+}
+
+function ssTiltProjector(el, ow, oh){
+  var fx = el.effect3d || {};
+  var ax = (fx.tiltX || 0) * Math.PI / 180;
+  var ay = (fx.tiltY || 0) * Math.PI / 180;
+  var dp = fx.persp || 900;
+  var cosA = Math.cos(ax), sinA = Math.sin(ax);
+  var cosB = Math.cos(ay), sinB = Math.sin(ay);
+
+  function raw(u, v){
+    var x = (u - 0.5) * ow, y = (v - 0.5) * oh;
+    var y1 = y * cosA, z1 = y * sinA;      // rotateX (z starts at 0)
+    var x2 = x * cosB + z1 * sinB;         // rotateY
+    var z2 = -x * sinB + z1 * cosB;
+    var sc = dp / (dp - z2);
+    return { x: x2 * sc, y: y1 * sc };
+  }
+
+  var c = [raw(0,0), raw(1,0), raw(0,1), raw(1,1)];
+  var minX = c[0].x, maxX = c[0].x, minY = c[0].y, maxY = c[0].y;
+  for(var i = 1; i < 4; i++){
+    if(c[i].x < minX) minX = c[i].x;
+    if(c[i].x > maxX) maxX = c[i].x;
+    if(c[i].y < minY) minY = c[i].y;
+    if(c[i].y > maxY) maxY = c[i].y;
+  }
+  var bw = (maxX - minX) || 1, bh = (maxY - minY) || 1;
+  var k  = Math.min(ow / bw, oh / bh, 1);
+  var ccx = (minX + maxX) / 2, ccy = (minY + maxY) / 2;
+
+  return {
+    k: k,
+    project: function(u, v){
+      var p = raw(u, v);
+      return { x: ow/2 + (p.x - ccx) * k, y: oh/2 + (p.y - ccy) * k };
+    }
+  };
+}
+
+function ssDrawTilted(octx, el, ow, oh, drawFn){
+  if(!_tiltCv) _tiltCv = document.createElement('canvas');
+  // 1.5x rather than 2x: the recording canvas is only REC_SCALE above stage
+  // units, so 2x was paying for resolution nothing consumed.
+  var ss = 1.5;
+  var cw = Math.max(1, Math.round(ow * ss)), chh = Math.max(1, Math.round(oh * ss));
+  if(_tiltCv.width !== cw || _tiltCv.height !== chh){ _tiltCv.width = cw; _tiltCv.height = chh; }
+  var tc = _tiltCv.getContext('2d');
+  tc.setTransform(1,0,0,1,0,0);
+  tc.clearRect(0, 0, cw, chh);
+  tc.save();
+  tc.scale(ss, ss);
+  drawFn(tc, ow, oh);
+  tc.restore();
+
+  var pr = ssTiltProjector(el, ow, oh);
+  var N = _tiltMeshN;   // 72 triangles at 6; 8x8 was 128, each redrawing all
+  for(var i = 0; i < N; i++){
+    for(var j = 0; j < N; j++){
+      var u0 = i/N, u1 = (i+1)/N, v0 = j/N, v1 = (j+1)/N;
+      var a00 = pr.project(u0,v0), a10 = pr.project(u1,v0);
+      var a01 = pr.project(u0,v1), a11 = pr.project(u1,v1);
+      var sx0 = u0*cw, sx1 = u1*cw, sy0 = v0*chh, sy1 = v1*chh;
+      ssDrawTriTex(octx, _tiltCv, a00.x,a00.y, a10.x,a10.y, a01.x,a01.y,
+                   sx0,sy0, sx1,sy0, sx0,sy1);
+      ssDrawTriTex(octx, _tiltCv, a10.x,a10.y, a11.x,a11.y, a01.x,a01.y,
+                   sx1,sy0, sx1,sy1, sx0,sy1);
+    }
+  }
+}
+
+// Wrapper: applies tilt when set, otherwise straight through. Every canvas
+// path (layered recording and full-slide re-render) calls ssDrawContent, so
+// both pick up tilt from here.
 function ssDrawContent(octx, ow, oh, el, ssVideo){
+  var fx = el.effect3d;
+  if(fx && (fx.tiltX || fx.tiltY)){
+    ssDrawTilted(octx, el, ow, oh, function(c, w, h){
+      ssDrawContentRaw(c, w, h, el, ssVideo);
+    });
+    return;
+  }
+  ssDrawContentRaw(octx, ow, oh, el, ssVideo);
+}
+
+function ssDrawContentRaw(octx, ow, oh, el, ssVideo){
   var ssBr = el.br || 10;
   var ssBw = el.bw || 0;
   var ssBStyle = el.borderStyle || 'solid';
@@ -12270,9 +12736,23 @@ function ssDrawContent(octx, ow, oh, el, ssVideo){
     try {
       var _svW = ssVideo.videoWidth  || ow;
       var _svH = ssVideo.videoHeight || oh;
-      var _svScale = Math.min(ow / _svW, oh / _svH);
-      var _svDW = _svW * _svScale, _svDH = _svH * _svScale;
-      octx.drawImage(ssVideo, (ow - _svDW) / 2, (oh - _svDH) / 2, _svDW, _svDH);
+      // Crop (if any) selects the source rect; letterboxing is then
+      // computed against the CROPPED dimensions, so a cropped region
+      // fills the slide element instead of being letterboxed to the
+      // full desktop's aspect. This is also where the sharpness win
+      // comes from — fewer source pixels discarded on downscale.
+      var _cr  = ssCropRect(el, _svW, _svH);
+      var _sx  = _cr ? _cr.sx : 0;
+      var _sy  = _cr ? _cr.sy : 0;
+      var _sw  = _cr ? _cr.sw : _svW;
+      var _sh  = _cr ? _cr.sh : _svH;
+      var _svScale = Math.min(ow / _sw, oh / _sh);
+      var _svDW = _sw * _svScale, _svDH = _sh * _svScale;
+      // Overdraw by 1px each way: rounding in the letterbox maths could
+      // otherwise leave a sub-pixel gap at the clip edge.
+      octx.drawImage(ssVideo, _sx, _sy, _sw, _sh,
+                     (ow - _svDW) / 2 - 1, (oh - _svDH) / 2 - 1,
+                     _svDW + 2, _svDH + 2);
     } catch(e){}
   } else {
     octx.fillStyle = '#1a1a22';
@@ -12306,14 +12786,21 @@ function ssDrawContent(octx, ow, oh, el, ssVideo){
       grad.addColorStop(1, ssBC1);
       octx.strokeStyle = grad;
     }
-    octx.lineWidth = ssBw;
-    var inset = ssBw / 2;
-    if(ssBr > 0){
-      ssRoundedPath(octx, inset, inset, ow - ssBw, oh - ssBw, Math.max(0, ssBr - inset));
-      octx.stroke();
-    } else {
-      octx.strokeRect(inset, inset, ow - ssBw, oh - ssBw);
-    }
+    // Stroke the SAME path as the content clip, at double width, with that
+    // clip still applied. The outer half is trimmed away, so the border's
+    // outer edge is defined by the clip itself rather than merely meeting
+    // it. Stroking an inset path put two antialiased edges flush against
+    // each other and let a hairline of background show through — visible as
+    // dark arcs on the rounded corners.
+    octx.save();
+    if(ssBr > 0) ssRoundedPath(octx, 0, 0, ow, oh, ssBr);
+    else { octx.beginPath(); octx.rect(0, 0, ow, oh); }
+    octx.clip();
+    octx.lineWidth = ssBw * 2;
+    if(ssBr > 0) ssRoundedPath(octx, 0, 0, ow, oh, ssBr);
+    else { octx.beginPath(); octx.rect(0, 0, ow, oh); }
+    octx.stroke();
+    octx.restore();
   }
 }
 
@@ -13447,6 +13934,7 @@ function renderScreenShare(el, isPres){
     // Controls overlay — only visible when element is selected in editor (to avoid clutter)
     if(!isPres){
       h += '<div class="ss-controls">';
+      h += '<button onmousedown="event.stopPropagation()" onclick="event.stopPropagation();enterCropMode(\''+el.id+'\',event)" title="Select the region to show">Crop</button>';
       h += '<button onmousedown="event.stopPropagation()" onclick="event.stopPropagation();connectScreenShare(\''+el.id+'\',event)" title="Change source">Change</button>';
       h += '<button class="disconnect" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();disconnectScreenShare(\''+el.id+'\',event)">Disconnect</button>';
       h += '</div>';
@@ -17712,7 +18200,26 @@ function buildMediaEffectStyle(el){
     parts.push('0 '+Math.round(12 + d*20)+'px '+Math.round(28 + d*40)+'px rgba(0,0,0,'+(0.18 + d*0.10).toFixed(2)+')');
     parts.push('0 '+Math.round(24 + d*32)+'px '+Math.round(48 + d*60)+'px rgba(0,0,0,'+(0.20 + d*0.10).toFixed(2)+')');
   }
-  return parts.length ? 'box-shadow:'+parts.join(', ')+';' : '';
+  var css = parts.length ? 'box-shadow:'+parts.join(', ')+';' : '';
+  // Real 3D tilt. Defaults are 0, so nothing changes for elements that
+  // never set it. NOTE: this is a CSS transform — the canvas recording
+  // path draws from element data and does not apply it, so tilt shows in
+  // the editor and presentation but not (yet) in exported MP4.
+  if(el && el.effect3d && (el.effect3d.tiltX || el.effect3d.tiltY)){
+    var per = el.effect3d.persp || 900;
+    // Same fit factor the canvas path uses, so the on-screen preview matches
+    // the exported frame instead of overflowing its box.
+    var kFit = 1;
+    try {
+      if(typeof ssTiltProjector === 'function' && el.w && el.h){
+        kFit = ssTiltProjector(el, el.w, el.h).k;
+      }
+    } catch(e){}
+    css += 'transform:perspective('+per+'px) rotateX('+(el.effect3d.tiltX||0)+
+           'deg) rotateY('+(el.effect3d.tiltY||0)+'deg) scale('+kFit.toFixed(4)+
+           ');transform-style:preserve-3d;';
+  }
+  return css;
 }
 
 function applyOpacity(color, opacity){
@@ -21619,18 +22126,1070 @@ window._resetSlideTransitionTracker = function(){
   window._lastTransSlideIdx = -1;
 };
 
+// Live DOM crop. The canvas path uses drawImage source-rect args; the
+// <video> can't, so instead we scale the video up and offset it so the
+// cropped region lands centred in the box. .ss-el already has
+// overflow:hidden, so it does the clipping for free — no clip-path.
+//
+// Produces the same letterbox result as ssDrawContent, which matters:
+// the editor preview and the recording must not disagree.
+function applySsCropStyle(idOrEl){
+  var el = (typeof idOrEl === 'string') ? ssFindEl(idOrEl) : idOrEl;
+  if(!el) return;
+  // Style EVERY copy — canvas, thumbnail and presentation stage all render
+  // this element, and each needs its own px offsets against its own box.
+  var list = document.querySelectorAll('video[id="ss-video-' + el.id + '"]');
+  for(var vi = 0; vi < list.length; vi++) applySsCropStyleTo(list[vi], el);
+}
+
+function applySsCropStyleTo(v, el){
+  if(!v) return;
+  var host = v.parentNode;
+  if(!host) return;
+
+  var crop = ssGetCrop(el);
+  // While cropping, the editor shows the UNCROPPED source so there's
+  // something to select against. el.ssCrop still drives the recording,
+  // so the audience keeps seeing the cropped region throughout.
+  if(_cropEditId === el.id) crop = null;
+  if(!crop){
+    // Reset to the stylesheet defaults (100%/100%, object-fit:contain).
+    v.style.position = ''; v.style.left = ''; v.style.top = '';
+    v.style.width = ''; v.style.height = ''; v.style.objectFit = '';
+    return;
+  }
+
+  var svW = v.videoWidth, svH = v.videoHeight;
+  if(!svW || !svH){
+    // Metadata isn't in yet — re-apply once it lands. Guarded so a
+    // render storm can't stack dozens of one-shot listeners.
+    if(!v._epCropWaiting){
+      v._epCropWaiting = true;
+      v.addEventListener('loadedmetadata', function(){
+        v._epCropWaiting = false;
+        applySsCropStyleTo(v, el);
+      }, { once:true });
+    }
+    return;
+  }
+
+  var ow = host.clientWidth, oh = host.clientHeight;
+  if(!ow || !oh) return;
+
+  var cw = svW * crop.w, ch = svH * crop.h;
+  var scale = Math.min(ow / cw, oh / ch);
+  var dw = cw * scale, dh = ch * scale;
+
+  v.style.position  = 'absolute';
+  v.style.objectFit = 'fill';
+  v.style.width  = (svW * scale) + 'px';
+  v.style.height = (svH * scale) + 'px';
+  v.style.left   = ((ow - dw) / 2 - svW * crop.x * scale) + 'px';
+  v.style.top    = ((oh - dh) / 2 - svH * crop.y * scale) + 'px';
+}
+
+// =========================================================
+// CROP MODE — interactive region selection (Phase 2)
+// While editing we show the FULL source with a selection rect over it;
+// you can't pick a region you can't see. el.ssCrop is written live on
+// every drag, so a recording in progress follows the handles in real
+// time (the layered compositor holds live element refs and redraws the
+// share every frame — no cache invalidation needed).
+// =========================================================
+var _cropEditId  = null;   // element id currently being cropped
+var _cropOrig    = null;   // crop as it was on entry, for Esc/cancel
+var _cropAspect  = null;   // null = free, 16/9 = locked
+var _cropDrag    = null;
+var CROP_MIN     = 0.03;   // smallest allowed crop, normalised
+
+// A slide can have more than one <video> carrying the same id — the editor
+// canvas, the sidebar thumbnail, and the presentation stage all render the
+// same element. getElementById returns only the FIRST in document order,
+// which is the thumbnail, so the main canvas was left with a black box.
+// Attach to every one; a MediaStream can feed multiple <video> elements.
+function ssAttachStreamAll(id, stream){
+  var list = document.querySelectorAll('video[id="ss-video-' + id + '"]');
+  for(var i = 0; i < list.length; i++){
+    if(list[i].srcObject !== stream){
+      list[i].srcObject = stream;
+      list[i].play().catch(function(){});
+    }
+  }
+  return list.length;
+}
+
+// Presentation mode can leave a second <video> with the same id in the DOM.
+// getElementById returns whichever comes first in document order, which may
+// be the hidden one — so pick the element that's actually on screen.
+function ssVideoEl(id){
+  var list = document.querySelectorAll('video[id="ss-video-' + id + '"]');
+  if(!list.length) return null;
+  if(list.length === 1) return list[0];
+  var best = null, bestArea = -1;
+  for(var i = 0; i < list.length; i++){
+    var v = list[i];
+    if(!v.offsetParent && v.style.position !== 'fixed') continue;
+    var r = v.getBoundingClientRect();
+    var a = r.width * r.height;
+    if(a > bestArea){ bestArea = a; best = v; }
+  }
+  return best || list[0];
+}
+
+// Geometry of the letterboxed video inside its host, in host-local CSS px,
+// plus the client->local scale factor so slide zoom is handled correctly.
+function ssCropGeom(id){
+  var v = ssVideoEl(id);
+  if(!v || !v.parentNode) return null;
+  var host = v.parentNode;
+  var svW = v.videoWidth, svH = v.videoHeight;
+  var ow = host.clientWidth, oh = host.clientHeight;
+  if(!svW || !svH || !ow || !oh) return null;
+  var s = Math.min(ow / svW, oh / svH);
+  var dw = svW * s, dh = svH * s;
+  var hr = host.getBoundingClientRect();
+  return {
+    host:host, svW:svW, svH:svH, ow:ow, oh:oh,
+    dw:dw, dh:dh, offX:(ow - dw) / 2, offY:(oh - dh) / 2,
+    hostRect:hr, scale:(hr.width / ow) || 1
+  };
+}
+
+// Client point -> normalised source coords (unclamped; callers clamp).
+function ssClientToNorm(g, clientX, clientY){
+  var lx = (clientX - g.hostRect.left) / g.scale;
+  var ly = (clientY - g.hostRect.top)  / g.scale;
+  return { x:(lx - g.offX) / g.dw, y:(ly - g.offY) / g.dh };
+}
+
+function cropWorking(el){
+  var c = el.ssCrop;
+  if(c && isFinite(c.x) && isFinite(c.y) && isFinite(c.w) && isFinite(c.h)){
+    return { x:+c.x, y:+c.y, w:+c.w, h:+c.h };
+  }
+  return { x:0, y:0, w:1, h:1 };
+}
+
+// Force a rect to the locked pixel aspect, anchored so the handle you're
+// dragging stays put. Source pixels may be non-square in normalised space,
+// so aspect is computed against svW/svH, not the 0-1 box.
+function cropApplyAspect(r, g, anchor){
+  if(!_cropAspect) return r;
+  var targetH = (g.svW * r.w) / (g.svH * _cropAspect);
+  if(targetH > 1){ targetH = 1; r.w = (g.svH * targetH * _cropAspect) / g.svW; }
+  if(anchor === 'n' || anchor === 'nw' || anchor === 'ne'){
+    r.y = r.y + r.h - targetH;   // top edge moves, bottom stays
+  }
+  r.h = targetH;
+  return r;
+}
+
+function cropClamp(r){
+  if(r.w < CROP_MIN) r.w = CROP_MIN;
+  if(r.h < CROP_MIN) r.h = CROP_MIN;
+  if(r.w > 1) r.w = 1;
+  if(r.h > 1) r.h = 1;
+  if(r.x < 0) r.x = 0;
+  if(r.y < 0) r.y = 0;
+  if(r.x + r.w > 1) r.x = 1 - r.w;
+  if(r.y + r.h > 1) r.y = 1 - r.h;
+  return r;
+}
+
+window.enterCropMode = function(id, evt){
+  if(evt){ evt.stopPropagation(); if(evt.preventDefault) evt.preventDefault(); }
+  if(!_screenShareStreams[id]){ showToast('Connect a source first'); return; }
+  var el = ssFindEl(id);
+  if(!el){ console.warn('[crop] no element', id); return; }
+
+  if(_cropEditId && _cropEditId !== id) exitCropMode(true);
+  _cropEditId = id;
+  _cropOrig   = el.ssCrop ? { x:el.ssCrop.x, y:el.ssCrop.y, w:el.ssCrop.w, h:el.ssCrop.h } : null;
+  // Opening on a full frame with no crop yet: start at a centred 70% box so
+  // there are handles to grab rather than a rect flush with the edges.
+  if(!el.ssCrop) el.ssCrop = { x:0.15, y:0.15, w:0.70, h:0.70 };
+
+  var g = ssCropGeom(id);
+  console.log('[crop] enter', id, g
+    ? { src:g.svW+'x'+g.svH, box:g.ow+'x'+g.oh, scale:g.scale.toFixed(3) }
+    : 'geometry not ready yet — overlay will appear once the video reports size');
+
+  hidePresChip();
+  closeStylePanel();
+  applySsCropStyle(el);   // drops to full-frame view while editing
+  cropSync();             // builds the overlay, retrying until it can position it
+  showToast('Crop mode — drag to select, Enter to apply, Esc to cancel');
+};
+window.epCrop = window.enterCropMode;   // console entry point
+
+window.exitCropMode = function(commit){
+  var id = _cropEditId;
+  if(!id) return;
+  var el = ssFindEl(id);
+  _cropEditId = null;
+  _cropDrag   = null;
+  if(el){
+    if(!commit){
+      if(_cropOrig) el.ssCrop = _cropOrig; else delete el.ssCrop;
+    } else if(el.ssCrop && !ssGetCrop(el)){
+      delete el.ssCrop;   // dragged back to full frame — store nothing
+    }
+  }
+  _cropOrig = null;
+  destroyCropOverlay();
+  if(el) applySsCropStyle(el);
+  if(typeof invalidateRecCache === 'function') invalidateRecCache();
+  if(commit && el) showToast(el.ssCrop ? 'Crop applied' : 'Crop cleared');
+};
+
+function destroyCropOverlay(){
+  var ovs = document.querySelectorAll('.ss-crop-ov, .ss-crop-bar');
+  for(var i = 0; i < ovs.length; i++) ovs[i].remove();
+}
+
+// Ensures the overlay exists and is positioned. Safe to call repeatedly.
+function cropSync(){
+  if(!_cropEditId) return;
+  if(!document.querySelector('.ss-crop-ov')) buildCropOverlay();
+  layoutCropOverlay();
+}
+
+function buildCropOverlay(){
+  var id = _cropEditId;
+  if(!id) return;
+  destroyCropOverlay();
+  // Only the host is needed to BUILD. Sizing comes later, once the video
+  // reports its dimensions — bailing here was why nothing appeared at all
+  // when metadata hadn't arrived yet.
+  var v = ssVideoEl(id);
+  var host = v && v.parentNode;
+  if(!host){ cropScheduleLayout(); return; }
+
+  var ov = document.createElement('div');
+  ov.className = 'ss-crop-ov';
+  var hs = ['nw','n','ne','e','se','s','sw','w'], hh = '';
+  for(var i = 0; i < hs.length; i++) hh += '<div class="ss-crop-h" data-h="'+hs[i]+'"></div>';
+  ov.innerHTML = '<div class="ss-crop-rect">' +
+    '<div class="ss-crop-thirds"><i class="v" style="left:33.33%"></i><i class="v" style="left:66.66%"></i>' +
+    '<i class="h" style="top:33.33%"></i><i class="h" style="top:66.66%"></i></div>' + hh + '</div>';
+  host.appendChild(ov);
+
+  var bar = document.createElement('div');
+  bar.className = 'ss-crop-bar';
+  bar.innerHTML =
+    '<span class="hint">CROP</span>' +
+    '<button data-a="free">Free</button>' +
+    '<button data-a="169">16:9</button>' +
+    '<div class="sep"></div>' +
+    '<button data-a="reset">Reset</button>' +
+    '<button data-a="done" class="done">Done</button>' +
+    '<span class="rec" style="display:none">● LIVE</span>';
+  document.body.appendChild(bar);
+
+  bar.addEventListener('mousedown', function(e){ e.stopPropagation(); });
+  bar.addEventListener('click', function(e){
+    var b = e.target.closest('button');
+    if(!b) return;
+    e.stopPropagation();
+    var a = b.getAttribute('data-a');
+    if(a === 'free'){ _cropAspect = null; }
+    else if(a === '169'){ _cropAspect = 16 / 9; cropSnapAspect(); }
+    else if(a === 'reset'){
+      // Back to the whole source — "reset" means undo the crop, not
+      // re-centre a smaller box.
+      _cropAspect = null;
+      cropSetRect({ x:0, y:0, w:1, h:1 });
+    }
+    else if(a === 'done'){ exitCropMode(true); return; }
+    layoutCropOverlay();
+  });
+
+  layoutCropOverlay();
+}
+
+function cropSetRect(r){
+  var el = ssFindEl(_cropEditId);
+  if(!el) return;
+  el.ssCrop = cropClamp(r);
+}
+
+function cropSnapAspect(){
+  var el = ssFindEl(_cropEditId), g = ssCropGeom(_cropEditId);
+  if(!el || !g) return;
+  el.ssCrop = cropClamp(cropApplyAspect(cropWorking(el), g, 'se'));
+}
+
+function layoutCropOverlay(){
+  var id = _cropEditId;
+  if(!id) return;
+  var el = ssFindEl(id), g = ssCropGeom(id);
+  var ovEl = document.querySelector('.ss-crop-ov');
+  var barEl = document.querySelector('.ss-crop-bar');
+  if(!el || !g){
+    // Video metadata isn't in yet (always true for a frame or two after a
+    // re-render). Keep the overlay HIDDEN and retry — if we let it paint
+    // now, the rect would be 0x0 and its 9999px box-shadow would black out
+    // the whole element, and the toolbar would sit unpositioned at 0,0.
+    if(ovEl)  ovEl.classList.remove('ready');
+    if(barEl) barEl.classList.remove('ready');
+    cropScheduleLayout();
+    return;
+  }
+  var host = g.host;
+  var rect = host.querySelector('.ss-crop-rect');
+  var bar  = barEl;
+  if(!rect) return;
+  var c = cropWorking(el);
+
+  rect.style.left   = (g.offX + c.x * g.dw) + 'px';
+  rect.style.top    = (g.offY + c.y * g.dh) + 'px';
+  rect.style.width  = (c.w * g.dw) + 'px';
+  rect.style.height = (c.h * g.dh) + 'px';
+
+  if(bar){
+    var btns = bar.querySelectorAll('button');
+    for(var i = 0; i < btns.length; i++){
+      var a = btns[i].getAttribute('data-a');
+      if(a === 'free') btns[i].classList.toggle('on', !_cropAspect);
+      if(a === '169')  btns[i].classList.toggle('on', !!_cropAspect);
+    }
+    // Source pixel readout tells you whether you're still above 1:1.
+    var hint = bar.querySelector('.hint');
+    if(hint) hint.textContent = Math.round(c.w * g.svW) + '×' + Math.round(c.h * g.svH);
+    var rec = bar.querySelector('.rec');
+    if(rec) rec.style.display = (typeof S !== 'undefined' && S.recActive) ? '' : 'none';
+
+    var hr = host.getBoundingClientRect();
+    var bw = bar.offsetWidth || 300, bh = bar.offsetHeight || 34;
+    var bx = hr.left + (hr.width - bw) / 2;
+    var by = hr.top - bh - 10;
+    if(by < 8) by = hr.bottom + 10;              // no room above — flip below
+    bar.style.left = Math.max(8, Math.min(bx, window.innerWidth  - bw - 8)) + 'px';
+    bar.style.top  = Math.max(8, Math.min(by, window.innerHeight - bh - 8)) + 'px';
+    bar.classList.add('ready');
+  }
+  if(ovEl) ovEl.classList.add('ready');
+  _cropLayoutTries = 0;
+}
+
+// Retry layout until the video reports real dimensions. Bounded so a dead
+// stream can't spin forever.
+var _cropLayoutTimer = null, _cropLayoutTries = 0;
+function cropScheduleLayout(){
+  if(_cropLayoutTimer || !_cropEditId) return;
+  if(_cropLayoutTries++ > 120){ _cropLayoutTries = 0; return; }  // ~4s
+  _cropLayoutTimer = setTimeout(function(){
+    _cropLayoutTimer = null;
+    if(_cropEditId) cropSync();
+  }, 33);
+}
+
+// Crop box in CLIENT px — the coordinate space mouse events arrive in.
+function cropBoxClient(g, c){
+  return {
+    x: g.hostRect.left + (g.offX + c.x * g.dw) * g.scale,
+    y: g.hostRect.top  + (g.offY + c.y * g.dh) * g.scale,
+    w: c.w * g.dw * g.scale,
+    h: c.h * g.dh * g.scale
+  };
+}
+
+// Which part of the crop UI is under the cursor. Done by hit-test rather
+// than by listening on the overlay, because in presentation mode other
+// layers sit above it and would swallow the event before it ever arrived.
+function cropHitTest(clientX, clientY){
+  var id = _cropEditId;
+  if(!id) return null;
+  var g = ssCropGeom(id), el = ssFindEl(id);
+  if(!g || !el) return null;
+  var b  = cropBoxClient(g, cropWorking(el));
+  var hr = g.hostRect;
+  var T  = 14;   // grab tolerance, client px
+
+  if(clientX < hr.left - T || clientX > hr.right + T ||
+     clientY < hr.top  - T || clientY > hr.bottom + T) return null;
+
+  var nearL = Math.abs(clientX - b.x) <= T;
+  var nearR = Math.abs(clientX - (b.x + b.w)) <= T;
+  var nearT = Math.abs(clientY - b.y) <= T;
+  var nearB = Math.abs(clientY - (b.y + b.h)) <= T;
+  var inX = clientX > b.x - T && clientX < b.x + b.w + T;
+  var inY = clientY > b.y - T && clientY < b.y + b.h + T;
+
+  var vert = '', horz = '';
+  if(nearT && inX) vert = 'n'; else if(nearB && inX) vert = 's';
+  if(nearL && inY) horz = 'w'; else if(nearR && inY) horz = 'e';
+  var mode = vert + horz;
+  if(mode) return mode;
+  if(clientX > b.x && clientX < b.x + b.w && clientY > b.y && clientY < b.y + b.h) return 'move';
+  return 'fresh';   // inside the element but outside the box — draw a new one
+}
+
+function onCropDown(e){
+  if(!_cropEditId) return;
+  if(e.button !== 0) return;
+  // Let the toolbar's own click handling work normally.
+  if(e.target && e.target.closest && e.target.closest('.ss-crop-bar')) return;
+
+  var hit = cropHitTest(e.clientX, e.clientY);
+  if(!hit) return;                 // outside the share — leave the app alone
+  var el = ssFindEl(_cropEditId), g = ssCropGeom(_cropEditId);
+  if(!el || !g) return;
+
+  e.stopPropagation();
+  e.preventDefault();
+  var n = ssClientToNorm(g, e.clientX, e.clientY);
+  if(hit === 'fresh'){
+    _cropDrag = { mode:'se', start:n, rect:{ x:n.x, y:n.y, w:CROP_MIN, h:CROP_MIN } };
+    cropSetRect({ x:n.x, y:n.y, w:CROP_MIN, h:CROP_MIN });
+    layoutCropOverlay();
+  } else {
+    _cropDrag = { mode:hit, start:n, rect:cropWorking(el) };
+  }
+  window.addEventListener('mousemove', onCropMove, true);
+  window.addEventListener('mouseup', onCropUp, true);
+}
+
+// Second entry point: double-click a live share to crop it. Capture phase and
+// resolved from the DOM rather than an inline attribute, so it also works in
+// presentation mode — recording usually happens while presenting, and that's
+// exactly when re-framing is wanted.
+document.addEventListener('dblclick', function(e){
+  if(_cropEditId) return;
+  var id = null;
+  var host = e.target && e.target.closest ? e.target.closest('.ss-el') : null;
+  if(host){
+    var v = host.querySelector('video[id^="ss-video-"]');
+    if(v && v.id) id = v.id.slice('ss-video-'.length);
+  }
+  // Presentation mode renders elements with pointer-events:none, so the
+  // event target is the stage, never the share. Fall back to hit-testing
+  // the cursor against each share's rect.
+  if(!id){
+    var hit = presShareHostAt(e.clientX, e.clientY);
+    if(hit) id = hit.id;
+  }
+  if(!id || !_screenShareStreams[id]) return;
+  e.stopPropagation();
+  e.preventDefault();
+  enterCropMode(id, null);
+}, true);
+
+// =========================================================
+// PRESENTATION-MODE MOVE / RESIZE for screen shares
+// Alt+drag moves, Alt+Shift+drag resizes from the bottom-right. Works
+// while recording: the compositor holds a live element reference and
+// re-reads el.x/el.y/el.w/el.h every frame, so the audience sees it move
+// in real time with no cache invalidation.
+// =========================================================
+// =========================================================
+// PRESENTATION HOVER CHIP
+// Elements render with pointer-events:none while presenting (so clicks
+// advance the slide), which leaves the share with no affordance at all.
+// This chip is position:fixed on <body>, so it stays clickable, and it is
+// pure DOM — recordings composite from element data via canvas, so it
+// never appears in the exported video.
+// =========================================================
+// ---- Presentation style panel -------------------------------------------
+// updateEl() writes through updateSlide(), which targets the EDITOR's current
+// slide (S.si) — wrong while presenting (S.presSlide). So these mutate the
+// element directly.
+//
+// Sliders update the DOM directly on `input` and only trigger a full render
+// on `change` (release). A render rebuilds the <video> and reattaches the
+// stream, so doing that per-pixel of slider travel would strobe the share.
+var _stylePan = null, _stylePanPos = null, _stylePanTab = 'border';
+
+// Apply a "k:v;k:v;" string returned by buildMediaEffectStyle to a node.
+function ssCssApply(node, css){
+  if(!node || !css) return;
+  var decls = css.split(';');
+  for(var i = 0; i < decls.length; i++){
+    var d = decls[i], c = d.indexOf(':');
+    if(c < 0) continue;
+    var k = d.slice(0, c).trim(), v = d.slice(c + 1).trim();
+    if(k) node.style.setProperty(k, v);
+  }
+}
+
+// Push border + effect state straight onto the live DOM, no re-render.
+function ssLiveStyleDom(el){
+  if(!el) return;
+  var list = document.querySelectorAll('video[id="ss-video-' + el.id + '"]');
+  var bs  = el.borderStyle || 'solid';
+  var bw  = el.bw != null ? el.bw : 2;
+  var br  = el.br != null ? el.br : 10;
+  var bc  = el.bc  || '#7ed957';
+  var bc2 = el.bc2 || '#9b59ff';
+  var useGrad = (bs === 'gradient' || bs === 'animated') && bw > 0;
+  var fxCss = buildMediaEffectStyle(el);
+
+  for(var i = 0; i < list.length; i++){
+    var host = list[i].parentNode;
+    if(!host) continue;
+    var outer = host;
+    if(host.parentNode && host.parentNode.classList &&
+       host.parentNode.classList.contains('ep-grad-border')) outer = host.parentNode;
+
+    if(useGrad && outer !== host){
+      outer.style.backgroundImage = 'linear-gradient(135deg, ' + bc + ' 0%, ' + bc2 + ' 50%, ' + bc + ' 100%)';
+      outer.style.padding = bw + 'px';
+      outer.style.borderRadius = br + 'px';
+      host.style.borderRadius = Math.max(0, br - Math.min(bw, 4)) + 'px';
+    } else if(outer === host){
+      host.style.border = bw + 'px solid ' + bc;
+      host.style.borderRadius = br + 'px';
+    }
+    outer.style.boxShadow = '';
+    outer.style.transform = '';
+    ssCssApply(outer, fxCss);
+  }
+  applySsCropStyle(el);
+}
+
+// live=true -> DOM only (drag). live=false -> full render (commit).
+function ssStyleSet(id, patch, live){
+  var el = ssFindEl(id);
+  if(!el) return;
+  for(var k in patch){ if(patch.hasOwnProperty(k)) el[k] = patch[k]; }
+  if(live){
+    ssLiveStyleDom(el);
+  } else {
+    if(S.pres) renderPres(); else render();
+    applySsCropStyle(id);
+    if(typeof invalidateRecCache === 'function') invalidateRecCache();
+  }
+}
+
+// BORDER_COLORS has no black or white, so the current shadow colour never
+// showed as selected — part of why shadow looked like it had "no colour".
+var SHADOW_COLORS = ['#000000','#ffffff'].concat(BORDER_COLORS);
+
+function ssShadowPatch(el, patch){
+  var cur = el.shadow || { on:false, x:0, y:8, blur:24, color:'#000000', opacity:0.4 };
+  return { shadow: Object.assign({}, cur, patch) };
+}
+function ssFxPatch(el, patch){
+  var cur = el.effect3d || { style:'flat', depth:50 };
+  return { effect3d: Object.assign({}, cur, patch) };
+}
+
+function closeStylePanel(){
+  if(_stylePan){ _stylePan.remove(); _stylePan = null; }
+}
+
+function ssStylePanelDrag(pan, e){
+  e.preventDefault(); e.stopPropagation();
+  var r = pan.getBoundingClientRect();
+  var ox = e.clientX - r.left, oy = e.clientY - r.top;
+  function mv(ev){
+    pan.style.left = Math.max(4, Math.min(ev.clientX - ox, window.innerWidth  - r.width  - 4)) + 'px';
+    pan.style.top  = Math.max(4, Math.min(ev.clientY - oy, window.innerHeight - r.height - 4)) + 'px';
+  }
+  function up(){
+    window.removeEventListener('mousemove', mv, true);
+    window.removeEventListener('mouseup', up, true);
+    _stylePanPos = { left: pan.style.left, top: pan.style.top };
+  }
+  window.addEventListener('mousemove', mv, true);
+  window.addEventListener('mouseup', up, true);
+}
+
+// Place the panel in the largest free gap around the share rather than on
+// top of it. Falls back to a corner when the share fills the stage.
+function ssPlaceStylePanel(pan, id){
+  if(_stylePanPos && _stylePanPos.left){
+    pan.style.left = _stylePanPos.left;
+    pan.style.top  = _stylePanPos.top;
+    return;
+  }
+  var rect = null, els = document.querySelectorAll('.ss-el');
+  for(var j = 0; j < els.length; j++){
+    if(els[j].querySelector('video[id="ss-video-' + id + '"]')){
+      rect = els[j].getBoundingClientRect(); break;
+    }
+  }
+  var pw = pan.offsetWidth || 272, ph = pan.offsetHeight || 380;
+  var W = window.innerWidth, H = window.innerHeight, M = 14;
+  var x, y;
+  if(rect){
+    var gapR = W - rect.right, gapL = rect.left;
+    if(gapR >= pw + M)      x = rect.right + M;
+    else if(gapL >= pw + M) x = rect.left - pw - M;
+    else                    x = W - pw - M;      // share is wider than the gaps
+    y = rect.top;
+  } else {
+    x = W - pw - M; y = 80;
+  }
+  pan.style.left = Math.max(M, Math.min(x, W - pw - M)) + 'px';
+  pan.style.top  = Math.max(M, Math.min(y, H - ph - M)) + 'px';
+}
+
+function buildStylePanel(id){
+  var el = ssFindEl(id);
+  if(!el) return;
+  if(_stylePan){
+    var r = _stylePan.getBoundingClientRect();
+    _stylePanPos = { left: r.left + 'px', top: r.top + 'px' };
+  }
+  closeStylePanel();
+
+  var bs  = el.borderStyle || 'solid';
+  var bw  = el.bw != null ? el.bw : 2;
+  var br  = el.br != null ? el.br : 10;
+  var bc  = el.bc  || '#7ed957';
+  var bc2 = el.bc2 || '#9b59ff';
+  var sh  = el.shadow  || { on:false, x:0, y:8, blur:24, color:'#000000', opacity:0.4 };
+  var fx  = el.effect3d || { style:'flat', depth:50 };
+  var lift = fx.style === 'lift';
+
+  function seg(act, list, cur){
+    var h = '<div class="ss-sp-seg">';
+    for(var i = 0; i < list.length; i++){
+      h += '<button data-act="' + act + '" data-v="' + list[i][0] + '"' +
+           (String(list[i][0]) === String(cur) ? ' class="on"' : '') + '>' + list[i][1] + '</button>';
+    }
+    return h + '</div>';
+  }
+  function slider(act, label, min, max, step, val, unit){
+    return '<div class="ss-sp-sl"><label>' + label +
+           '<span data-out="' + act + '">' + val + (unit || '') + '</span></label>' +
+           '<input type="range" data-act="' + act + '" min="' + min + '" max="' + max +
+           '" step="' + step + '" value="' + val + '"></div>';
+  }
+  function swatchesFrom(act, cur, pal){
+    var h = '<div class="ss-sp-sw">';
+    for(var i = 0; i < pal.length; i++){
+      h += '<button class="sw' + (pal[i].toLowerCase() === String(cur).toLowerCase() ? ' on' : '') +
+           '" data-act="' + act + '" data-v="' + pal[i] + '" style="background:' + pal[i] + '"></button>';
+    }
+    h += '<input type="color" class="ss-sp-cust" data-act="' + act + '" value="' + cur + '" title="Custom colour">';
+    return h + '</div>';
+  }
+  function swatches(act, cur){ return swatchesFrom(act, cur, BORDER_COLORS); }
+
+  var pan = document.createElement('div');
+  pan.className = 'ss-style-pan';
+
+  var head = '<div class="ss-sp-head"><span class="ss-sp-grip"></span>' +
+             '<span class="ss-sp-title">SHARE STYLE</span>' +
+             '<button class="ss-sp-x" data-act="close">&#10005;</button></div>';
+
+  var tabs = '<div class="ss-sp-tabs">' +
+    ['border','shadow','depth'].map(function(t){
+      return '<button data-act="tab" data-v="' + t + '"' + (_stylePanTab === t ? ' class="on"' : '') + '>' +
+             (t === 'border' ? 'Border' : t === 'shadow' ? 'Shadow' : '3D') + '</button>';
+    }).join('') + '</div>';
+
+  var body = '';
+  if(_stylePanTab === 'border'){
+    body += '<div class="ss-sp-lab">STYLE</div>' +
+            seg('bstyle', [['none','None'],['solid','Solid'],['gradient','Gradient'],['animated','Animated']],
+                (bw === 0 ? 'none' : bs));
+    body += '<div class="ss-sp-lab">COLOUR</div>' + swatches('bc', bc);
+    if(bs === 'gradient' || bs === 'animated'){
+      body += '<div class="ss-sp-lab">SECOND COLOUR</div>' + swatches('bc2', bc2);
+    }
+    body += slider('bw', 'Width',  0, 32,  1, bw, 'px');
+    body += slider('br', 'Radius', 0, 160, 1, br, 'px');
+  } else if(_stylePanTab === 'shadow'){
+    body += '<div class="ss-sp-lab">SHADOW</div>' +
+            seg('shon', [['off','Off'],['on','On']], sh.on ? 'on' : 'off');
+    body += '<div class="ss-sp-lab">PRESET</div>' +
+            '<div class="ss-sp-seg">' +
+            '<button data-act="shpre" data-v="soft">Soft</button>' +
+            '<button data-act="shpre" data-v="deep">Deep</button>' +
+            '<button data-act="shpre" data-v="glow">Glow</button></div>';
+    body += slider('shx',  'Offset X', -80, 80,  1, sh.x || 0, 'px');
+    body += slider('shy',  'Offset Y', -80, 80,  1, sh.y != null ? sh.y : 12, 'px');
+    body += slider('shb',  'Blur',       0, 160, 1, sh.blur != null ? sh.blur : 38, 'px');
+    body += slider('sho',  'Opacity',    0, 100, 1, Math.round((sh.opacity != null ? sh.opacity : 0.55) * 100), '%');
+    body += '<div class="ss-sp-lab">SHADOW COLOUR</div>' + swatchesFrom('shc', sh.color || '#000000', SHADOW_COLORS);
+  } else {
+    body += '<div class="ss-sp-lab">LIFT (SHADOW STACK)</div>' +
+            seg('lift', [['flat','Off'],['lift','On']], lift ? 'lift' : 'flat');
+    body += slider('depth', 'Depth', 0, 100, 1, (fx.depth != null ? fx.depth : 50), '');
+    body += '<div class="ss-sp-lab">TILT</div>';
+    body += slider('tiltx', 'Tilt X', -45, 45, 1, fx.tiltX || 0, '\u00B0');
+    body += slider('tilty', 'Tilt Y', -45, 45, 1, fx.tiltY || 0, '\u00B0');
+    body += slider('persp', 'Perspective', 300, 2400, 20, fx.persp || 900, 'px');
+    body += '<div class="ss-sp-seg" style="margin-top:8px">' +
+            '<button data-act="tiltpre" data-v="reset">Flat</button>' +
+            '<button data-act="tiltpre" data-v="left">Left</button>' +
+            '<button data-act="tiltpre" data-v="right">Right</button></div>';
+    body += '<div class="ss-sp-note">Lift stacks shadow layers; Tilt rotates the share in 3D. ' +
+            'Tilt now renders in exported MP4 too, via a triangle mesh on canvas. ' +
+            'Large tilt angles cost more per frame than none.</div>';
+  }
+
+  var foot = '<div class="ss-sp-foot"><button data-act="reset">Reset styling</button></div>';
+  pan.innerHTML = head + tabs + '<div class="ss-sp-body">' + body + '</div>' + foot;
+
+  pan.addEventListener('mousedown', function(e){
+    if(e.target.closest && e.target.closest('.ss-sp-head') && !e.target.closest('.ss-sp-x')){
+      ssStylePanelDrag(pan, e);
+      return;
+    }
+    e.stopPropagation();
+  }, true);
+
+  function patchFor(act, v, live){
+    var e2 = ssFindEl(id);
+    if(!e2) return null;
+    if(act === 'bc')  return { bc: v };
+    if(act === 'bc2') return { bc2: v };
+    if(act === 'bw')  return { bw: parseInt(v, 10) };
+    if(act === 'br')  return { br: parseInt(v, 10) };
+    if(act === 'shx') return ssShadowPatch(e2, { on:true, x: parseInt(v, 10) });
+    if(act === 'shy') return ssShadowPatch(e2, { on:true, y: parseInt(v, 10) });
+    if(act === 'shb') return ssShadowPatch(e2, { on:true, blur: parseInt(v, 10) });
+    if(act === 'sho') return ssShadowPatch(e2, { on:true, opacity: parseInt(v, 10) / 100 });
+    if(act === 'shc') return ssShadowPatch(e2, { on:true, color: v });
+    if(act === 'depth') return ssFxPatch(e2, { style:'lift', depth: parseInt(v, 10) });
+    if(act === 'tiltx') return ssFxPatch(e2, { tiltX: parseInt(v, 10) });
+    if(act === 'tilty') return ssFxPatch(e2, { tiltY: parseInt(v, 10) });
+    if(act === 'persp') return ssFxPatch(e2, { persp: parseInt(v, 10) });
+    return null;
+  }
+
+  // Drag = DOM-only. Release = commit + rebuild so the controls resync.
+  pan.addEventListener('input', function(e){
+    var t = e.target;
+    if(!t || (t.type !== 'range' && t.type !== 'color')) return;
+    var act = t.getAttribute('data-act');
+    var pt = patchFor(act, t.value, true);
+    if(!pt) return;
+    ssStyleSet(id, pt, true);
+    var out = pan.querySelector('[data-out="' + act + '"]');
+    if(out){
+      var unit = act === 'sho' ? '%'
+               : act === 'depth' ? ''
+               : (act === 'tiltx' || act === 'tilty') ? '\u00B0'
+               : 'px';
+      out.textContent = t.value + unit;
+    }
+  }, true);
+
+  pan.addEventListener('change', function(e){
+    var t = e.target;
+    if(!t || (t.type !== 'range' && t.type !== 'color')) return;
+    var pt = patchFor(t.getAttribute('data-act'), t.value, false);
+    if(pt) ssStyleSet(id, pt, false);
+  }, true);
+
+  pan.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('button') : null;
+    if(!b) return;
+    e.stopPropagation(); e.preventDefault();
+    var act = b.getAttribute('data-act'), v = b.getAttribute('data-v');
+    var e2 = ssFindEl(id);
+    if(!e2) return;
+
+    if(act === 'close'){ closeStylePanel(); return; }
+    if(act === 'tab'){ _stylePanTab = v; buildStylePanel(id); return; }
+    if(act === 'bstyle'){
+      if(v === 'none') ssStyleSet(id, { bw: 0 }, false);
+      else ssStyleSet(id, { borderStyle: v, bw: (e2.bw || 0) === 0 ? 2 : e2.bw }, false);
+    }
+    else if(act === 'bc')  ssStyleSet(id, { bc: v }, false);
+    else if(act === 'bc2') ssStyleSet(id, { bc2: v }, false);
+    else if(act === 'shc') ssStyleSet(id, ssShadowPatch(e2, { on:true, color: v }), false);
+    else if(act === 'lift') ssStyleSet(id, ssFxPatch(e2, { style: v }), false);
+    else if(act === 'shon'){
+      if(v === 'off') ssStyleSet(id, ssShadowPatch(e2, { on:false }), false);
+      else {
+        // Turning shadow on used to leave it black at 40% — invisible against
+        // a dark slide, which read as "no colour / not working". Default to a
+        // visible soft glow in the element's own border colour instead.
+        var cur = e2.shadow || {};
+        var seeded = (cur.blur ? cur : { x:0, y:12, blur:38, opacity:0.55, color:(e2.bc || '#7ed957') });
+        ssStyleSet(id, ssShadowPatch(e2, Object.assign({}, seeded, { on:true })), false);
+      }
+    }
+    else if(act === 'tiltpre'){
+      if(v === 'reset')      ssStyleSet(id, ssFxPatch(e2, { tiltX:0,  tiltY:0 }), false);
+      else if(v === 'left')  ssStyleSet(id, ssFxPatch(e2, { tiltX:6,  tiltY:14,  persp: e2.effect3d && e2.effect3d.persp || 900 }), false);
+      else if(v === 'right') ssStyleSet(id, ssFxPatch(e2, { tiltX:6,  tiltY:-14, persp: e2.effect3d && e2.effect3d.persp || 900 }), false);
+    }
+    else if(act === 'shpre'){
+      if(v === 'soft') ssStyleSet(id, ssShadowPatch(e2, { on:true, x:0,  y:14, blur:40,  opacity:0.55, color:'#000000' }), false);
+      else if(v === 'deep') ssStyleSet(id, ssShadowPatch(e2, { on:true, x:0,  y:26, blur:70,  opacity:0.60, color:'#000000' }), false);
+      else if(v === 'glow') ssStyleSet(id, ssShadowPatch(e2, { on:true, x:0,  y:0,  blur:55,  opacity:0.85, color:(e2.bc || '#7ed957') }), false);
+    }
+    else if(act === 'reset'){
+      ssStyleSet(id, {
+        borderStyle:'solid', bw:2, br:10, bc:'#7ed957', bc2:'#9b59ff',
+        shadow:{ on:false, x:0, y:12, blur:38, color:'#000000', opacity:0.55 },
+        effect3d:{ style:'flat', depth:50, tiltX:0, tiltY:0, persp:900 }
+      }, false);
+    }
+    buildStylePanel(id);
+  }, true);
+
+  document.body.appendChild(pan);
+  _stylePan = pan;
+  ssPlaceStylePanel(pan, id);
+}
+
+var _presChip = null, _presChipId = null;
+
+function ensurePresChip(){
+  if(_presChip && document.body.contains(_presChip)) return _presChip;
+  var c = document.createElement('div');
+  c.className = 'ss-crop-bar ready ss-pres-chip';
+  c.style.display = 'none';
+  c.innerHTML =
+    '<button data-a="crop">Crop</button>' +
+    '<button data-a="style">Style</button>' +
+    '<button data-a="full">Full</button>' +
+    '<div class="sep"></div>' +
+    '<span class="hint">Alt+drag move · Alt+Shift resize</span>';
+  c.addEventListener('mousedown', function(e){ e.stopPropagation(); }, true);
+  c.addEventListener('mouseenter', cancelPresChipHide, true);
+  c.addEventListener('mouseleave', schedulePresChipHide, true);
+  c.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('button') : null;
+    if(!b || !_presChipId) return;
+    e.stopPropagation();
+    e.preventDefault();
+    var a = b.getAttribute('data-a');
+    if(a === 'crop') enterCropMode(_presChipId, null);
+    else if(a === 'style') buildStylePanel(_presChipId);
+    else if(a === 'full'){
+      var el = ssFindEl(_presChipId);
+      if(el){
+        delete el.ssCrop;
+        applySsCropStyle(el);
+        if(typeof invalidateRecCache === 'function') invalidateRecCache();
+        showToast('Showing full source');
+      }
+    }
+  }, true);
+  document.body.appendChild(c);
+  _presChip = c;
+  return c;
+}
+
+var _presChipHideT = null;
+function hidePresChip(){
+  cancelPresChipHide();
+  if(_presChip) _presChip.style.display = 'none';
+  _presChipId = null;
+}
+// Moving from the share to the chip crosses a gap where the cursor is over
+// neither. Hiding instantly made the chip impossible to reach, so hide is
+// deferred and cancelled the moment the cursor lands on either.
+function schedulePresChipHide(){
+  if(_presChipHideT) return;
+  _presChipHideT = setTimeout(function(){
+    _presChipHideT = null;
+    if(_presChip) _presChip.style.display = 'none';
+    _presChipId = null;
+  }, 800);
+}
+function cancelPresChipHide(){
+  if(_presChipHideT){ clearTimeout(_presChipHideT); _presChipHideT = null; }
+}
+
+var _presChipRaf = null;
+document.addEventListener('mousemove', function(e){
+  if(!S || !S.pres || _cropEditId || _presDrag){ hidePresChip(); return; }
+  if(_presChipRaf) return;
+  _presChipRaf = requestAnimationFrame(function(){
+    _presChipRaf = null;
+    var hit = presShareHostAt(e.clientX, e.clientY);
+    if(!hit){
+      // Keep it up while the cursor is on or near the chip itself, with a
+      // generous margin so the trip across the gap is forgiving.
+      if(_presChip && _presChip.style.display !== 'none'){
+        var cr = _presChip.getBoundingClientRect();
+        if(e.clientX >= cr.left - 26 && e.clientX <= cr.right + 26 &&
+           e.clientY >= cr.top - 26 && e.clientY <= cr.bottom + 26){
+          cancelPresChipHide();
+          return;
+        }
+      }
+      if(_stylePan){ cancelPresChipHide(); return; }
+      schedulePresChipHide();
+      return;
+    }
+    cancelPresChipHide();
+    var chip = ensurePresChip();
+    _presChipId = hit.id;
+    chip.style.display = '';
+    var cw = chip.offsetWidth || 260, ch = chip.offsetHeight || 32;
+    var cx = hit.rect.left + (hit.rect.width - cw) / 2;
+    var cy = hit.rect.top - ch - 2;
+    if(cy < 8) cy = hit.rect.top + 6;
+    chip.style.left = Math.max(8, Math.min(cx, window.innerWidth - cw - 8)) + 'px';
+    chip.style.top  = Math.max(8, Math.min(cy, window.innerHeight - ch - 8)) + 'px';
+  });
+}, true);
+
+var _presDrag = null;
+
+function presShareHostAt(clientX, clientY){
+  var els = document.querySelectorAll('.ss-el');
+  for(var i = els.length - 1; i >= 0; i--){
+    var r = els[i].getBoundingClientRect();
+    if(clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom){
+      var v = els[i].querySelector('video[id^="ss-video-"]');
+      if(!v) continue;
+      var id = v.id.slice('ss-video-'.length);
+      if(!_screenShareStreams[id]) continue;
+      return { host:els[i], id:id, rect:r };
+    }
+  }
+  return null;
+}
+
+function onPresShareDown(e){
+  if(!S || !S.pres) return;            // editor already has its own drag
+  if(_cropEditId) return;              // crop mode owns the pointer
+  if(!e.altKey) return;                // Alt is the opt-in
+  if(e.button !== 0) return;
+  var hit = presShareHostAt(e.clientX, e.clientY);
+  if(!hit) return;
+  var el = ssFindEl(hit.id);
+  if(!el) return;
+
+  e.stopPropagation();
+  e.preventDefault();
+  var scale = (S.stageScale || 1);
+  _presDrag = {
+    id: hit.id, mode: e.shiftKey ? 'resize' : 'move',
+    sx: e.clientX, sy: e.clientY, scale: scale,
+    ex: el.x, ey: el.y, ew: el.w, eh: el.h,
+    host: hit.host,
+    // The positioned wrapper is the ancestor .el div — it carries left/top.
+    wrap: hit.host.closest ? hit.host.closest('.el') : null
+  };
+  window.addEventListener('mousemove', onPresShareMove, true);
+  window.addEventListener('mouseup', onPresShareUp, true);
+  showToast(_presDrag.mode === 'resize' ? 'Resizing share' : 'Moving share');
+}
+
+function onPresShareMove(e){
+  if(!_presDrag) return;
+  e.stopPropagation();
+  e.preventDefault();
+  var el = ssFindEl(_presDrag.id);
+  if(!el) return;
+  // Client px -> stage units, so movement tracks the cursor at any zoom.
+  var dx = (e.clientX - _presDrag.sx) / _presDrag.scale;
+  var dy = (e.clientY - _presDrag.sy) / _presDrag.scale;
+
+  if(_presDrag.mode === 'move'){
+    el.x = Math.round(_presDrag.ex + dx);
+    el.y = Math.round(_presDrag.ey + dy);
+  } else {
+    var nw = Math.max(120, Math.round(_presDrag.ew + dx));
+    var nh = Math.max(80,  Math.round(_presDrag.eh + dy));
+    if(e.ctrlKey){                       // Ctrl keeps the element's aspect
+      var ar = _presDrag.ew / _presDrag.eh;
+      nh = Math.round(nw / ar);
+    }
+    el.w = nw; el.h = nh;
+  }
+  // Move the live DOM directly rather than re-rendering the whole slide —
+  // a full render on every mousemove drops frames out of the recording.
+  if(_presDrag.wrap){
+    _presDrag.wrap.style.left = el.x + 'px';
+    _presDrag.wrap.style.top  = el.y + 'px';
+  }
+  if(_presDrag.mode === 'resize' && _presDrag.host){
+    _presDrag.host.style.width  = el.w + 'px';
+    _presDrag.host.style.height = el.h + 'px';
+    applySsCropStyle(el);                // crop offsets are px — recompute
+  }
+}
+
+function onPresShareUp(e){
+  window.removeEventListener('mousemove', onPresShareMove, true);
+  window.removeEventListener('mouseup', onPresShareUp, true);
+  if(!_presDrag) return;
+  var id = _presDrag.id;
+  _presDrag = null;
+  if(e) e.stopPropagation();
+  if(S.pres) renderPres(); else render();
+  applySsCropStyle(id);
+  if(typeof invalidateRecCache === 'function') invalidateRecCache();
+}
+
+window.addEventListener('mousedown', onPresShareDown, true);
+
+// Registered once, capture phase, on window — so no element above the
+// overlay can intercept the drag.
+window.addEventListener('mousedown', onCropDown, true);
+
+function onCropMove(e){
+  if(!_cropDrag || !_cropEditId) return;
+  e.stopPropagation();
+  e.preventDefault();
+  var g = ssCropGeom(_cropEditId), el = ssFindEl(_cropEditId);
+  if(!g || !el) return;
+  var n  = ssClientToNorm(g, e.clientX, e.clientY);
+  var d  = { x:n.x - _cropDrag.start.x, y:n.y - _cropDrag.start.y };
+  var s  = _cropDrag.rect, m = _cropDrag.mode;
+  var r  = { x:s.x, y:s.y, w:s.w, h:s.h };
+
+  if(m === 'move'){
+    r.x = s.x + d.x; r.y = s.y + d.y;
+  } else {
+    if(m.indexOf('w') !== -1){ r.x = s.x + d.x; r.w = s.w - d.x; }
+    if(m.indexOf('e') !== -1){ r.w = s.w + d.x; }
+    if(m.indexOf('n') !== -1){ r.y = s.y + d.y; r.h = s.h - d.y; }
+    if(m.indexOf('s') !== -1){ r.h = s.h + d.y; }
+    if(r.w < CROP_MIN){ if(m.indexOf('w') !== -1) r.x = s.x + s.w - CROP_MIN; r.w = CROP_MIN; }
+    if(r.h < CROP_MIN){ if(m.indexOf('n') !== -1) r.y = s.y + s.h - CROP_MIN; r.h = CROP_MIN; }
+    r = cropApplyAspect(r, g, m);
+  }
+  cropSetRect(r);
+  layoutCropOverlay();
+}
+
+function onCropUp(e){
+  window.removeEventListener('mousemove', onCropMove, true);
+  window.removeEventListener('mouseup', onCropUp, true);
+  if(!_cropDrag) return;
+  _cropDrag = null;
+  if(e){ e.stopPropagation(); }
+  // Only needed for slides the layered compositor declined; cheap, and
+  // fires on release rather than per mousemove.
+  if(typeof S !== 'undefined' && S.recActive && typeof invalidateRecCache === 'function'){
+    invalidateRecCache();
+  }
+}
+
+// Keyboard: Enter commits, Esc reverts. Capture phase so the editor's own
+// key handling doesn't swallow them first.
+document.addEventListener('keydown', function(e){
+  if(!_cropEditId) return;
+  if(e.key === 'Enter'){ e.preventDefault(); e.stopPropagation(); exitCropMode(true); }
+  else if(e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); exitCropMode(false); }
+}, true);
+
+window.addEventListener('resize', function(){ if(_cropEditId) layoutCropOverlay(); });
+
 function reattachScreenShareStreams(){
   // For every element with an active stream, find its <video> and reattach srcObject
   var ids = Object.keys(_screenShareStreams);
   for(var i=0; i<ids.length; i++){
     var id = ids[i];
-    var v = document.getElementById('ss-video-' + id);
-    if(v && _screenShareStreams[id]){
-      if(v.srcObject !== _screenShareStreams[id]){
-        v.srcObject = _screenShareStreams[id];
-        v.play().catch(function(){});
-      }
+    if(_screenShareStreams[id]){
+      ssAttachStreamAll(id, _screenShareStreams[id]);
+      // Re-apply crop after every render. Element resizes rebuild this
+      // markup, and the offsets are in px against the box, so they must
+      // be recomputed rather than carried over.
+      applySsCropStyle(id);
     }
+  }
+  // Re-renders replace .ss-el's innerHTML, taking the overlay with it.
+  // Rebuild it here — this is the same funnel every render already calls.
+  if(_cropEditId && _screenShareStreams[_cropEditId]){
+    cropSync();
+  } else if(_cropEditId){
+    exitCropMode(true);   // stream went away mid-crop
   }
 }
 
