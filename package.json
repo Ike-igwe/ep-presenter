@@ -1,87 +1,87 @@
 {
-    "name":  "ep-presenter",
-    "productName":  "EP Presenter",
-    "version": "1.0.24",
-    "description":  "Eze Profit Presenter — forex trading education presentation tool",
-    "author":  {
-                   "name":  "Ike Igwe",
-                   "email":  "hello@ikeigwe.com",
-                   "url":  "https://ikeigwe.com"
-               },
-    "license":  "UNLICENSED",
-    "private":  true,
-    "main":  "main.js",
-    "scripts":  {
-                    "start":  "electron .",
-                    "build:win":  "electron-builder --win",
-                    "build:win-installer":  "electron-builder --win nsis",
-                    "build:win-portable":  "electron-builder --win portable",
-                    "pack":  "electron-builder --dir",
-                    "release":  "electron-builder --win --publish always"
+    "name": "ep-presenter",
+    "productName": "EP Presenter",
+    "version": "1.0.25",
+    "description": "Eze Profit Presenter — forex trading education presentation tool",
+    "author": {
+        "name": "Ike Igwe",
+        "email": "hello@ikeigwe.com",
+        "url": "https://ikeigwe.com"
+    },
+    "license": "UNLICENSED",
+    "private": true,
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "build:win": "electron-builder --win",
+        "build:win-installer": "electron-builder --win nsis",
+        "build:win-portable": "electron-builder --win portable",
+        "pack": "electron-builder --dir",
+        "release": "electron-builder --win --publish always"
+    },
+    "devDependencies": {
+        "electron": "^31.0.0",
+        "electron-builder": "^24.13.3"
+    },
+    "dependencies": {
+        "electron-updater": "^6.2.1",
+        "ffmpeg-static": "^5.3.0"
+    },
+    "build": {
+        "appId": "com.ikeigwe.eppresenter",
+        "productName": "EP Presenter",
+        "copyright": "Copyright (c) 2026 IKEIGWE AI Solutions Ltd",
+        "directories": {
+            "output": "dist",
+            "buildResources": "build"
+        },
+        "files": [
+            "main.js",
+            "preload.js",
+            "renderer/**/*",
+            "build/icon.*",
+            "!**/*.map",
+            "!**/node_modules/**/{README.md,readme.md,CHANGELOG.md,HISTORY.md,LICENSE,licence}"
+        ],
+        "win": {
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
                 },
-    "devDependencies":  {
-                            "electron":  "^31.0.0",
-                            "electron-builder":  "^24.13.3"
-                        },
-    "dependencies":  {
-                         "electron-updater":  "^6.2.1",
-                         "ffmpeg-static":  "^5.3.0"
-                     },
-    "build":  {
-                  "appId":  "com.ikeigwe.eppresenter",
-                  "productName":  "EP Presenter",
-                  "copyright":  "Copyright (c) 2026 IKEIGWE AI Solutions Ltd",
-                  "directories":  {
-                                      "output":  "dist",
-                                      "buildResources":  "build"
-                                  },
-                  "files":  [
-                                "main.js",
-                                "preload.js",
-                                "renderer/**/*",
-                                "build/icon.*",
-                                "!**/*.map",
-                                "!**/node_modules/**/{README.md,readme.md,CHANGELOG.md,HISTORY.md,LICENSE,licence}"
-                            ],
-                  "win":  {
-                              "target":  [
-                                             {
-                                                 "target":  "nsis",
-                                                 "arch":  [
-                                                              "x64"
-                                                          ]
-                                             },
-                                             {
-                                                 "target":  "portable",
-                                                 "arch":  [
-                                                              "x64"
-                                                          ]
-                                             }
-                                         ],
-                              "icon":  "build/icon.ico",
-                              "artifactName":  "EP-Presenter-${version}-${arch}-${ext}.${ext}"
-                          },
-                  "nsis":  {
-                               "oneClick":  false,
-                               "perMachine":  false,
-                               "allowToChangeInstallationDirectory":  true,
-                               "createDesktopShortcut":  true,
-                               "createStartMenuShortcut":  true,
-                               "shortcutName":  "EP Presenter",
-                               "installerIcon":  "build/icon.ico",
-                               "uninstallerIcon":  "build/icon.ico",
-                               "installerHeaderIcon":  "build/icon.ico",
-                               "deleteAppDataOnUninstall":  false,
-                               "artifactName":  "EP-Presenter-Setup-${version}.${ext}"
-                           },
-                  "portable":  {
-                                   "artifactName":  "EP-Presenter-Portable-${version}.${ext}"
-                               },
-                  "publish":  {
-                                  "provider":  "github",
-                                  "owner":  "Ike-igwe",
-                                  "repo":  "ep-presenter",
-                                  "releaseType":  "release"
-                              }
-              }
+                {
+                    "target": "portable",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ],
+            "icon": "build/icon.ico",
+            "artifactName": "EP-Presenter-${version}-${arch}-${ext}.${ext}"
+        },
+        "nsis": {
+            "oneClick": false,
+            "perMachine": false,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true,
+            "shortcutName": "EP Presenter",
+            "installerIcon": "build/icon.ico",
+            "uninstallerIcon": "build/icon.ico",
+            "installerHeaderIcon": "build/icon.ico",
+            "deleteAppDataOnUninstall": false,
+            "artifactName": "EP-Presenter-Setup-${version}.${ext}"
+        },
+        "portable": {
+            "artifactName": "EP-Presenter-Portable-${version}.${ext}"
+        },
+        "publish": {
+            "provider": "github",
+            "owner": "Ike-igwe",
+            "repo": "ep-presenter",
+            "releaseType": "release"
+        }
+    }
 }
