@@ -349,7 +349,14 @@ function buildFfmpegArgs(format, inputPath, outputPath, opts) {
       const x264Crf    = quality === 'fast' ? '24' : quality === 'balanced' ? '20' : '18';
       args.push('-c:v', 'libx264', '-preset', x264Preset, '-crf', x264Crf);
     }
-    // Common video output flags
+    // Common video output flags.
+    // -r 30 forces CONSTANT frame rate. canvas.captureStream(30) emits frames
+    // whenever the compositor finishes one, so the WebM is variable-frame-rate
+    // with irregular timestamps. WebM players cope with that natively; MP4/MOV
+    // assume CFR, and the uneven gaps show up as stutter on playback even
+    // though no frames were lost. Resampling to a steady 30fps removes it.
+    args.push('-r', '30');
+    args.push('-vsync', 'cfr');
     args.push('-pix_fmt', 'yuv420p');
     if (format === 'mp4') args.push('-movflags', '+faststart');
     // Audio: AAC at decent bitrate
@@ -471,7 +478,13 @@ ipcMain.handle('ep:convert-video', async (event, args) => {
     return new Promise((resolve) => {
       const child = spawn(ffmpegPath, ffArgs, { windowsHide: true });
       let stderrBuf = '';
-      let totalDurationMs = null;
+      // MediaRecorder writes WebM with NO duration header, so ffmpeg prints
+      // 'Duration: N/A' and the regex below never matches. That left
+      // totalDurationMs null, no progress events were ever emitted, and the
+      // dialog sat at 0% indefinitely even while ffmpeg worked normally.
+      // The renderer now passes the recording length it already tracked.
+      let totalDurationMs = (opts && opts.durationMs > 0) ? opts.durationMs : null;
+      let lastProgressAt = Date.now();
 
       // Notify renderer which encoder is in use (for the progress label)
       try {
@@ -486,7 +499,8 @@ ipcMain.handle('ep:convert-video', async (event, args) => {
         // Cap stderr buffer so very long encodes don't balloon memory
         if (stderrBuf.length > 16000) stderrBuf = stderrBuf.slice(-8000);
 
-        // Parse total duration (first line containing "Duration: HH:MM:SS.MS")
+        // Parse total duration (first line containing "Duration: HH:MM:SS.MS").
+        // Only if the renderer did not already supply it.
         if (totalDurationMs === null) {
           const dm = s.match(/Duration:\s*(\d+):(\d+):(\d+\.\d+)/);
           if (dm) {
@@ -495,6 +509,7 @@ ipcMain.handle('ep:convert-video', async (event, args) => {
         }
         // Parse current time so we can compute %
         const tm = s.match(/time=\s*(\d+):(\d+):(\d+\.\d+)/);
+        if (tm) lastProgressAt = Date.now();
         if (tm && totalDurationMs && totalDurationMs > 0) {
           const curMs = (parseInt(tm[1], 10) * 3600 + parseInt(tm[2], 10) * 60 + parseFloat(tm[3])) * 1000;
           const pct = Math.max(0, Math.min(100, Math.round((curMs / totalDurationMs) * 100)));
@@ -506,11 +521,33 @@ ipcMain.handle('ep:convert-video', async (event, args) => {
         }
       });
 
+      // Heartbeat: if we still cannot compute a percentage (no duration from
+      // either source), at least prove the app is alive rather than frozen.
+      // Also detects a genuinely stalled ffmpeg — no 'time=' output for 90s.
+      const heartbeat = setInterval(() => {
+        const idleMs = Date.now() - lastProgressAt;
+        try {
+          if (event && event.sender && !event.sender.isDestroyed()) {
+            event.sender.send('ep:convert-progress', {
+              pct: null,
+              encoder: encoderToUse,
+              working: true,
+              idleSeconds: Math.round(idleMs / 1000)
+            });
+          }
+        } catch (e) {}
+        if (idleMs > 90000) {
+          console.warn('[EP] ffmpeg appears stalled. Last stderr:\n' + stderrBuf.slice(-1500));
+        }
+      }, 2000);
+
       child.on('error', (err) => {
+        clearInterval(heartbeat);
         resolve({ ok: false, error: 'ffmpeg failed to start: ' + err.message });
       });
 
       child.on('close', (code) => {
+        clearInterval(heartbeat);
         if (code === 0) {
           resolve({ ok: true, outputPath: outputPath });
         } else {
@@ -618,9 +655,37 @@ autoUpdater.on('update-available', (info) => {
   });
 });
 
+// Download progress. Without this the user clicks "Download" and then sees
+// NOTHING for however long a ~100MB transfer takes — no bar, no percentage, no
+// indication the app is doing anything at all. Most people conclude it failed
+// and give up. We surface progress two ways: the Windows taskbar icon fills up
+// (setProgressBar), and the window title shows a percentage.
+autoUpdater.on('download-progress', (p) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const pct = Math.round(p.percent || 0);
+  const mb = (p.transferred / 1048576).toFixed(0);
+  const totalMb = (p.total / 1048576).toFixed(0);
+  const speed = (p.bytesPerSecond / 1048576).toFixed(1);
+  try {
+    mainWindow.setProgressBar(pct / 100);
+    mainWindow.setTitle('EP Presenter — Downloading update ' + pct + '% (' +
+                        mb + '/' + totalMb + ' MB, ' + speed + ' MB/s)');
+  } catch (e) {}
+});
+
+// Clear the progress indicator once the download resolves either way.
+function clearUpdateProgress() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  try {
+    mainWindow.setProgressBar(-1);
+    mainWindow.setTitle('EP Presenter — IKEIGWE AI Solutions');
+  } catch (e) {}
+}
+
 // Update has finished downloading. Ask whether to restart now or later.
 // If they pick Later, autoInstallOnAppQuit:true means it'll install on next quit.
 autoUpdater.on('update-downloaded', () => {
+  clearUpdateProgress();
   if (!mainWindow) return;
   dialog.showMessageBox(mainWindow, {
     type: 'question',
@@ -635,5 +700,23 @@ autoUpdater.on('update-downloaded', () => {
 });
 
 autoUpdater.on('error', (err) => {
+  clearUpdateProgress();
   console.warn('Auto-update error:', err && err.message ? err.message : err);
+  // Previously this failed silently — the user would wait indefinitely for a
+  // download that had already died. Tell them, and give them a manual route.
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    dialog.showMessageBox(mainWindow, {
+      type: 'error',
+      buttons: ['OK', 'Download manually'],
+      defaultId: 0,
+      title: 'Update failed',
+      message: 'Could not download the update',
+      detail: String((err && err.message) || err) +
+              '\n\nYou can download the installer directly from GitHub instead.'
+    }).then(r => {
+      if (r.response === 1) {
+        shell.openExternal('https://github.com/Ike-igwe/ep-presenter/releases/latest');
+      }
+    });
+  }
 });

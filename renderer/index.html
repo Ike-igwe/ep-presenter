@@ -3134,6 +3134,7 @@ var S = {
   recAudio:true,        // include mic audio
   recStartTime:0,       // ms timestamp
   recElapsedBeforePause:0, // accumulated ms when paused/resumed
+  recFinalMs:0,         // duration captured at stop, BEFORE recActive clears
   recorder:null,        // MediaRecorder instance
   recChunks:[],         // blob chunks
   recCanvas:null,       // the compositing canvas
@@ -5829,7 +5830,8 @@ var _recLayerCache = { slideId:null, revealStep:-1, drawsRef:null, drawsLen:-1,
                        generation:-1, below:null, above:null, shares:null };
 var _recLayerReady   = null;   // last successfully built layer set
 var _recLayerPending = false;  // guards against stacking async rebuilds per frame
-var _recLayerFailed  = false;  // sticky: once layering errors, stay on the safe path
+var _recLayerFailed  = false;
+var _recUsingLayers  = false;  // true only while the layered path draws a frame  // sticky: once layering errors, stay on the safe path
 
 function _shareEligibleForLayering(el){
   if(el.type !== 'screenshare') return false;
@@ -5872,11 +5874,12 @@ function slideEligibleForLayering(slide){
 async function getLayeredRecBitmaps(slide){
   if(!slideEligibleForLayering(slide)) return null;
 
+  // NOTE: draws are intentionally absent from this key. Ink lives in the live
+  // overlay, so a stroke must not invalidate the cached element layers.
   if(_recLayerCache.below &&
      _recLayerCache.slideId === slide.id &&
      _recLayerCache.revealStep === S.revealStep &&
-     _recLayerCache.drawsRef === slide.draws &&
-     _recLayerCache.drawsLen === (slide.draws ? slide.draws.length : 0) &&
+     _recLayerCache.elCount === slide.els.length &&
      _recLayerCache.generation === _recCacheGeneration){
     return _recLayerCache;
   }
@@ -5901,12 +5904,17 @@ async function getLayeredRecBitmaps(slide){
 
   var below = await renderSlideToCanvas(
     { id: slide.id, bg: slide.bg, els: belowEls, draws: [] }, REC_SCALE);
+  // Ink is deliberately NOT baked into this layer. recDrawOverlays composites
+  // drawCanvas live every frame, so baking strokes here would double-composite
+  // (visibly wrong for highlighters) AND force a full two-layer rebuild on
+  // every single stroke commit — which is what made the picture blink while
+  // annotating.
   var above = await renderSlideToCanvas(
-    { id: slide.id, bg: slide.bg, els: aboveEls, draws: drawsCopy, _noBg: true }, REC_SCALE);
+    { id: slide.id, bg: slide.bg, els: aboveEls, draws: [], _noBg: true }, REC_SCALE);
 
   _recLayerCache = {
     slideId: slide.id, revealStep: S.revealStep,
-    drawsRef: slide.draws, drawsLen: drawsCopy.length,
+    elCount: slide.els.length,
     generation: _recCacheGeneration,
     below: below, above: above, shares: shares
   };
@@ -5974,7 +5982,8 @@ function recDrawOverlays(ctx, W, H, slide){
     var bitmapDrawsLen = (_recSlideCache && _recSlideCache.slideId === slide.id)
                          ? _recSlideCache.drawsLen : -1;
     var actualDrawsLen = (slide.draws || []).length;
-    var needLiveInk = isDrawing || (bitmapDrawsLen !== actualDrawsLen);
+    // Layered path bakes no ink at all, so it must always composite live.
+    var needLiveInk = _recUsingLayers || isDrawing || (bitmapDrawsLen !== actualDrawsLen);
     if(needLiveInk){
       try {
         ctx.drawImage(drawCanvas, 0, 0, W, H);
@@ -6118,13 +6127,19 @@ function recComposeFrame(){
           _recLayerFailed = true;
         });
       }
+      // Render with the last GOOD layers even if a rebuild is in flight. The
+      // previous code required generation parity, so any cache invalidation
+      // (every ink stroke) dropped us onto the slow path mid-recording and the
+      // frame visibly blinked. Static content being a few frames stale is
+      // invisible; a blank frame is not.
       var LR = _recLayerReady;
-      if(!_recLayerFailed && LR && LR.below && LR.slideId === slide.id &&
-         LR.generation === _recCacheGeneration){
+      if(!_recLayerFailed && LR && LR.below && LR.slideId === slide.id){
+        _recUsingLayers = true;
         ctx.drawImage(LR.below, 0, 0, W, H);
         drawLiveSharesToRec(ctx, LR.shares);
         ctx.drawImage(LR.above, 0, 0, W, H);
         recDrawOverlays(ctx, W, H, slide);
+        _recUsingLayers = false;
         return;
       }
       // Layers not built yet — fall through to the full-render path for this
@@ -6242,6 +6257,11 @@ function currentRecMs(){
 // Cached encoder list + chosen quality (stickies between dialogs)
 var _epEncoderList = null;
 var _epLastQuality = null; // 'fast' | 'balanced' | 'high'
+// Recording length in ms, stashed at module scope because handleExportFormat
+// is a separate global function and cannot see showRecordingExportDialog's
+// parameters. ffmpeg needs this: MediaRecorder WebM carries no duration
+// header, so without it no progress percentage can be computed.
+var _epExportDurationMs = 0;
 
 function epEncoderHumanName(enc){
   switch(enc){
@@ -6253,7 +6273,8 @@ function epEncoderHumanName(enc){
   }
 }
 
-function showRecordingExportDialog(blob, durStr){
+function showRecordingExportDialog(blob, durStr, durationMs){
+  _epExportDurationMs = durationMs || 0;
   var hasFfmpeg = !!(window.epElectron && window.epElectron.convertVideo);
   var sizeStr = (blob.size / 1024 / 1024).toFixed(1) + ' MB';
   var suggestedName = 'ep-recording-' + Date.now();
@@ -6433,7 +6454,21 @@ window.handleExportFormat = async function(format){
   if(closeBtn) closeBtn.style.display = 'none';
 
   // Subscribe to progress
+  var _convDots = 0;
   var unsubscribe = window.epElectron.onConvertProgress(function(data){
+    // Heartbeat with no percentage — ffmpeg is running but we cannot measure
+    // it. Show motion so the dialog never looks frozen.
+    if(data.working && data.pct == null){
+      _convDots = (_convDots + 1) % 4;
+      if(progressLabel){
+        progressLabel.textContent = 'Converting to ' + format.toUpperCase() +
+          ' (' + quality + ', ' + epEncoderHumanName(data.encoder || '') + ')' +
+          '   working' + '.'.repeat(_convDots) +
+          (data.idleSeconds > 60 ? '  [' + data.idleSeconds + 's]' : '');
+      }
+      if(progressFill && !progressFill.style.width) progressFill.style.width = '5%';
+      return;
+    }
     if(progressFill && data.pct != null){
       progressFill.style.width = data.pct + '%';
       if(progressPct) progressPct.textContent = data.pct + '%';
@@ -6448,7 +6483,11 @@ window.handleExportFormat = async function(format){
 
   try {
     var arrayBuffer = await blob.arrayBuffer();
-    var result = await window.epElectron.convertVideo(arrayBuffer, format, name, { quality: quality });
+    // durationMs matters: MediaRecorder WebM has no duration header, so ffmpeg
+    // reports 'Duration: N/A' and the main process cannot compute a percentage.
+    // Passing the known recording length is what makes the progress bar move.
+    var result = await window.epElectron.convertVideo(arrayBuffer, format, name,
+                   { quality: quality, durationMs: _epExportDurationMs });
     if(unsubscribe) unsubscribe();
     if(result && result.ok){
       if(progressFill) progressFill.style.width = '100%';
@@ -6814,9 +6853,13 @@ window.startRecording = async function(){
       S.recRouteSlideAudio = false;
       S.recChunks = [];
       S.recCanvas = null;
-      var durStr = formatRecTime(currentRecMs());
+      // BUG: currentRecMs() returns 0 the moment S.recActive is false, and
+      // onstop fires AFTER the recorder has stopped — so this always read
+      // 00:00. S.recFinalMs is captured while the recording is still active.
+      var _finalMs = S.recFinalMs || 0;
+      var durStr = formatRecTime(_finalMs);
       // Show format picker; user chooses WebM (direct), MP4, MOV, GIF, or MP3
-      showRecordingExportDialog(blob, durStr);
+      showRecordingExportDialog(blob, durStr, _finalMs);
     };
     S.recorder = rec;
     rec.start(1000); // emit chunks every 1s
@@ -6890,6 +6933,10 @@ window.stopRecording = function(){
     }
     S._recStopping = false;
   }, 4000);
+  // Capture the final duration while the recording is still 'active' —
+  // currentRecMs() returns 0 once recActive is false, and onstop runs later.
+  // This is what feeds both the Length readout and the ffmpeg progress bar.
+  S.recFinalMs = currentRecMs();
   S.recActive = false;
   S.recPaused = false;
   if(S.pres) renderPres();
