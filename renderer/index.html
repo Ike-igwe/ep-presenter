@@ -3217,7 +3217,7 @@ var S = {
   webcamBorderWidth:4,           // border thickness (px). 4 matches the legacy green ring width
   // Phase 3a: floating webcam media effects (mirrors slide-element webcam shape)
   webcamShadow:{on:false,x:0,y:8,blur:24,color:'#000000',opacity:0.4},
-  webcamEffect3d:{style:'flat',depth:50},
+  webcamEffect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900},
   // v1.0.20: floating webcam device picker. Empty string = OS default
   // (facingMode:user). Otherwise an enumerateDevices() deviceId — typically
   // the user's physical cam, NVIDIA Broadcast Camera, OBS Virtual Camera, etc.
@@ -5287,7 +5287,10 @@ function ensureWebcamOverlay(){
     var btnSettings = document.createElement('button');
     btnSettings.title = 'Style settings';
     btnSettings.textContent = '\u2699'; // ⚙
-    btnSettings.onclick = function(e){ window.toggleWebcamSettings(e); };
+    btnSettings.onclick = function(e){
+      e.stopPropagation();
+      if(_wcPan) closeWebcamStylePanel(); else buildWebcamStylePanel();
+    };
 
     var btnCorner = document.createElement('button');
     btnCorner.title = 'Snap to corner';
@@ -5412,10 +5415,12 @@ function _applyFloatingWebcamStyling(overlay){
   var fxCss = buildMediaEffectStyle(fxFakeEl);
   if(fxCss){
     // fxCss is "box-shadow:<value>;" — strip the wrapper, keep just the value.
-    var sv = fxCss.replace(/^box-shadow:/, '').replace(/;\s*$/, '');
-    frame.style.boxShadow = sv;
+    frame.style.boxShadow = '';
+    frame.style.transform = '';
+    ssCssApply(frame, fxCss);   // handles box-shadow AND transform
   } else {
     frame.style.boxShadow = '';
+    frame.style.transform = '';
   }
 
   // Video must inherit the inner shape (smaller corner radius if shape=rounded).
@@ -6238,8 +6243,27 @@ function recDrawOverlays(ctx, W, H, slide){
       // Phase 3b: route through drawMediaElementWithEffects so the floating
       // camera's drop-shadow and lift effects render in MP4 exports. The
       // helper expects an `el` shape; synthesize one from S.webcam* state.
-      var floatFakeEl = { shadow: S.webcamShadow, effect3d: S.webcamEffect3d };
+      var floatFakeEl = { shadow: S.webcamShadow, effect3d: S.webcamEffect3d,
+                          br: (oShape === 'circle' ? size/2 : (oShape === 'rounded' ? oRR : 0)) };
+      var _wcFx = S.webcamEffect3d || {};
       drawMediaElementWithEffects(ctx, floatFakeEl, px, py, size, size, function(octx, ow, oh){
+        // Camera tilt goes through the same strip renderer the shares use.
+        if(_wcFx.tiltX || _wcFx.tiltY){
+          // Warp the video only, then stroke the ring as real geometry on top.
+          // Pushing the ring through the strip mesh resampled it and turned a
+          // circle into a lumpy egg.
+          ssDrawTilted(octx, floatFakeEl, ow, oh, function(c2, w2, h2){
+            _wcDrawCamBody(c2, w2, h2, v, oShape, oRR, oBStyle, 0, oBC1, oBC2);
+          });
+          ssStrokeProjectedBorder(octx, floatFakeEl, ow, oh, oBW, oBStyle, oBC1, oBC2);
+          return;
+        }
+        return _wcDrawCamBody(octx, ow, oh, v, oShape, oRR, oBStyle, oBW, oBC1, oBC2);
+      });
+    }
+  }
+
+  function _wcDrawCamBody(octx, ow, oh, v, oShape, oRR, oBStyle, oBW, oBC1, oBC2){
         // Helper: walk the shape's clip path on octx in offscreen-local coords
         // `ins` insets the path. The stroke is centred on the path, so without
         // an inset of half the border width its outer half falls outside the
@@ -6274,6 +6298,9 @@ function recDrawOverlays(ctx, W, H, slide){
         octx.save();
         walkOverlayPath(octx, 0);
         octx.clip();
+        // Mirror applies to the video only — the border stroke below must be
+        // unmirrored or a gradient border would run the wrong way.
+        octx.save();
         octx.translate(ow, 0);
         octx.scale(-1, 1);
         try {
@@ -6284,7 +6311,10 @@ function recDrawOverlays(ctx, W, H, slide){
         } catch(e){}
         octx.restore();
 
-        // Border — solid / gradient / animated
+        // Border — solid / gradient / animated. Stroked INSIDE the same clip
+        // as the video at double width, so the clip defines the outer edge.
+        // Stroking an inset path put two antialiased edges flush together and
+        // left a ragged rim — which read as the circle not being truly round.
         if(oBW > 0){
           if(oBStyle === 'solid'){
             octx.strokeStyle = oBC1;
@@ -6309,14 +6339,11 @@ function recDrawOverlays(ctx, W, H, slide){
             oGrad.addColorStop(1,   oBC1);
             octx.strokeStyle = oGrad;
           }
-          octx.lineWidth = oBW;
-          // Inset by half the border width so the whole stroke lands inside
-          // the buffer and the outer edge sits flush with the shape.
-          walkOverlayPath(octx, oBW / 2);
+          octx.lineWidth = oBW * 2;
+          walkOverlayPath(octx, 0);
           octx.stroke();
         }
-      });
-    }
+        octx.restore();
   }
   // Pointer (laser/spotlight/trail/magnifier/pulse) — drawn last so it sits
   // on top of everything. Uses recording canvas / window scale so the pointer
@@ -12554,6 +12581,63 @@ window.epRecDiag = function(){
   return r;
 };
 
+// On-screen performance readout. epPerfHUD() to toggle.
+// Shows main-thread frame health plus which heavy features are on, so a
+// screenshot while it's stuttering says which one is responsible.
+var _hudEl = null, _hudPrev = 0, _hudWorst = 0, _hudSamples = [];
+window.epPerfHUD = function(){
+  if(_hudEl){ _hudEl.remove(); _hudEl = null; return false; }
+  _hudEl = document.createElement('div');
+  _hudEl.style.cssText = 'position:fixed;left:10px;bottom:10px;z-index:2147483647;' +
+    'background:rgba(8,8,10,0.92);color:#7ed957;font:600 11px/1.5 Consolas,monospace;' +
+    'padding:8px 10px;border:1px solid rgba(126,217,87,0.4);border-radius:6px;' +
+    'white-space:pre;pointer-events:none';
+  document.body.appendChild(_hudEl);
+  _hudPrev = 0; _hudWorst = 0; _hudSamples = [];
+  requestAnimationFrame(function tick(ts){
+    if(!_hudEl) return;
+    if(_hudPrev){
+      var dt = ts - _hudPrev;
+      _hudSamples.push(dt);
+      if(_hudSamples.length > 60) _hudSamples.shift();
+      if(dt > _hudWorst) _hudWorst = dt;
+    }
+    _hudPrev = ts;
+    if(_hudSamples.length && (_hudSamples.length % 10 === 0)){
+      var sum = 0, i;
+      for(i = 0; i < _hudSamples.length; i++) sum += _hudSamples[i];
+      var avg = sum / _hudSamples.length;
+      var slide = S.pres ? S.slides[S.presSlide] : cs();
+      var shares = 0, tilt = 'no', shadow = 'no', crop = 'no';
+      if(slide && slide.els){
+        for(i = 0; i < slide.els.length; i++){
+          var e2 = slide.els[i];
+          if(e2.type !== 'screenshare') continue;
+          shares++;
+          if(e2.effect3d && (e2.effect3d.tiltX || e2.effect3d.tiltY)) tilt = 'YES';
+          if(e2.shadow && e2.shadow.on) shadow = 'YES';
+          if(e2.ssCrop) crop = 'YES';
+        }
+      }
+      var wcTilt = (S.webcamEffect3d && (S.webcamEffect3d.tiltX || S.webcamEffect3d.tiltY)) ? 'YES' : 'no';
+      var layered = 'n/a';
+      try { if(slide) layered = slideEligibleForLayering(slide) ? 'YES' : 'NO (slow path)'; } catch(e){}
+      _hudEl.textContent =
+        'fps ' + (1000/avg).toFixed(1) + '   avg ' + avg.toFixed(1) + 'ms   worst ' + _hudWorst.toFixed(0) + 'ms\n' +
+        'recording  ' + (S.recActive ? 'YES' : 'no') + '\n' +
+        'layered    ' + layered + '\n' +
+        'shares ' + shares + '  crop ' + crop + '\n' +
+        'share tilt ' + tilt + '   shadow ' + shadow + '\n' +
+        'cam tilt   ' + wcTilt + '\n' +
+        'strokes    ' + ((slide && slide.draws) ? slide.draws.length : 0);
+      _hudWorst = 0;
+    }
+    requestAnimationFrame(tick);
+  });
+  console.log('[EP] perf HUD on — run epPerfHUD() again to hide');
+  return true;
+};
+
 window.epTiltMesh = function(n){
   _tiltMeshN = Math.max(1, Math.min(16, parseInt(n, 10) || 6));
   console.log('[EP] tilt mesh =', _tiltMeshN + 'x' + _tiltMeshN,
@@ -12659,8 +12743,6 @@ function ssTiltProjector(el, ow, oh){
 
 function ssDrawTilted(octx, el, ow, oh, drawFn){
   if(!_tiltCv) _tiltCv = document.createElement('canvas');
-  // 1.5x rather than 2x: the recording canvas is only REC_SCALE above stage
-  // units, so 2x was paying for resolution nothing consumed.
   var ss = 1.5;
   var cw = Math.max(1, Math.round(ow * ss)), chh = Math.max(1, Math.round(oh * ss));
   if(_tiltCv.width !== cw || _tiltCv.height !== chh){ _tiltCv.width = cw; _tiltCv.height = chh; }
@@ -12673,19 +12755,106 @@ function ssDrawTilted(octx, el, ow, oh, drawFn){
   tc.restore();
 
   var pr = ssTiltProjector(el, ow, oh);
-  var N = _tiltMeshN;   // 72 triangles at 6; 8x8 was 128, each redrawing all
-  for(var i = 0; i < N; i++){
-    for(var j = 0; j < N; j++){
-      var u0 = i/N, u1 = (i+1)/N, v0 = j/N, v1 = (j+1)/N;
-      var a00 = pr.project(u0,v0), a10 = pr.project(u1,v0);
-      var a01 = pr.project(u0,v1), a11 = pr.project(u1,v1);
-      var sx0 = u0*cw, sx1 = u1*cw, sy0 = v0*chh, sy1 = v1*chh;
-      ssDrawTriTex(octx, _tiltCv, a00.x,a00.y, a10.x,a10.y, a01.x,a01.y,
-                   sx0,sy0, sx1,sy0, sx0,sy1);
-      ssDrawTriTex(octx, _tiltCv, a10.x,a10.y, a11.x,a11.y, a01.x,a01.y,
-                   sx1,sy0, sx1,sy1, sx0,sy1);
-    }
+  var fx = el.effect3d || {};
+  // Strips instead of a triangle mesh. Each strip is drawn with a plain
+  // affine transform and NO ctx.clip() — clipping was the expensive part,
+  // 72 of them per frame. Strips run perpendicular to the dominant rotation
+  // axis so the foreshortening along that axis is exact.
+  // A single clip to the projected outline. Cheap (once per frame, not per
+  // strip) and it means the parallelogram error inside the mesh can never
+  // show at the silhouette — which is what made the border look pixelated
+  // and the camera's circle look lumpy.
+  octx.save();
+  var _op = ssRoundedOutlinePts(ow, oh, el.br != null ? el.br : 10, 10);
+  octx.beginPath();
+  for(var _oi = 0; _oi < _op.length; _oi++){
+    var _q = pr.project(_op[_oi].x / ow, _op[_oi].y / oh);
+    if(_oi === 0) octx.moveTo(_q.x, _q.y); else octx.lineTo(_q.x, _q.y);
   }
+  octx.closePath();
+  octx.clip();
+
+  var horizontal = Math.abs(fx.tiltX || 0) > Math.abs(fx.tiltY || 0);
+  // Each strip is approximated by a parallelogram, so its far corner drifts
+  // from the true projection; more strips shrink that error proportionally.
+  var N = Math.max(24, Math.min(120, Math.round((horizontal ? oh : ow) / 8) * (_tiltMeshN / 6)));
+
+  for(var i = 0; i < N; i++){
+    var t0 = i / N, t1 = (i + 1) / N;
+    var P0, P1, P2, sx, sy, sw, sh;
+    if(horizontal){
+      // strip spans full width, slice along v
+      P0 = pr.project(0, t0);   // origin
+      P1 = pr.project(1, t0);   // +u
+      P2 = pr.project(0, t1);   // +v
+      sx = 0; sy = t0 * chh; sw = cw; sh = (t1 - t0) * chh;
+    } else {
+      P0 = pr.project(t0, 0);
+      P1 = pr.project(t1, 0);
+      P2 = pr.project(t0, 1);
+      sx = t0 * cw; sy = 0; sw = (t1 - t0) * cw; sh = chh;
+    }
+    var du = horizontal ? cw : (t1 - t0) * cw;
+    var dv = horizontal ? (t1 - t0) * chh : chh;
+    if(du <= 0 || dv <= 0) continue;
+
+    var a = (P1.x - P0.x) / du, d = (P1.y - P0.y) / du;
+    var b = (P2.x - P0.x) / dv, e = (P2.y - P0.y) / dv;
+    var c = P0.x - a * sx - b * sy;
+    var f = P0.y - d * sx - e * sy;
+
+    octx.save();
+    octx.transform(a, d, b, e, c, f);
+    // Overlap by a pixel so adjacent strips don't leave seams.
+    var ex = horizontal ? 0 : 0.5, ey = horizontal ? 0.5 : 0;
+    var w2 = Math.min(cw  - sx, sw + ex);
+    var h2 = Math.min(chh - sy, sh + ey);
+    try { octx.drawImage(_tiltCv, sx, sy, w2, h2, sx, sy, w2, h2); } catch(err){}
+    octx.restore();
+  }
+  octx.restore();   // outline clip
+}
+
+// Stroke a border along the PROJECTED outline, as real geometry on the
+// destination canvas. Warping a pre-drawn border through the strip mesh
+// resampled it and left stair-stepped edges; drawing it after the warp
+// keeps it crisp at any tilt.
+function ssStrokeProjectedBorder(octx, el, ow, oh, bw, style, c1, c2){
+  if(!bw || bw <= 0) return;
+  var pr = ssTiltProjector(el, ow, oh);
+  var pts = ssRoundedOutlinePts(ow, oh, el.br != null ? el.br : 10, 10);
+  octx.save();
+  octx.beginPath();
+  for(var i = 0; i < pts.length; i++){
+    var q = pr.project(pts[i].x / ow, pts[i].y / oh);
+    if(i === 0) octx.moveTo(q.x, q.y); else octx.lineTo(q.x, q.y);
+  }
+  octx.closePath();
+  if(style === 'gradient' || style === 'animated'){
+    var cx = ow/2, cy = oh/2, rad = ow;
+    var ang = (style === 'animated')
+      ? ((performance.now() / 3000) % 1) * Math.PI * 2
+      : Math.PI * 0.75;
+    var g = octx.createLinearGradient(
+      cx - Math.cos(ang) * rad, cy - Math.sin(ang) * rad,
+      cx + Math.cos(ang) * rad, cy + Math.sin(ang) * rad);
+    g.addColorStop(0, c1); g.addColorStop(0.5, c2); g.addColorStop(1, c1);
+    octx.strokeStyle = g;
+  } else {
+    octx.strokeStyle = c1;
+  }
+  // Clip to the same outline and stroke double width, so only the inner half
+  // shows and the outer edge is defined by the path itself.
+  octx.clip();
+  octx.lineWidth = bw * 2 * pr.k;
+  octx.beginPath();
+  for(var j = 0; j < pts.length; j++){
+    var q2 = pr.project(pts[j].x / ow, pts[j].y / oh);
+    if(j === 0) octx.moveTo(q2.x, q2.y); else octx.lineTo(q2.x, q2.y);
+  }
+  octx.closePath();
+  octx.stroke();
+  octx.restore();
 }
 
 // Wrapper: applies tilt when set, otherwise straight through. Every canvas
@@ -12695,14 +12864,17 @@ function ssDrawContent(octx, ow, oh, el, ssVideo){
   var fx = el.effect3d;
   if(fx && (fx.tiltX || fx.tiltY)){
     ssDrawTilted(octx, el, ow, oh, function(c, w, h){
-      ssDrawContentRaw(c, w, h, el, ssVideo);
+      ssDrawContentRaw(c, w, h, el, ssVideo, true);   // skip border
     });
+    ssStrokeProjectedBorder(octx, el, ow, oh, el.bw || 0,
+                            el.borderStyle || 'solid',
+                            el.bc || '#7ed957', el.bc2 || '#9b59ff');
     return;
   }
-  ssDrawContentRaw(octx, ow, oh, el, ssVideo);
+  ssDrawContentRaw(octx, ow, oh, el, ssVideo, false);
 }
 
-function ssDrawContentRaw(octx, ow, oh, el, ssVideo){
+function ssDrawContentRaw(octx, ow, oh, el, ssVideo, skipBorder){
   var ssBr = el.br || 10;
   var ssBw = el.bw || 0;
   var ssBStyle = el.borderStyle || 'solid';
@@ -12765,7 +12937,7 @@ function ssDrawContentRaw(octx, ow, oh, el, ssVideo){
   }
   octx.restore();
 
-  if(ssBw > 0){
+  if(ssBw > 0 && !skipBorder){
     if(ssBStyle === 'solid'){
       octx.strokeStyle = ssBC1;
     } else {
@@ -13248,8 +13420,14 @@ async function renderSlideToCanvas(s, scale){
         }
         octx.restore();
 
-        // Border (drawn after clip removed so it sits ON the edge)
+        // Border. Stroked INSIDE the shape clip at double width so the clip
+        // defines the outer edge. Previously this stroked a path that touches
+        // the element bounds with a centred line, so half the border fell
+        // outside the buffer and was clipped away — the flattened/cut edges.
         if(wcBw > 0){
+          octx.save();
+          walkShape(octx);
+          octx.clip();
           if(wcBorderStyle === 'solid'){
             octx.strokeStyle = wcBC1;
           } else {
@@ -13273,9 +13451,10 @@ async function renderSlideToCanvas(s, scale){
             grad.addColorStop(1,   wcBC1);
             octx.strokeStyle = grad;
           }
-          octx.lineWidth = wcBw;
+          octx.lineWidth = wcBw * 2;
           walkShape(octx);
           octx.stroke();
+          octx.restore();
         }
       });
     }
@@ -22931,6 +23110,215 @@ function buildStylePanel(id){
   ssPlaceStylePanel(pan, id);
 }
 
+// ---- Floating camera style panel ----------------------------------------
+// Same panel chrome as the share, driving S.webcam* instead of an element.
+// All of this state was already read by both the DOM overlay and the MP4
+// export — there was simply no way to set it from the presentation view, so
+// it stayed at defaults and every export came out flat.
+var _wcPan = null, _wcPanPos = null, _wcPanTab = 'shape';
+
+function wcSet(patch, live){
+  for(var k in patch){ if(patch.hasOwnProperty(k)) S[k] = patch[k]; }
+  _applyFloatingWebcamStyling();
+  if(!live && _wcPan) buildWebcamStylePanel();
+}
+function wcShadowPatch(p2){
+  var cur = S.webcamShadow || { on:false, x:0, y:12, blur:38, color:'#000000', opacity:0.55 };
+  return { webcamShadow: Object.assign({}, cur, p2) };
+}
+function wcFxPatch(p2){
+  var cur = S.webcamEffect3d || { style:'flat', depth:50, tiltX:0, tiltY:0, persp:900 };
+  return { webcamEffect3d: Object.assign({}, cur, p2) };
+}
+function closeWebcamStylePanel(){ if(_wcPan){ _wcPan.remove(); _wcPan = null; } }
+
+window.buildWebcamStylePanel = function(){
+  if(_wcPan){
+    var pr0 = _wcPan.getBoundingClientRect();
+    _wcPanPos = { left: pr0.left + 'px', top: pr0.top + 'px' };
+  }
+  closeWebcamStylePanel();
+
+  var shp = S.webcamShape || 'circle';
+  var bs  = S.webcamBorderStyle || 'solid';
+  var bw  = (typeof S.webcamBorderWidth === 'number') ? S.webcamBorderWidth : 4;
+  var rr  = S.webcamRoundedRadius || 14;
+  var bc  = S.webcamBorderColor  || '#7ed957';
+  var bc2 = S.webcamBorderColor2 || '#9b59ff';
+  var sh  = S.webcamShadow  || { on:false, x:0, y:12, blur:38, color:'#000000', opacity:0.55 };
+  var fx  = S.webcamEffect3d || { style:'flat', depth:50 };
+
+  function seg(act, list, cur){
+    var h = '<div class="ss-sp-seg">';
+    for(var i = 0; i < list.length; i++){
+      h += '<button data-act="' + act + '" data-v="' + list[i][0] + '"' +
+           (String(list[i][0]) === String(cur) ? ' class="on"' : '') + '>' + list[i][1] + '</button>';
+    }
+    return h + '</div>';
+  }
+  function sl(act, label, min, max, step, val, unit){
+    return '<div class="ss-sp-sl"><label>' + label + '<span data-out="' + act + '">' +
+           val + (unit || '') + '</span></label><input type="range" data-act="' + act +
+           '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + val + '"></div>';
+  }
+  function sw(act, cur, pal){
+    var h = '<div class="ss-sp-sw">';
+    for(var i = 0; i < pal.length; i++){
+      h += '<button class="sw' + (pal[i].toLowerCase() === String(cur).toLowerCase() ? ' on' : '') +
+           '" data-act="' + act + '" data-v="' + pal[i] + '" style="background:' + pal[i] + '"></button>';
+    }
+    return h + '<input type="color" class="ss-sp-cust" data-act="' + act + '" value="' + cur + '"></div>';
+  }
+
+  var body = '';
+  if(_wcPanTab === 'shape'){
+    body += '<div class="ss-sp-lab">SHAPE</div>' +
+            seg('shape', [['circle','Circle'],['rounded','Rounded'],['rect','Square']], shp);
+    if(shp === 'rounded') body += sl('rr', 'Corner radius', 0, 80, 1, rr, 'px');
+    body += '<div class="ss-sp-lab">BORDER STYLE</div>' +
+            seg('bstyle', [['solid','Solid'],['gradient','Gradient'],['animated','Animated']], bs);
+    body += '<div class="ss-sp-lab">COLOUR</div>' + sw('bc', bc, BORDER_COLORS);
+    if(bs === 'gradient' || bs === 'animated'){
+      body += '<div class="ss-sp-lab">SECOND COLOUR</div>' + sw('bc2', bc2, BORDER_COLORS);
+    }
+    body += sl('bw', 'Border width', 0, 24, 1, bw, 'px');
+    body += sl('size', 'Camera size', 120, 460, 4, S.webcamSize || 220, 'px');
+  } else if(_wcPanTab === 'shadow'){
+    body += '<div class="ss-sp-lab">SHADOW</div>' + seg('shon', [['off','Off'],['on','On']], sh.on ? 'on' : 'off');
+    body += '<div class="ss-sp-lab">PRESET</div><div class="ss-sp-seg">' +
+            '<button data-act="shpre" data-v="soft">Soft</button>' +
+            '<button data-act="shpre" data-v="deep">Deep</button>' +
+            '<button data-act="shpre" data-v="glow">Glow</button></div>';
+    body += sl('shx', 'Offset X', -80, 80, 1, sh.x || 0, 'px');
+    body += sl('shy', 'Offset Y', -80, 80, 1, sh.y != null ? sh.y : 12, 'px');
+    body += sl('shb', 'Blur', 0, 160, 1, sh.blur != null ? sh.blur : 38, 'px');
+    body += sl('sho', 'Opacity', 0, 100, 1, Math.round((sh.opacity != null ? sh.opacity : 0.55) * 100), '%');
+    body += '<div class="ss-sp-lab">SHADOW COLOUR</div>' + sw('shc', sh.color || '#000000', SHADOW_COLORS);
+  } else {
+    body += '<div class="ss-sp-lab">LIFT</div>' +
+            seg('lift', [['flat','Off'],['lift','On']], fx.style === 'lift' ? 'lift' : 'flat');
+    body += sl('depth', 'Depth', 0, 100, 1, fx.depth != null ? fx.depth : 50, '');
+    body += '<div class="ss-sp-lab">TILT</div>';
+    body += sl('tiltx', 'Tilt X', -45, 45, 1, fx.tiltX || 0, '\u00B0');
+    body += sl('tilty', 'Tilt Y', -45, 45, 1, fx.tiltY || 0, '\u00B0');
+    body += sl('persp', 'Perspective', 300, 2400, 20, fx.persp || 900, 'px');
+  }
+
+  var pan = document.createElement('div');
+  pan.className = 'ss-style-pan';
+  pan.innerHTML =
+    '<div class="ss-sp-head"><span class="ss-sp-grip"></span>' +
+    '<span class="ss-sp-title">CAMERA STYLE</span>' +
+    '<button class="ss-sp-x" data-act="close">&#10005;</button></div>' +
+    '<div class="ss-sp-tabs">' +
+      ['shape','shadow','depth'].map(function(t){
+        return '<button data-act="tab" data-v="' + t + '"' + (_wcPanTab === t ? ' class="on"' : '') + '>' +
+               (t === 'shape' ? 'Shape' : t === 'shadow' ? 'Shadow' : '3D') + '</button>';
+      }).join('') +
+    '</div><div class="ss-sp-body">' + body + '</div>' +
+    '<div class="ss-sp-foot"><button data-act="reset">Reset camera styling</button></div>';
+
+  pan.addEventListener('mousedown', function(e){
+    if(e.target.closest && e.target.closest('.ss-sp-head') && !e.target.closest('.ss-sp-x')){
+      ssStylePanelDrag(pan, e); return;
+    }
+    e.stopPropagation();
+  }, true);
+
+  function wcPatch(act, v){
+    if(act === 'bc')   return { webcamBorderColor: v };
+    if(act === 'bc2')  return { webcamBorderColor2: v };
+    if(act === 'bw')   return { webcamBorderWidth: parseInt(v, 10) };
+    if(act === 'rr')   return { webcamRoundedRadius: parseInt(v, 10) };
+    if(act === 'size') return { webcamSize: parseInt(v, 10) };
+    if(act === 'shx')  return wcShadowPatch({ on:true, x: parseInt(v, 10) });
+    if(act === 'shy')  return wcShadowPatch({ on:true, y: parseInt(v, 10) });
+    if(act === 'shb')  return wcShadowPatch({ on:true, blur: parseInt(v, 10) });
+    if(act === 'sho')  return wcShadowPatch({ on:true, opacity: parseInt(v, 10)/100 });
+    if(act === 'shc')  return wcShadowPatch({ on:true, color: v });
+    if(act === 'depth')return wcFxPatch({ style:'lift', depth: parseInt(v, 10) });
+    if(act === 'tiltx')return wcFxPatch({ tiltX: parseInt(v, 10) });
+    if(act === 'tilty')return wcFxPatch({ tiltY: parseInt(v, 10) });
+    if(act === 'persp')return wcFxPatch({ persp: parseInt(v, 10) });
+    return null;
+  }
+
+  pan.addEventListener('input', function(e){
+    var t = e.target;
+    if(!t || (t.type !== 'range' && t.type !== 'color')) return;
+    var act = t.getAttribute('data-act'), pt = wcPatch(act, t.value);
+    if(!pt) return;
+    wcSet(pt, true);
+    var out = pan.querySelector('[data-out="' + act + '"]');
+    if(out){
+      var u = act === 'sho' ? '%' : act === 'depth' ? ''
+            : (act === 'tiltx' || act === 'tilty') ? '\u00B0' : 'px';
+      out.textContent = t.value + u;
+    }
+  }, true);
+
+  pan.addEventListener('change', function(e){
+    var t = e.target;
+    if(!t || (t.type !== 'range' && t.type !== 'color')) return;
+    var pt = wcPatch(t.getAttribute('data-act'), t.value);
+    if(pt) wcSet(pt, false);
+  }, true);
+
+  pan.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('button') : null;
+    if(!b) return;
+    e.stopPropagation(); e.preventDefault();
+    var act = b.getAttribute('data-act'), v = b.getAttribute('data-v');
+    if(act === 'close'){ closeWebcamStylePanel(); return; }
+    if(act === 'tab'){ _wcPanTab = v; buildWebcamStylePanel(); return; }
+    if(act === 'shape')  wcSet({ webcamShape: v });
+    else if(act === 'bstyle') wcSet({ webcamBorderStyle: v });
+    else if(act === 'bc')  wcSet({ webcamBorderColor: v });
+    else if(act === 'bc2') wcSet({ webcamBorderColor2: v });
+    else if(act === 'shc') wcSet(wcShadowPatch({ on:true, color: v }));
+    else if(act === 'lift') wcSet(wcFxPatch({ style: v }));
+    else if(act === 'shon'){
+      if(v === 'off') wcSet(wcShadowPatch({ on:false }));
+      else {
+        var cur = S.webcamShadow || {};
+        var seeded = cur.blur ? cur : { x:0, y:12, blur:38, opacity:0.55,
+                                        color:(S.webcamBorderColor || '#7ed957') };
+        wcSet(wcShadowPatch(Object.assign({}, seeded, { on:true })));
+      }
+    }
+    else if(act === 'shpre'){
+      if(v === 'soft') wcSet(wcShadowPatch({ on:true, x:0, y:14, blur:40, opacity:0.55, color:'#000000' }));
+      else if(v === 'deep') wcSet(wcShadowPatch({ on:true, x:0, y:26, blur:70, opacity:0.60, color:'#000000' }));
+      else if(v === 'glow') wcSet(wcShadowPatch({ on:true, x:0, y:0, blur:55, opacity:0.85,
+                                                  color:(S.webcamBorderColor || '#7ed957') }));
+    }
+    else if(act === 'reset'){
+      wcSet({
+        webcamShape:'circle', webcamBorderStyle:'solid', webcamBorderWidth:4,
+        webcamRoundedRadius:14, webcamBorderColor:'#7ed957', webcamBorderColor2:'#9b59ff',
+        webcamShadow:{ on:false, x:0, y:12, blur:38, color:'#000000', opacity:0.55 },
+        webcamEffect3d:{ style:'flat', depth:50, tiltX:0, tiltY:0, persp:900 }
+      });
+    }
+    buildWebcamStylePanel();
+  }, true);
+
+  document.body.appendChild(pan);
+  _wcPan = pan;
+
+  if(_wcPanPos && _wcPanPos.left){ pan.style.left = _wcPanPos.left; pan.style.top = _wcPanPos.top; }
+  else {
+    var ov = document.getElementById('webcamOverlay');
+    var r  = ov ? ov.getBoundingClientRect() : null;
+    var pw = pan.offsetWidth || 272, ph = pan.offsetHeight || 380, M = 14;
+    var x = r ? (r.right + M + pw < window.innerWidth ? r.right + M : r.left - pw - M)
+              : window.innerWidth - pw - M;
+    var y = r ? r.top : 80;
+    pan.style.left = Math.max(M, Math.min(x, window.innerWidth  - pw - M)) + 'px';
+    pan.style.top  = Math.max(M, Math.min(y, window.innerHeight - ph - M)) + 'px';
+  }
+};
+
 var _presChip = null, _presChipId = null;
 
 function ensurePresChip(){
@@ -22991,9 +23379,24 @@ function cancelPresChipHide(){
   if(_presChipHideT){ clearTimeout(_presChipHideT); _presChipHideT = null; }
 }
 
-var _presChipRaf = null;
+var _presChipRaf = null, _presChipLast = 0;
 document.addEventListener('mousemove', function(e){
   if(!S || !S.pres || _cropEditId || _presDrag){ hidePresChip(); return; }
+  // Skip entirely while a drawing tool is active. presShareHostAt() calls
+  // getBoundingClientRect() on every .ss-el, which forces a synchronous
+  // layout; running that per animation frame during inking is what made the
+  // pen lag on share slides specifically — slides without a share exit the
+  // loop immediately and stayed smooth.
+  if(typeof isDrawingTool === 'function' && isDrawingTool(S.tool)){
+    if(_presChip && _presChip.style.display !== 'none') hidePresChip();
+    return;
+  }
+  if(S.recActive && _presChip && _presChip.style.display === 'none' && !_stylePan){
+    // While recording, only bother looking when the cursor is roughly idle.
+  }
+  var now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  if(now - _presChipLast < 120) return;      // 8x/sec is plenty for a hover chip
+  _presChipLast = now;
   if(_presChipRaf) return;
   _presChipRaf = requestAnimationFrame(function(){
     _presChipRaf = null;
