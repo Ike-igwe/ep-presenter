@@ -1,99 +1,61 @@
-# EP Presenter v4 — Release Notes
+## v1.0.25 — Screen share crop, presentation styling, recording fixes
 
-A major stability and polish release covering sticky notes, lasso, drawing, recording, webcam, and stickers. Many long-standing flicker and rendering bugs have been resolved, and the sticky note system has been substantially improved.
+### New: crop / region selection for screen share
 
----
+Pick exactly which part of a shared screen appears on the slide, instead of
+squeezing a whole 2561-wide desktop into a small element.
 
-## Sticky Notes
+- Enter crop mode via the **Crop** button on the share, or by double-clicking it
+- Drag inside the box to move, handles to resize, or drag on the dimmed area to
+  draw a fresh region
+- **Free** or **16:9** aspect lock; **Reset** restores the full frame
+- Live source-pixel readout so you can tell when you're sampling at 1:1 or better
+- Works in the editor and while presenting, including mid-recording — the
+  audience sees the region update live while you keep the full screen in view
+- Crop is stored per element, normalised, and survives save/reload
 
-**Rich text formatting per character.** Bold, italic, underline, font, font size, and color can now be applied to selections — not just the whole note. Use Ctrl+B / Ctrl+I / Ctrl+U or the toolbar buttons to format selected text.
+Cropping also **improves sharpness**: the selected region fills the slide closer
+to 1:1 rather than being downscaled from the whole desktop.
 
-**Recordings preserve formatting.** Sticky notes in exported videos now show all formatting (bold spans, multiple colors, mixed sizes) — previously they exported as plain text.
+### New: presentation-mode controls
 
-**Newlines render correctly in recordings.** A bug where multi-line notes appeared on a single line in exported videos has been fixed.
+Shares are no longer inert while presenting.
 
-**Two visual styles.** Notes can now be Flat (2D) or Lifted (3D with shadow and slight rotation).
+- Hover a share for a control chip: **Crop**, **Style**, **Full**
+- **Alt+drag** to move, **Alt+Shift+drag** to resize (**Ctrl** keeps aspect)
+- Draggable style panel with three tabs:
+  - **Border** — none / solid / gradient / animated, full palette plus custom
+    colour, continuous width and radius
+  - **Shadow** — on/off, Soft / Deep / Glow presets, offset X and Y, blur,
+    opacity, colour
+  - **3D** — Lift with depth, plus new **Tilt X / Tilt Y / Perspective**
 
-**Custom font dropdown** replaces the system dropdown for a consistent dark-theme look.
+3D tilt now renders in exported MP4, not just on screen.
 
-**Better editing experience.**
-- Double-click to enter edit mode (single-click selects)
-- Tool hotkeys (T, S, R, K, P) no longer fire while typing in a note
-- Phantom scrollbar issue resolved
-- Long text scrolls cleanly within the note
+### Recording performance
 
----
+Annotating while recording on a screen-share slide no longer lags.
 
-## Lasso Tool
+- Shares with a shadow or 3D lift no longer fall off the layered compositor
+- Shadows are rendered once into a cached sprite instead of running a
+  `ctx.filter` drop-shadow over a full-size buffer every frame
+- Animated borders on shares no longer force the slow full-slide re-render path
 
-**Group + reveal-step bug fixed.** Selecting elements with lasso, grouping them, and setting a reveal step now works reliably. Previously caused selection issues.
+### Fixes
 
-**Lasso properties panel no longer flickers.** Clicking buttons in the lasso sub-toolbar (Group, Delete, Clear, reveal step controls) is now smooth.
+- Screen share showed a black box on the main canvas while the slide thumbnail
+  held the stream — the stream now attaches to every matching video element
+- Hairline dark arcs on the rounded corners of bordered shares
+- Dark rim around shares with a drop shadow
+- Shadow on a tilted share now follows its rounded corners
+- Floating webcam appeared in a different position when recorded than on
+  screen — position, size, border width and radius now map through the stage
+  rectangle instead of window fractions
+- Floating webcam was stretched to a square in every export; it now cover-fits
+  to match the on-screen overlay
+- Floating webcam border was clipped flat at the edges of its buffer
 
----
+### Console helpers
 
-## Drawing & Annotation
-
-**Recording flicker fixed.** A flash that appeared at the location of every pen/highlighter stroke in exported videos has been eliminated.
-
-**Pen popover dismisses properly in presentation mode.** Picking a color in the ink popover now closes it automatically — no longer have to click outside first.
-
----
-
-## Webcam
-
-### Slide-element webcam (Insert → Webcam)
-
-**Properties panel no longer flickers.** Changing shape, border color, mirror, badge, etc. is now smooth — the video stays playing while properties update.
-
-**Live video in recordings.** Slide-element webcams now record as live video. Previously they could appear frozen on a single frame.
-
-**Gradient and animated borders render in recordings.** Border styles other than solid now appear correctly in exported videos. Animated borders sweep colors around the webcam over time.
-
-### Floating camera (W key)
-
-**Full styling support.** A new gear (⚙) button on the floating camera opens a settings popover with:
-- Shape: Circle, Rounded, or Sharp (rectangular)
-- Border style: Solid, Gradient, or Animated
-- Border colors (1 and 2)
-- Border width
-
-**No flicker during use.** The floating camera no longer flickers when drawing on slides or interacting with sub-toolbars.
-
-**Free-drag positioning.** Drag the camera anywhere on screen during presentation. Position is preserved across window resizes via percentage-based storage.
-
-**Tooltip clarification.** Tooltip now reads "Floating Camera (W) — separate from slide-element webcams" so it's clear this is a different feature from Insert → Webcam.
-
----
-
-## Stickers (Animated Emojis)
-
-**Click registration fixed.** Animated stickers in the picker now respond to the first click instead of requiring multiple attempts.
-
-**Stickers animate in recordings.** Animated stickers are no longer frozen on a single frame in exported videos.
-
----
-
-## Recording & Export
-
-**WebM is now the recommended export format.** Instant save, no transcoding, no quality loss. MP4 is still available for cases that specifically need it (After Effects, Camtasia, YouTube uploads).
-
-**Recording cache improvements.** Various rendering issues during recording have been resolved through smarter cache invalidation.
-
----
-
-## Internal Architecture (for context)
-
-Several rendering subsystems were refactored to eliminate flicker:
-- The floating webcam overlay now lives outside the main render tree
-- Slide-element webcam videos use a position-synced pool — never destroyed/recreated by renders
-- Recording bitmap cache no longer nulls between frames
-
-These changes resolved the "video blinks every time I touch anything" class of bugs.
-
----
-
-## Known limitations / deliberately deferred
-
-- **Properties-panel B/I/U buttons don't reflect selection state.** When you select bold text inside a note, the B button doesn't light up green to indicate it. Functionality works correctly; only visual state is missing. Will be addressed in a future release.
-- **MP4 export is slower than WebM.** This is inherent — MP4 requires transcoding while WebM is the native recording format. Use WebM for fastest exports.
+`epShareIds()`, `epSetCrop(id, x, y, w, h)`, `epGetCrop(id)`, `epClearCrop(id)`,
+`epRecDiag()`, `epTiltMesh(n)`
