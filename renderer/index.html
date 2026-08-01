@@ -537,7 +537,7 @@ body.ep-speed-slow{--ep-trans-dur:1.1s;--ep-reveal-dur:0.85s}
 .ep-sp-icon{width:14px;height:14px;flex-shrink:0}
 
 /* ========= SCREEN SHARE ELEMENT ========= */
-.ss-el{width:100%;height:100%;border-radius:inherit;overflow:hidden;background:#0a0a0c;position:relative}
+.ss-el{width:100%;height:100%;border-radius:inherit;overflow:hidden;background:#0a0a0c;position:relative;transform:translateZ(0)}
 .ss-el video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
 .ss-placeholder{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#a0a0b0;background:repeating-linear-gradient(45deg,rgba(255,255,255,0.015) 0 10px,rgba(255,255,255,0.04) 10px 20px);transition:background 0.15s}
 .ss-placeholder svg{width:48px;height:48px;color:#7ed957;opacity:0.8}
@@ -3289,11 +3289,22 @@ function drawPointerOnCtx(ctx, W, H, posClient, scale){
   var mode = S.pointerMode || 'laser';
   if(mode === 'off') return;
   var color = S.pointerColor || '#ff2a2a';
+  // The caller's scale is W / window.innerWidth, but the recording canvas is
+  // the STAGE, letterboxed inside the window. Multiplying a window coordinate
+  // by that ratio shifted the pointer in the export — which is why the ink
+  // looked like it came from the top of the cursor instead of its centre.
+  // Map through the stage rect instead, exactly as the floating camera does.
+  var _psr = (typeof ssStageViewportRect === 'function') ? ssStageViewportRect() : null;
+  var _pkx = (_psr && _psr.w > 0) ? (W / _psr.w) : scale;
+  var _pky = (_psr && _psr.h > 0) ? (H / _psr.h) : scale;
+  var _plx = _psr ? _psr.left : 0;
+  var _ply = _psr ? _psr.top  : 0;
+  scale = _pkx;                     // sizes follow the same ratio
   var sizeBase = (S.pointerSize || 18) * scale;
   var now = Date.now();
 
   // Helper: client → canvas coordinates
-  function tx(p){ return { x: p.x * scale, y: p.y * scale }; }
+  function tx(p){ return { x: (p.x - _plx) * _pkx, y: (p.y - _ply) * _pky }; }
 
   // Spotlight: dim everything except a circle around cursor
   if(mode === 'spotlight' && posClient){
@@ -4199,6 +4210,9 @@ window.startPresent = function(){
   S.pres = true;
   S.presSlide = S.si;
   S.revealStep = 0;
+  // Build share shadow sprites now, while nothing is animating, so the first
+  // reveal doesn't pay for the allocation mid-frame.
+  try { warmShareShadowSprites(S.slides[S.presSlide]); } catch(e){}
   S.tool = 'cursor';
   S.pop = null;
   S.sel = null;
@@ -4800,6 +4814,12 @@ function setupPointerOverlay(){
     c.style.height = '100%';
     c.style.pointerEvents = 'none';
     c.style.zIndex = '1000';
+    // Promote to its own compositor layer. This canvas repaints every frame
+    // the cursor is on the slide; without its own layer that repaint can pull
+    // the live screen-share video into a repaint too, which shows up as
+    // cursor lag on share slides specifically.
+    c.style.transform = 'translateZ(0)';
+    c.style.willChange = 'transform';
     document.body.appendChild(c);
     _pointerStageCanvas = c;
   }
@@ -4908,6 +4928,7 @@ function onPointerBlur(){
 // S.pointerActive goes false.
 var _pointerLastBitmapFetch = 0;
 var _pointerOverlayDirty = true; // set by mousemove/click; cleared after redraw
+var _pointerLastDrawn = null;    // last position actually painted
 function _pointerRafTick(){
   if(!S.pointerActive || !_pointerStageCanvas){
     return;
@@ -4935,8 +4956,11 @@ function _pointerRafTick(){
   //   - active pulses exist (animation in progress)
   //   - in trail mode (trail keeps fading even without movement)
   //   - dirty flag from recent input
+  var _pMoved = !_pointerPos || !_pointerLastDrawn ||
+                _pointerPos.x !== _pointerLastDrawn.x ||
+                _pointerPos.y !== _pointerLastDrawn.y;
   var needsRedraw = _pointerOverlayDirty ||
-                    _pointerPos !== null ||
+                    (_pointerPos !== null && _pMoved) ||
                     (_pointerPulses && _pointerPulses.length) ||
                     S.pointerMode === 'trail';
   if(needsRedraw){
@@ -4944,6 +4968,7 @@ function _pointerRafTick(){
     ctx.clearRect(0, 0, _pointerStageCanvas.width, _pointerStageCanvas.height);
     drawPointerOnCtx(ctx, window.innerWidth, window.innerHeight, _pointerPos, 1);
     _pointerOverlayDirty = false;
+    _pointerLastDrawn = _pointerPos ? { x:_pointerPos.x, y:_pointerPos.y } : null;
   }
   requestAnimationFrame(_pointerRafTick);
 }
@@ -5931,6 +5956,9 @@ async function getSlideBitmap(slide){
 var _recLayerCache = { slideId:null, revealStep:-1, drawsRef:null, drawsLen:-1,
                        generation:-1, below:null, above:null, shares:null };
 var _recLayerReady   = null;   // last successfully built layer set
+var _recFreezeUntil  = 0;      // hold the last frame until this timestamp
+var _recFrozenFrame  = null;   // canvas holding that frame
+var _recFrozenSlide  = null;
 var _recLayerPending = false;  // guards against stacking async rebuilds per frame
 var _recLayerFailed  = false;
 var _recUsingLayers  = false;  // true only while the layered path draws a frame  // sticky: once layering errors, stay on the safe path
@@ -6005,15 +6033,21 @@ async function getLayeredRecBitmaps(slide){
   var shares = shareIdx.map(function(i){ return visibleEls[i]; });
   var drawsCopy = (slide.draws || []).slice();
 
-  var below = await renderSlideToCanvas(
+  // Build both layers CONCURRENTLY. They're independent rasterisations, and
+  // awaiting them one after the other doubled the window in which the
+  // compositor has no valid layers for the new reveal step.
+  var _belowP = renderSlideToCanvas(
     { id: slide.id, bg: slide.bg, els: belowEls, draws: [] }, REC_SCALE);
+  var _aboveP = renderSlideToCanvas(
+    { id: slide.id, bg: slide.bg, els: aboveEls, draws: [], _noBg: true }, REC_SCALE);
+  var _both = await Promise.all([_belowP, _aboveP]);
+  var below = _both[0];
   // Ink is deliberately NOT baked into this layer. recDrawOverlays composites
   // drawCanvas live every frame, so baking strokes here would double-composite
   // (visibly wrong for highlighters) AND force a full two-layer rebuild on
   // every single stroke commit — which is what made the picture blink while
   // annotating.
-  var above = await renderSlideToCanvas(
-    { id: slide.id, bg: slide.bg, els: aboveEls, draws: [], _noBg: true }, REC_SCALE);
+  var above = _both[1];
 
   _recLayerCache = {
     slideId: slide.id, revealStep: S.revealStep,
@@ -6153,6 +6187,12 @@ function drawLiveSharesToRec(ctx, shares){
 
 function invalidateRecCache(){
   _recCacheGeneration++;
+  // Keep the previous LAYER bitmaps alive until replacements exist. Nulling
+  // them outright leaves the compositor with nothing for the frames between
+  // invalidation and the async rebuild, so it falls back to a full re-render
+  // — one dark/!stale frame, seen as a blink at the moment of a reveal. The
+  // same reasoning already applied to _lastRecBitmap below; the layer cache
+  // needed it too.
   _recSlideCache = { slideId:null, revealStep:-1, drawsRef:null, drawsLen:-1, canvas:null, generation:-1 };
   _recLayerCache = { slideId:null, revealStep:-1, drawsRef:null, drawsLen:-1,
                      generation:-1, below:null, above:null, shares:null };
@@ -6162,8 +6202,17 @@ function invalidateRecCache(){
   // color fill for ~1 frame at the moment of every cache invalidation
   // (after each pen/highlighter stroke), producing a visible flicker exactly
   // where strokes were drawn.
-  console.log('[EP] Rec cache invalidated. New gen=' + _recCacheGeneration);
+  if(window._epTraceInvalidate){
+    console.log('[EP] Rec cache invalidated. gen=' + _recCacheGeneration,
+                new Error().stack.split('\n')[2]);
+  }
 }
+// epTraceInvalidate() prints WHO invalidates the cache. Off by default — the
+// log itself was flooding the console with ~100 lines before recording began.
+window.epTraceInvalidate = function(on){
+  window._epTraceInvalidate = (on !== false);
+  console.log('[EP] invalidation tracing', window._epTraceInvalidate ? 'ON' : 'OFF');
+};
 
 // Composite loop — runs every ~33ms (≈30fps) while recording.
 // IMPORTANT: We use setInterval instead of requestAnimationFrame because RAF
@@ -6373,6 +6422,14 @@ function recComposeFrame(){
     // instead of rebuilding the whole slide every frame. This is what keeps
     // recComposeFrame inside its 33ms budget at 2560x1440.
     if(slideEligibleForLayering(slide)){
+      // Rebuild synchronously-ish when the reveal step changes. Otherwise the
+      // in-flight rebuild races the frame and the compositor keeps drawing the
+      // PREVIOUS reveal state (slideId still matches, revealStep does not) —
+      // then snaps to the new one, which reads as a blink on the first reveal.
+      if(_recLayerReady && _recLayerReady.revealStep !== S.revealStep &&
+         _recLayerReady.slideId === slide.id){
+        _recLayerReady = null;   // stale for THIS reveal — don't draw it
+      }
       if(!_recLayerPending){
         _recLayerPending = true;
         getLayeredRecBitmaps(slide).then(function(L){
@@ -6389,14 +6446,54 @@ function recComposeFrame(){
       // (every ink stroke) dropped us onto the slow path mid-recording and the
       // frame visibly blinked. Static content being a few frames stale is
       // invisible; a blank frame is not.
+      // While frozen, re-present the last composited frame rather than
+      // rebuilding. _recFrozenFrame is captured on the previous good tick.
+      if(_recFreezeUntil && performance.now() < _recFreezeUntil &&
+         _recFrozenFrame && _recFrozenSlide === slide.id){
+        // Hold the static composite, but keep the SHARE LIVE on top of it.
+        // Presenting the frozen frame wholesale froze the video too, which is
+        // why the blink survived inside the share region while the rest of
+        // the slide held steady.
+        ctx.drawImage(_recFrozenFrame, 0, 0, W, H);
+        var _fzShares = (_recLayerReady && _recLayerReady.shares) ||
+                        (_recLayerCache && _recLayerCache.shares) || null;
+        if(_fzShares && _fzShares.length){
+          _recUsingLayers = true;
+          drawLiveSharesToRec(ctx, _fzShares);
+          _recUsingLayers = false;
+        }
+        recDrawOverlays(ctx, W, H, slide);
+        return;
+      }
+      if(_recFreezeUntil && performance.now() >= _recFreezeUntil) _recFreezeUntil = 0;
+
       var LR = _recLayerReady;
-      if(!_recLayerFailed && LR && LR.below && LR.slideId === slide.id){
+      if(!_recLayerFailed && LR && LR.below && LR.slideId === slide.id &&
+         LR.revealStep === S.revealStep){
         _recUsingLayers = true;
         ctx.drawImage(LR.below, 0, 0, W, H);
         drawLiveSharesToRec(ctx, LR.shares);
         ctx.drawImage(LR.above, 0, 0, W, H);
         recDrawOverlays(ctx, W, H, slide);
         _recUsingLayers = false;
+        // Keep this composite so the next reveal can hold it while the new
+        // layers rasterise. Copied, not referenced — cv is drawn over.
+        try {
+          if(!_recFrozenFrame){
+            _recFrozenFrame = document.createElement('canvas');
+          }
+          if(_recFrozenFrame.width !== W || _recFrozenFrame.height !== H){
+            _recFrozenFrame.width = W; _recFrozenFrame.height = H;
+          }
+          var _fctx = _recFrozenFrame.getContext('2d');
+          _fctx.clearRect(0, 0, W, H);
+          // Store the STATIC layers only (no live video, no overlays). The
+          // share is redrawn live on top during a freeze; baking a stale copy
+          // in here would show through around cropped or tilted edges.
+          _fctx.drawImage(LR.below, 0, 0, W, H);
+          _fctx.drawImage(LR.above, 0, 0, W, H);
+          _recFrozenSlide = slide.id;
+        } catch(e){}
         return;
       }
       // Layers not built yet — fall through to the full-render path for this
@@ -6530,8 +6627,28 @@ function epEncoderHumanName(enc){
   }
 }
 
+// Last finished recording, retained until the next one starts. The export
+// dialog previously held the only reference — if conversion failed and the
+// dialog was dismissed, the recording was gone for good.
+var _epLastRec = null;
+
+// Re-open the export dialog for the last recording. Survives a failed export,
+// a closed dialog, even a stray Escape.
+window.epRecoverLast = function(){
+  if(!_epLastRec || !_epLastRec.blob){
+    console.warn('[EP] No recording held in memory.');
+    showToast('No recording available to recover');
+    return false;
+  }
+  console.log('[EP] Recovering recording:',
+              (_epLastRec.blob.size/1024/1024).toFixed(1) + ' MB, ' + _epLastRec.durStr);
+  showRecordingExportDialog(_epLastRec.blob, _epLastRec.durStr, _epLastRec.durationMs);
+  return true;
+};
+
 function showRecordingExportDialog(blob, durStr, durationMs){
   _epExportDurationMs = durationMs || 0;
+  if(blob && blob.size) _epLastRec = { blob: blob, durStr: durStr, durationMs: durationMs };
   var hasFfmpeg = !!(window.epElectron && window.epElectron.convertVideo);
   var sizeStr = (blob.size / 1024 / 1024).toFixed(1) + ' MB';
   var suggestedName = 'ep-recording-' + Date.now();
@@ -6616,7 +6733,10 @@ function showRecordingExportDialog(blob, durStr, durationMs){
   overlay._epQuality = quality;
 
   overlay._epKeyHandler = function(e){
-    if(e.key === 'Escape' && !overlay._epConverting) closeExportDialog(true);
+    if(e.key === 'Escape' && !overlay._epConverting){
+      closeExportDialog(true);
+      showToast('Export closed — epRecoverLast() reopens it');
+    }
   };
   document.addEventListener('keydown', overlay._epKeyHandler);
 }
@@ -6769,8 +6889,16 @@ window.handleExportFormat = async function(format){
       if(closeBtn) closeBtn.style.display = '';
     } else {
       var msg = (result && result.error) || 'Conversion failed';
-      if(progressLabel) progressLabel.textContent = 'Failed: ' + msg;
-      showToast('Export failed: ' + msg);
+      if(progressLabel){
+        progressLabel.innerHTML = 'Failed: ' + msg +
+          '<br><span style="opacity:.75;font-size:11px">Your recording is safe \u2014 ' +
+          'choose <b>WebM</b> to save it losslessly, or run <b>epRecoverLast()</b> ' +
+          'in the console to reopen this dialog.</span>';
+      }
+      console.warn('[EP] Export failed:', msg,
+                   '\n[EP] Recording is still in memory — epRecoverLast() reopens the export dialog,',
+                   '\n[EP] or pick WebM in the dialog to save without ffmpeg.');
+      showToast('Export failed — recording kept, try WebM');
       overlay._epConverting = false;
       for(var bi3=0; bi3<btns.length; bi3++){
         btns[bi3].disabled = btns[bi3].classList.contains('disabled');
@@ -6945,6 +7073,17 @@ window.startRecording = async function(){
     var cv = document.createElement('canvas');
     cv.width = Math.round(STAGE_W * REC_SCALE);
     cv.height = Math.round(STAGE_H * REC_SCALE);
+    // Attach the canvas to the document (off-screen but not display:none).
+    // captureStream() on a fully detached canvas can return a track that never
+    // produces frames — Chromium may not allocate a GPU backing surface for a
+    // canvas that isn't in the document. display:none has the same effect, so
+    // it is parked off-viewport at 1x1 instead.
+    cv.id = 'epRecCanvas';
+    cv.style.cssText = 'position:fixed;left:-10px;top:-10px;width:1px;height:1px;' +
+                       'opacity:0.01;pointer-events:none;z-index:-1';
+    var _oldCv = document.getElementById('epRecCanvas');
+    if(_oldCv && _oldCv.parentNode) _oldCv.parentNode.removeChild(_oldCv);
+    document.body.appendChild(cv);
     S.recCanvas = cv;
 
     // Force-clear the canvas pixels (defensive: new canvases default transparent, but be explicit)
@@ -6969,6 +7108,27 @@ window.startRecording = async function(){
     // When slide audio mixing is requested, we build an AudioContext destination that
     // both mic and slide-audio tracks can feed into.
     var videoStream = cv.captureStream(30);
+    // Verify the capture actually yielded a live video track. If the canvas
+    // has no backing (GPU reset, lost context) captureStream still returns a
+    // stream, but with a track that never produces frames — which is how a
+    // 57-second recording ends up as 0.0 KB.
+    var _vt = videoStream.getVideoTracks()[0];
+    if(!_vt || _vt.readyState !== 'live'){
+      throw new Error('Canvas capture produced no live video track — try restarting the app.');
+    }
+    _vt.addEventListener('ended', function(){
+      console.error('[EP] Capture track ended mid-recording.');
+      if(S.recActive) showToast('Capture stopped unexpectedly — stop the recording');
+    });
+    // Nudge the canvas so the compositor definitely has something to capture
+    // before MediaRecorder starts. Some drivers otherwise hand back a track
+    // that stays idle until the first paint after start.
+    primeCtx.fillStyle = '#000';
+    primeCtx.fillRect(0, 0, cv.width, cv.height);
+    if(typeof _vt.requestFrame === 'function'){
+      try { _vt.requestFrame(); } catch(e){}
+    }
+    console.log('[EP] Capture track:', _vt.readyState, _vt.getSettings ? _vt.getSettings() : '');
     var combinedStream = new MediaStream();
     videoStream.getVideoTracks().forEach(function(t){
       // SHARPNESS FIX (v1.0.23): slides and screen shares are detail content,
@@ -7079,7 +7239,10 @@ window.startRecording = async function(){
       audioBitsPerSecond: 128000
     });
     rec.ondataavailable = function(e){
-      if(e.data && e.data.size > 0) S.recChunks.push(e.data);
+      if(e.data && e.data.size > 0){
+        S.recChunks.push(e.data);
+        S.recBytes = (S.recBytes || 0) + e.data.size;
+      }
     };
     rec.onstop = function(){
       // Guard against double-fire (defensive timeout in stopRecording may have invoked us)
@@ -7115,11 +7278,72 @@ window.startRecording = async function(){
       // 00:00. S.recFinalMs is captured while the recording is still active.
       var _finalMs = S.recFinalMs || 0;
       var durStr = formatRecTime(_finalMs);
+      if(S.recWatchdog){ clearInterval(S.recWatchdog); S.recWatchdog = null; }
+      var _rc = document.getElementById('epRecCanvas');
+      if(_rc && _rc.parentNode) _rc.parentNode.removeChild(_rc);
+      if(!blob || blob.size < 51200){
+        // Under ~50KB there is no usable video; handing this to ffmpeg is what
+        // produced the "ffmpeg exited with code ..." failure.
+        console.error('[EP] Recording produced ' + (blob ? blob.size : 0) + ' bytes across ' +
+                      (S.recBytes || 0) + ' captured bytes — nothing to export.');
+        showToast('Recording captured no video data — nothing to export');
+        alert('This recording came out empty (' + ((blob ? blob.size : 0)/1024).toFixed(1) + ' KB).\n\n' +
+              'The timer ran but the capture stream produced no frames, so there is nothing to convert.\n\n' +
+              'If this repeats, check the console for a MediaRecorder error.');
+        return;
+      }
       // Show format picker; user chooses WebM (direct), MP4, MOV, GIF, or MP3
       showRecordingExportDialog(blob, durStr, _finalMs);
     };
     S.recorder = rec;
+    // MediaRecorder can stop delivering data mid-session (encoder fault, a
+    // track ending) without throwing anywhere visible. That produced a
+    // full-length timer with an empty blob — the "0.0 MB" export that ffmpeg
+    // then rejected. Surface it instead of discovering it at export time.
+    rec.onerror = function(ev){
+      console.error('[EP] MediaRecorder error:', ev && ev.error ? ev.error : ev);
+      showToast('Recorder error — stop and restart the recording');
+    };
+    S.recBytes = 0;
     rec.start(1000); // emit chunks every 1s
+
+    // Watchdog: if nothing has been captured after 6s, say so NOW rather
+    // than after a 40-minute session.
+    setTimeout(function(){
+      if(S.recActive && !S.recPaused && !S.recBytes){
+        console.error('[EP] No recording data after 6s — the capture stream is producing nothing.');
+        // A toast is too easy to miss; a dead recorder wastes the whole take.
+        // Stop immediately and say so, rather than letting it run for an hour.
+        try { if(S.recorder && S.recorder.state !== 'inactive') S.recorder.stop(); } catch(e){}
+        S.recActive = false;
+        if(S.recInterval){ clearInterval(S.recInterval); S.recInterval = null; }
+        try { tickRecIndicator(); } catch(e){}
+        alert('Recording aborted after 6 seconds.\n\n' +
+              'The capture stream produced no frames, so this take would have been empty.\n\n' +
+              'This is usually the canvas capture failing to start. Try:\n' +
+              '  1. Stop and start the recording again\n' +
+              '  2. If it repeats, restart EP Presenter\n\n' +
+              'Nothing has been lost — no usable video was ever captured.');
+      }
+    }, 6000);
+
+    // Second check: a recorder can also die MID-session. Watch for the byte
+    // count going flat while still nominally recording.
+    var _wdLast = 0, _wdStalls = 0;
+    S.recWatchdog = setInterval(function(){
+      if(!S.recActive){ clearInterval(S.recWatchdog); S.recWatchdog = null; return; }
+      if(S.recPaused) return;
+      if((S.recBytes || 0) === _wdLast){
+        _wdStalls++;
+        if(_wdStalls === 5){   // ~10s with no new data
+          console.error('[EP] Recording has stalled — no new data for ~10s.');
+          showToast('Recording stalled — no data being captured');
+        }
+      } else {
+        _wdStalls = 0;
+        _wdLast = S.recBytes || 0;
+      }
+    }, 2000);
 
     // 4. Start compositor loop
     S.recActive = true;
@@ -7241,8 +7465,32 @@ window.presNext = function(){
     if(slide && slide.id){
       _revealAnimTimes[slide.id + ':' + S.revealStep] = performance.now();
     }
+    // Warm BEFORE invalidating: getSlideBitmap() is async, so invalidating
+    // first leaves a window where the compositor has no cached layers and
+    // falls back to a full re-render mid-frame. That gap is the first-reveal
+    // blink — later reveals don't show it because by then the bitmap resolves
+    // fast enough to land inside the same frame.
+    warmShareShadowSprites(slide);
     invalidateRecCache();
-    if(S.recActive) prewarmRecCache();
+    if(S.recActive){
+      prewarmRecCache();
+      // Kick the layer rebuild NOW rather than waiting for the next compositor
+      // tick. That tick is up to 33ms away, and until the rebuild lands the
+      // frame falls back to a full re-render — the residual first-reveal blink.
+      // Freeze the last good frame for the few ms the rebuild takes. The
+      // compositor now correctly refuses stale layers, but that leaves it
+      // with nothing — so it fell back to a full re-render and the picture
+      // jumped. Holding the previous composite is invisible at 30fps and
+      // strictly better than a re-render mid-reveal.
+      _recFreezeUntil = performance.now() + 220;
+      if(slideEligibleForLayering(slide) && !_recLayerPending){
+        _recLayerPending = true;
+        getLayeredRecBitmaps(slide).then(function(L){
+          _recLayerPending = false;
+          if(L) _recLayerReady = L;
+        }).catch(function(){ _recLayerPending = false; });
+      }
+    }
     renderPres();
     syncPresenterView();
     return;
@@ -7323,7 +7571,41 @@ window.presClearDraws = function(){
 // Runs async — the compose loop uses whatever's currently in cache; this just speeds up cache population.
 function prewarmRecCache(){
   var slide = S.slides[S.presSlide];
-  if(slide) getSlideBitmap(slide).catch(function(e){ console.warn('[EP] prewarm failed:', e); });
+  if(!slide) return;
+  warmShareShadowSprites(slide);
+  getSlideBitmap(slide).catch(function(e){ console.warn('[EP] prewarm failed:', e); });
+}
+
+// (Reveal pre-rasterisation removed — see note in presNext.)
+
+// Build every share's shadow sprite up front. The sprite is otherwise created
+// lazily, and it allocates two full-size canvases, runs a blur filter over one
+// and composites them — tens of milliseconds. The layered compositor builds it
+// on frame one, but the full-slide fallback path builds its OWN on first use,
+// which lands exactly on the first reveal. That one-off allocation is the
+// first-reveal flash; every later reveal hits the warm cache.
+function warmShareShadowSprites(slide){
+  if(!slide || !slide.els) return;
+  for(var i = 0; i < slide.els.length; i++){
+    var el = slide.els[i];
+    if(el.type !== 'screenshare') continue;
+    try { ssShadowSprite(el, el.w, el.h); } catch(e){}
+    // Also warm the tilt offscreen. It's allocated at the size of the element
+    // and only on first tilted draw, so it lands on the first reveal for the
+    // same reason the shadow sprite did.
+    var fx = el.effect3d;
+    if(fx && (fx.tiltX || fx.tiltY)){
+      try {
+        if(!_tiltCv) _tiltCv = document.createElement('canvas');
+        var ss = 1.5;
+        var cw = Math.max(1, Math.round(el.w * ss)), chh = Math.max(1, Math.round(el.h * ss));
+        if(_tiltCv.width !== cw || _tiltCv.height !== chh){
+          _tiltCv.width = cw; _tiltCv.height = chh;
+          _tiltCv.getContext('2d').clearRect(0, 0, cw, chh);
+        }
+      } catch(e){}
+    }
+  }
 }
 
 // =========================================================
@@ -12624,7 +12906,8 @@ window.epPerfHUD = function(){
       try { if(slide) layered = slideEligibleForLayering(slide) ? 'YES' : 'NO (slow path)'; } catch(e){}
       _hudEl.textContent =
         'fps ' + (1000/avg).toFixed(1) + '   avg ' + avg.toFixed(1) + 'ms   worst ' + _hudWorst.toFixed(0) + 'ms\n' +
-        'recording  ' + (S.recActive ? 'YES' : 'no') + '\n' +
+        'recording  ' + (S.recActive ? 'YES' : 'no') +
+          (S.recActive ? '  captured ' + (((S.recBytes||0)/1048576).toFixed(1)) + ' MB' : '') + '\n' +
         'layered    ' + layered + '\n' +
         'shares ' + shares + '  crop ' + crop + '\n' +
         'share tilt ' + tilt + '   shadow ' + shadow + '\n' +
@@ -13351,10 +13634,19 @@ async function renderSlideToCanvas(s, scale){
     }
     if(el.type === 'screenshare'){
       var ssStream = _screenShareStreams[el.id];
-      var ssVideo = ssStream ? document.getElementById('ss-video-' + el.id) : null;
-      drawMediaElementWithEffects(x, el, el.x, el.y, el.w, el.h, function(octx, ow, oh){
-        ssDrawContent(octx, ow, oh, el, ssVideo);
-      });
+      var ssVideo = ssStream ? ssVideoEl(el.id) : null;
+      // Use the SAME cached shadow sprite the layered compositor uses.
+      // This path previously went through drawMediaElementWithEffects, which
+      // applies ctx.filter drop-shadow instead — so whenever a reveal
+      // invalidated the layer cache and the recording fell back here for a
+      // few frames, the share's shadow was drawn a different way and its
+      // colour visibly pulsed. One renderer, one appearance.
+      var _ssSp = ssShadowSprite(el, el.w, el.h);
+      x.save();
+      if(_ssSp) x.drawImage(_ssSp.canvas, el.x - _ssSp.pad, el.y - _ssSp.pad);
+      x.translate(el.x, el.y);
+      ssDrawContent(x, el.w, el.h, el, ssVideo);
+      x.restore();
     }
     if(el.type === 'webcam'){
       // Phase 3b: route through drawMediaElementWithEffects so drop-shadow
@@ -22231,6 +22523,11 @@ function renderPres(){
   // anything, causing a visible black flicker. By holding onto the live
   // videos and swapping them into the new DOM, we keep the streams playing
   // without any frame gap.
+  // SCREEN SHARES ONLY. Webcam element videos are pooled in document.body by
+  // reattachWebcamStreams and position-synced each render — innerHTML never
+  // touches them, so they must NOT be detached here. Doing so removed them
+  // from the pool and nulled their srcObject, blacking the camera out for
+  // good.
   var preservedVideos = {};
   var activeIds = Object.keys(_screenShareStreams);
   for(var pi = 0; pi < activeIds.length; pi++){
@@ -22335,6 +22632,7 @@ function applySsCropStyleTo(v, el){
     // Reset to the stylesheet defaults (100%/100%, object-fit:contain).
     v.style.position = ''; v.style.left = ''; v.style.top = '';
     v.style.width = ''; v.style.height = ''; v.style.objectFit = '';
+    v.style.transform = ''; v.style.transformOrigin = ''; v.style.willChange = '';
     return;
   }
 
@@ -22355,16 +22653,34 @@ function applySsCropStyleTo(v, el){
   var ow = host.clientWidth, oh = host.clientHeight;
   if(!ow || !oh) return;
 
-  var cw = svW * crop.w, ch = svH * crop.h;
-  var scale = Math.min(ow / cw, oh / ch);
-  var dw = cw * scale, dh = ch * scale;
+  // Crop by GPU transform, NOT by inflating the element.
+  //
+  // The previous approach set width/height in px so the cropped region filled
+  // the box — but that makes the <video> layer as large as the whole source
+  // scaled up (a tight crop of a 2561-wide desktop became a ~3600px element),
+  // and the browser composites all of it every frame before clipping it to
+  // the host. That saturated the compositor and dragged down everything else
+  // on the slide: webcam, cursor, reveal animations.
+  //
+  // Keeping the element at container size and applying translate+scale means
+  // the layer stays small and the work happens on the GPU.
+  var s0 = Math.min(ow / svW, oh / svH);          // object-fit:contain scale
+  var s1 = Math.min(ow / (svW * crop.w), oh / (svH * crop.h));
+  var k  = s0 > 0 ? (s1 / s0) : 1;
+  // Offset of the crop centre from the video centre, in displayed px.
+  var offX = ((crop.x + crop.w / 2) - 0.5) * svW * s0;
+  var offY = ((crop.y + crop.h / 2) - 0.5) * svH * s0;
 
-  v.style.position  = 'absolute';
-  v.style.objectFit = 'fill';
-  v.style.width  = (svW * scale) + 'px';
-  v.style.height = (svH * scale) + 'px';
-  v.style.left   = ((ow - dw) / 2 - svW * crop.x * scale) + 'px';
-  v.style.top    = ((oh - dh) / 2 - svH * crop.y * scale) + 'px';
+  v.style.position = '';
+  v.style.width    = '';
+  v.style.height   = '';
+  v.style.left     = '';
+  v.style.top      = '';
+  v.style.objectFit = 'contain';
+  v.style.transformOrigin = '50% 50%';
+  v.style.transform = 'translate(' + (-k * offX).toFixed(2) + 'px,' +
+                                     (-k * offY).toFixed(2) + 'px) scale(' + k.toFixed(4) + ')';
+  v.style.willChange = 'transform';
 }
 
 // =========================================================
@@ -23024,7 +23340,7 @@ function buildStylePanel(id){
     if(act === 'shb') return ssShadowPatch(e2, { on:true, blur: parseInt(v, 10) });
     if(act === 'sho') return ssShadowPatch(e2, { on:true, opacity: parseInt(v, 10) / 100 });
     if(act === 'shc') return ssShadowPatch(e2, { on:true, color: v });
-    if(act === 'depth') return ssFxPatch(e2, { style:'lift', depth: parseInt(v, 10) });
+    if(act === 'depth') return ssFxPatch(e2, { depth: parseInt(v, 10) });
     if(act === 'tiltx') return ssFxPatch(e2, { tiltX: parseInt(v, 10) });
     if(act === 'tilty') return ssFxPatch(e2, { tiltY: parseInt(v, 10) });
     if(act === 'persp') return ssFxPatch(e2, { persp: parseInt(v, 10) });
@@ -23236,7 +23552,7 @@ window.buildWebcamStylePanel = function(){
     if(act === 'shb')  return wcShadowPatch({ on:true, blur: parseInt(v, 10) });
     if(act === 'sho')  return wcShadowPatch({ on:true, opacity: parseInt(v, 10)/100 });
     if(act === 'shc')  return wcShadowPatch({ on:true, color: v });
-    if(act === 'depth')return wcFxPatch({ style:'lift', depth: parseInt(v, 10) });
+    if(act === 'depth')return wcFxPatch({ depth: parseInt(v, 10) });
     if(act === 'tiltx')return wcFxPatch({ tiltX: parseInt(v, 10) });
     if(act === 'tilty')return wcFxPatch({ tiltY: parseInt(v, 10) });
     if(act === 'persp')return wcFxPatch({ persp: parseInt(v, 10) });
