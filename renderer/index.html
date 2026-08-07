@@ -539,6 +539,10 @@ body.ep-speed-slow{--ep-trans-dur:1.1s;--ep-reveal-dur:0.85s}
 /* ========= SCREEN SHARE ELEMENT ========= */
 .ss-el{width:100%;height:100%;border-radius:inherit;overflow:hidden;background:#0a0a0c;position:relative;transform:translateZ(0)}
 .ss-el video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
+/* File-backed videos: hard-clamp to the element box. A <video> lays out at
+   its intrinsic size until metadata resolves, so without this a 1080p clip
+   momentarily renders far larger than its element and spills off the slide. */
+.ss-el video[id^="vid-el-"]{max-width:100%;max-height:100%;min-width:0;min-height:0}
 .ss-placeholder{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#a0a0b0;background:repeating-linear-gradient(45deg,rgba(255,255,255,0.015) 0 10px,rgba(255,255,255,0.04) 10px 20px);transition:background 0.15s}
 .ss-placeholder svg{width:48px;height:48px;color:#7ed957;opacity:0.8}
 .ss-placeholder .ss-title{font-size:15px;font-weight:700;color:#f0f0f5;letter-spacing:0.3px}
@@ -2689,6 +2693,7 @@ var I = {
   chartPie:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M 12 12 L 12 3 A 9 9 0 0 1 20.4 16.5 Z" fill="currentColor" stroke="none"/></svg>',
   chartDonut:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M 12 12 L 12 3 A 9 9 0 0 1 20.4 16.5 L 14.6 14.4 A 4 4 0 0 0 12 8 Z" fill="currentColor" stroke="none"/></svg>',
   record:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>',
+  video:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>',
   monitor:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
   chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="3" y1="20" x2="21" y2="20"/></svg>',
   mic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>',
@@ -3218,6 +3223,7 @@ var S = {
   // Phase 3a: floating webcam media effects (mirrors slide-element webcam shape)
   webcamShadow:{on:false,x:0,y:8,blur:24,color:'#000000',opacity:0.4},
   webcamEffect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900},
+  webcamFilter:{look:'none'},
   // v1.0.20: floating webcam device picker. Empty string = OS default
   // (facingMode:user). Otherwise an enumerateDevices() deviceId — typically
   // the user's physical cam, NVIDIA Broadcast Camera, OBS Virtual Camera, etc.
@@ -3283,7 +3289,7 @@ var _pointerStageCanvas = null; // overlay canvas in DOM for live display
 // posClient: cursor in client/window coords; W,H = target canvas size.
 // scale: how to translate client px → canvas px (recording canvas is typically
 // larger than the window, so this is W/window.innerWidth or similar).
-function drawPointerOnCtx(ctx, W, H, posClient, scale){
+function drawPointerOnCtx(ctx, W, H, posClient, scale, isRecording){
   if(!S.pointerActive) return;
   if(!posClient && S.pointerMode !== 'pulse') return; // pulses can render after cursor leaves
   var mode = S.pointerMode || 'laser';
@@ -3294,7 +3300,12 @@ function drawPointerOnCtx(ctx, W, H, posClient, scale){
   // by that ratio shifted the pointer in the export — which is why the ink
   // looked like it came from the top of the cursor instead of its centre.
   // Map through the stage rect instead, exactly as the floating camera does.
-  var _psr = (typeof ssStageViewportRect === 'function') ? ssStageViewportRect() : null;
+  // Only the RECORDING canvas needs window->stage mapping. The live overlay is
+  // a full-window canvas already in client coordinates, and applying the stage
+  // transform to it pushed the drawn cursor away from the real one — the
+  // pointer appearing in a different place from the ink.
+  var _isRec = !!isRecording;
+  var _psr = _isRec && (typeof ssStageViewportRect === 'function') ? ssStageViewportRect() : null;
   var _pkx = (_psr && _psr.w > 0) ? (W / _psr.w) : scale;
   var _pky = (_psr && _psr.h > 0) ? (H / _psr.h) : scale;
   var _plx = _psr ? _psr.left : 0;
@@ -3733,6 +3744,23 @@ function mkChart(x, y){
 // Webcam element: a placeholder on the slide that fills with live camera feed.
 // Unlike the floating webcam overlay (toggled via W key), this is per-slide,
 // positionable, resizable, with its own shape/border/mirror settings.
+// Video element. Deliberately shaped like a screenshare so the existing
+// border/shadow/3D/crop code paths apply unchanged. src holds a file:// path
+// rather than embedded data: these files are large, and embedding would bloat
+// the deck and stall autosave. fileName is kept so a broken link can name the
+// file it wants.
+function mkVideo(x,y){return{id:uid(),type:'video',x:x,y:y,w:640,h:360,label:'Video',
+  src:'', fileName:'', bc:'#7ed957',bc2:'#9b59ff',bw:2,br:10,borderStyle:'solid',
+  badgeStyle:'off',badgePos:'tl',lk:false,
+  volume:100, muted:false, loop:false, autoplay:false,
+  fit:'contain',        // 'contain' = whole frame letterboxed, 'cover' = fill+crop
+  lockAspect:true,      // corner-drag keeps the video's proportions
+  natW:0, natH:0,
+  trimStart:0, trimEnd:0,          // seconds; trimEnd 0 = to the end
+  shadow:{on:false,x:0,y:12,blur:38,color:'#000000',opacity:0.55},
+  effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900}
+}}
+
 function mkWebcam(x,y){return{id:uid(),type:'webcam',x:x,y:y,w:280,h:280,label:'Webcam',shape:'circle',bc:'#7ed957',bc2:'#9b59ff',bw:3,br:14,borderStyle:'solid',mirror:true,badgeStyle:'off',badgePos:'tl',deviceId:'',lk:false,
   // Phase 3a: media effects, off by default
   shadow:{on:false,x:0,y:8,blur:24,color:'#000000',opacity:0.4},
@@ -4210,6 +4238,7 @@ window.startPresent = function(){
   S.pres = true;
   S.presSlide = S.si;
   S.revealStep = 0;
+  setTimeout(startAutoplayVideos, 120);
   // Build share shadow sprites now, while nothing is animating, so the first
   // reveal doesn't pay for the allocation mid-frame.
   try { warmShareShadowSprites(S.slides[S.presSlide]); } catch(e){}
@@ -4966,7 +4995,7 @@ function _pointerRafTick(){
   if(needsRedraw){
     var ctx = _pointerStageCanvas.getContext('2d');
     ctx.clearRect(0, 0, _pointerStageCanvas.width, _pointerStageCanvas.height);
-    drawPointerOnCtx(ctx, window.innerWidth, window.innerHeight, _pointerPos, 1);
+    drawPointerOnCtx(ctx, window.innerWidth, window.innerHeight, _pointerPos, 1, false);
     _pointerOverlayDirty = false;
     _pointerLastDrawn = _pointerPos ? { x:_pointerPos.x, y:_pointerPos.y } : null;
   }
@@ -5379,6 +5408,13 @@ function ensureWebcamOverlay(){
 // Apply the current S.webcam* styling to the frame element + video.
 // Idempotent — safe to call any time the user changes a setting.
 function _applyFloatingWebcamStyling(overlay){
+  // Image filter goes on the <video>, not the frame — filtering the frame
+  // would blur/tint the border along with the picture.
+  (function(){
+    var ov = overlay || document.getElementById('webcamOverlay');
+    var vv = ov && ov.querySelector('video');
+    if(vv) vv.style.filter = buildMediaFilterString({ filter: S.webcamFilter }) || '';
+  })();
   if(!overlay) overlay = document.getElementById('webcamOverlay');
   if(!overlay) return;
   var frame = overlay.querySelector('.webcam-frame');
@@ -5816,6 +5852,7 @@ function slideHasLiveScreenShare(slide){
   for(var i=0; i<slide.els.length; i++){
     var el = slide.els[i];
     if(el.type === 'screenshare' && _screenShareStreams[el.id]) return true;
+    if(el.type === 'video' && el.src) return true;
   }
   return false;
 }
@@ -5964,7 +6001,7 @@ var _recLayerFailed  = false;
 var _recUsingLayers  = false;  // true only while the layered path draws a frame  // sticky: once layering errors, stay on the safe path
 
 function _shareEligibleForLayering(el){
-  if(el.type !== 'screenshare') return false;
+  if(el.type !== 'screenshare' && !(el.type === 'video' && el.src)) return false;
   // NOTE: el.shadow is an OBJECT ({on:bool}) and el.effect3d is an object too,
   // so testing them for truthiness excluded every share whether or not the
   // effect was actually enabled. Read the flags, exactly as
@@ -5993,7 +6030,9 @@ function slideEligibleForLayering(slide){
   if(slideHasAnimatingChart(slide))   return _layerDecline('a chart is mid-animation');
   if(slideHasAnimatedBorder(slide))   return _layerDecline('an animated gradient border is active');
   if(slideHasInProgressReveal(slide)) return false; // transient, do not spam
-  var shares = slide.els.filter(function(e){ return e.type === 'screenshare'; });
+  var shares = slide.els.filter(function(e){
+    return e.type === 'screenshare' || (e.type === 'video' && e.src);
+  });
   if(shares.length === 0) return false;
   if(!shares.every(_shareEligibleForLayering))
     return _layerDecline('the screen share has a drop shadow or 3D lift enabled');
@@ -6020,14 +6059,19 @@ async function getLayeredRecBitmaps(slide){
     return true;
   });
   var shareIdx = [];
-  visibleEls.forEach(function(el, i){ if(el.type === 'screenshare') shareIdx.push(i); });
+  visibleEls.forEach(function(el, i){
+    if(el.type === 'screenshare' || (el.type === 'video' && el.src)) shareIdx.push(i);
+  });
   if(shareIdx.length === 0) return null;
 
   var first = shareIdx[0], last = shareIdx[shareIdx.length - 1];
   var belowEls = visibleEls.slice(0, first);
   var aboveEls = [];
   for(var i = first + 1; i <= last; i++){
-    if(visibleEls[i].type !== 'screenshare') aboveEls.push(visibleEls[i]);
+    var _av = visibleEls[i];
+    // Videos are live media like shares — if they were baked into the static
+    // "above" layer they'd also be drawn live, double-rendering every frame.
+    if(_av.type !== 'screenshare' && !(_av.type === 'video' && _av.src)) aboveEls.push(_av);
   }
   aboveEls = aboveEls.concat(visibleEls.slice(last + 1));
   var shares = shareIdx.map(function(i){ return visibleEls[i]; });
@@ -6173,8 +6217,13 @@ function ssShadowSprite(el, w, h){
 function drawLiveSharesToRec(ctx, shares){
   for(var i=0; i<shares.length; i++){
     var el = shares[i];
-    var stream = _screenShareStreams[el.id];
-    var vid = stream ? ssVideoEl(el.id) : null;
+    var vid;
+    if(el.type === 'video'){
+      var _ve = document.getElementById('vid-el-' + el.id);
+      vid = (_ve && _ve.readyState >= 2) ? _ve : null;
+    } else {
+      vid = _screenShareStreams[el.id] ? ssVideoEl(el.id) : null;
+    }
     ctx.save();
     ctx.scale(REC_SCALE, REC_SCALE);
     var sp = ssShadowSprite(el, el.w, el.h);
@@ -6356,7 +6405,10 @@ function recDrawOverlays(ctx, W, H, slide){
           var _vw = v.videoWidth || ow, _vh = v.videoHeight || oh;
           var _cs = Math.max(ow / _vw, oh / _vh);
           var _cdw = _vw * _cs, _cdh = _vh * _cs;
+          var _wf = buildMediaFilterString({ filter: S.webcamFilter });
+          if(_wf) octx.filter = _wf;
           octx.drawImage(v, (ow - _cdw) / 2, (oh - _cdh) / 2, _cdw, _cdh);
+          if(_wf) octx.filter = 'none';
         } catch(e){}
         octx.restore();
 
@@ -6399,7 +6451,7 @@ function recDrawOverlays(ctx, W, H, slide){
   // appears correctly sized in the MP4 regardless of viewport size.
   try {
     var pointerScale = W / Math.max(1, window.innerWidth);
-    drawPointerOnCtx(ctx, W, H, _pointerPos, pointerScale);
+    drawPointerOnCtx(ctx, W, H, _pointerPos, pointerScale, true);
   } catch(e){ /* never let pointer rendering break the recording loop */ }
   // Note: no RAF reschedule — setInterval handles the next tick.
 }
@@ -7139,7 +7191,18 @@ window.startRecording = async function(){
     });
 
     // AudioContext-based mixer (only created when needed)
-    if(S.recAudio || includeAudio){
+    // Also build the mixer when the current slide has a video with sound —
+    // video audio was never routed anywhere, so exports were silent unless
+    // mic or slide-voiceover happened to be on.
+    // Check the WHOLE DECK, not just the current slide. Recording usually
+    // starts on slide 1 and reaches the video later — deciding by current
+    // slide meant the mixer was never built and the video was silent.
+    var _deckHasVideoAudio = S.slides.some(function(sl){
+      return sl.els && sl.els.some(function(e){
+        return e.type === 'video' && e.src && !e.muted;
+      });
+    });
+    if(S.recAudio || includeAudio || _deckHasVideoAudio){
       try {
         S.recAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
         S.recAudioDest = S.recAudioCtx.createMediaStreamDestination();
@@ -7172,6 +7235,14 @@ window.startRecording = async function(){
         // the same recAudioDest that mic + slide voiceover use. This produces
         // a single mixed audio track in the output. Screen audio NEVER plays
         // through speakers — it only enters the recording.
+        // Route file-video audio into the recording. Unlike screen share, a
+        // <video> element is ALSO audible through the speakers, so it must be
+        // connected to both the mixer and the real destination — calling
+        // createMediaElementSource silently detaches it from the speakers
+        // otherwise, and the presenter would suddenly hear nothing.
+        S.recVideoElGains = [];
+        routeVideoAudioToMixer();
+
         S.recScreenShareGains = []; // {source, gain, ssId} — track for cleanup + live volume updates
         if(includeAudio){
           Object.keys(_screenShareStreams).forEach(function(ssId){
@@ -7279,6 +7350,15 @@ window.startRecording = async function(){
       var _finalMs = S.recFinalMs || 0;
       var durStr = formatRecTime(_finalMs);
       if(S.recWatchdog){ clearInterval(S.recWatchdog); S.recWatchdog = null; }
+      // Disconnect video mixer taps from the recording destination. The
+      // MediaElementSource itself must stay attached to the element (it can
+      // only be created once per element), so only the dest link is cut.
+      if(S.recVideoElGains){
+        S.recVideoElGains.forEach(function(g){
+          try { g.node.disconnect(S.recAudioDest); } catch(e){}
+        });
+        S.recVideoElGains = null;
+      }
       var _rc = document.getElementById('epRecCanvas');
       if(_rc && _rc.parentNode) _rc.parentNode.removeChild(_rc);
       if(!blob || blob.size < 51200){
@@ -7512,6 +7592,7 @@ window.presNext = function(){
         _slideTransitionTime = performance.now();
       } catch(e){ _prevSlideBitmap = null; }
     }
+    pauseAllVideos();     // don't let audio bleed into the next slide
     S.presSlide++;
     S.revealStep = 0;
     S.pop = null;
@@ -8384,8 +8465,13 @@ document.addEventListener('mousemove', function(evt){
     if(c.indexOf('s') >= 0){ newH = resize.oh + dy; }
     if(c.indexOf('n') >= 0){ newH = resize.oh - dy; newY = resize.oy + dy; }
 
-    // Shift = constrain aspect (corner handles only)
-    if(shift && isCorner){
+    // Videos default to LOCKED aspect (Shift then releases it) — dragging a
+    // video off-ratio just letterboxes or crops it, so proportional is the
+    // sane default. Every other element keeps Shift-to-constrain.
+    var _lockAspect = shift;
+    if(el2.type === 'video' && el2.lockAspect !== false) _lockAspect = !shift;
+
+    if(_lockAspect && isCorner){
       // Pick which axis drove the change more and match the other to it
       var wRatio = newW / resize.ow;
       var hRatio = newH / resize.oh;
@@ -9677,6 +9763,11 @@ function reattachWebcamStreams(){
 
     // Mirror transform on video itself (no transform on host, so no double-scale).
     video.style.transform = mirror ? 'scaleX(-1)' : 'none';
+    // Image filter for webcam slide elements.
+    (function(){
+      var wcEl = ssFindEl(id);
+      video.style.filter = wcEl ? (buildMediaFilterString(wcEl) || '') : '';
+    })();
 
     // Clip path / border radius from data-* attributes (set in renderWebcam)
     var shape = host.getAttribute('data-wc-shape') || 'circle';
@@ -10544,6 +10635,193 @@ window.addShape = function(sh){
   updateSlide(function(s){s.els.push(el); return s;});
   S.sel = el.id;
   S.tool = 'select';
+};
+
+// Replace the file behind an existing video element, keeping its position,
+// size and styling. Also the recovery path when a deck is reopened and the
+// object URL from the previous session is gone.
+// Resize the element to the video's true aspect, keeping its top-left corner.
+// Diagnostic: reports what the element says vs what the DOM actually did.
+// epVideoDiag() with no argument checks every video on the current slide.
+window.epVideoDiag = function(id){
+  var slide = S.pres ? S.slides[S.presSlide] : cs();
+  if(!slide){ console.warn('[vid] no slide'); return; }
+  var els = slide.els.filter(function(e){
+    return e.type === 'video' && (!id || e.id === id);
+  });
+  if(!els.length){ console.warn('[vid] no video elements on this slide'); return; }
+  els.forEach(function(el){
+    var v = document.getElementById('vid-el-' + el.id);
+    var host = v && v.parentNode;
+    var out = {
+      id: el.id,
+      'el.w x el.h': el.w + ' x ' + el.h,
+      'natural': (el.natW || '?') + ' x ' + (el.natH || '?'),
+      'video intrinsic': v ? (v.videoWidth + ' x ' + v.videoHeight) : 'NO <video>',
+      'video box': v ? (Math.round(v.getBoundingClientRect().width) + ' x ' +
+                        Math.round(v.getBoundingClientRect().height)) : '-',
+      'host box': host ? (Math.round(host.getBoundingClientRect().width) + ' x ' +
+                          Math.round(host.getBoundingClientRect().height)) : '-',
+      'host inline w/h': host ? (host.style.width + ' / ' + host.style.height) : '-',
+      'host class': host ? host.className : '-'
+    };
+    console.log('[vid] ---');
+    console.table ? console.table(out) : console.log(out);
+  });
+  console.log('[vid] If "el.w x el.h" is portrait but "host inline w/h" is empty,',
+              'this element is being drawn by an older code path.');
+  return els.length;
+};
+
+window.fitVideoAspect = function(id){
+  var el = ssFindEl(id);
+  var v = document.getElementById('vid-el-' + id);
+  if(!el) return;
+  var vw = (v && v.videoWidth) || el.natW || 0;
+  var vh = (v && v.videoHeight) || el.natH || 0;
+  if(!vw || !vh){ showToast('Video dimensions not available yet'); return; }
+  var ar = vw / vh;
+  // Preserve area so the element doesn't jump in visual size.
+  var area = el.w * el.h;
+  var h = Math.round(Math.sqrt(area / ar));
+  var w = Math.round(h * ar);
+  if(w > STAGE_W - 40){ w = STAGE_W - 40; h = Math.round(w / ar); }
+  if(h > STAGE_H - 40){ h = STAGE_H - 40; w = Math.round(h * ar); }
+  updateEl(id, { w:Math.max(160, w), h:Math.max(90, h), natW:vw, natH:vh });
+  showToast('Fitted to ' + vw + '\u00D7' + vh);
+};
+
+window.replaceVideoFile = function(id){
+  var inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'video/*';
+  inp.onchange = function(){
+    var f = inp.files && inp.files[0];
+    if(!f) return;
+    var url = URL.createObjectURL(f);
+    var old = _videoElStreams[id];
+    if(old){ try { URL.revokeObjectURL(old); } catch(e){} }
+    _videoElStreams[id] = url;
+    delete _videoElState[id];
+    updateEl(id, { src:url, fileName:f.name });
+    showToast('Video replaced');
+  };
+  inp.click();
+};
+
+// Autoplay on slide entry, for elements that opted in.
+function startAutoplayVideos(){
+  var slide = S.pres ? S.slides[S.presSlide] : null;
+  if(!slide || !slide.els) return;
+  for(var i = 0; i < slide.els.length; i++){
+    var el = slide.els[i];
+    if(el.type !== 'video' || !el.src || !el.autoplay) continue;
+    var v = document.getElementById('vid-el-' + el.id);
+    if(v && v.paused){
+      if((el.trimStart || 0) > 0) v.currentTime = el.trimStart;
+      v.play().catch(function(){});
+    }
+  }
+}
+
+// Pause every video when leaving a slide, so audio doesn't bleed across.
+function pauseAllVideos(){
+  var vids = document.querySelectorAll('[id^="vid-el-"]');
+  for(var i = 0; i < vids.length; i++){
+    try { vids[i].pause(); } catch(e){}
+  }
+}
+
+// Tap every on-screen video into the recording mixer. Called at recording
+// start AND whenever a video element appears, because recording usually
+// begins on a different slide than the one holding the video — at start time
+// there may be nothing to route yet.
+function routeVideoAudioToMixer(){
+  if(!S.recActive || !S.recAudioCtx || !S.recAudioDest) return;
+  if(!S.recVideoElGains) S.recVideoElGains = [];
+  var vids = document.querySelectorAll('[id^="vid-el-"]');
+  for(var i = 0; i < vids.length; i++){
+    var v = vids[i];
+    var vid = v.id.slice('vid-el-'.length);
+    if(v._epMixDest === S.recAudioDest) continue;   // already routed this session
+    try {
+      if(!v._epMixNode){
+        // createMediaElementSource can only be called ONCE per element, ever.
+        // The node is cached on the element and reused for later recordings.
+        var vSrc = S.recAudioCtx.createMediaElementSource(v);
+        var vGain = S.recAudioCtx.createGain();
+        vGain.gain.value = 1;
+        vSrc.connect(vGain);
+        // Keep it audible: createMediaElementSource detaches the element from
+        // the speakers, so without this the presenter hears nothing.
+        vGain.connect(S.recAudioCtx.destination);
+        v._epMixNode = vGain;
+      }
+      v._epMixNode.connect(S.recAudioDest);
+      v._epMixDest = S.recAudioDest;
+      S.recVideoElGains.push({ node:v._epMixNode, id:vid });
+      console.log('[EP] Video audio routed into recording:', vid);
+    } catch(e){
+      console.warn('[EP] Video audio routing failed for', vid, e);
+    }
+  }
+}
+
+window.triggerVideoInput = function(){
+  document.getElementById('vidInput').click();
+};
+
+// Live <video> elements for video slide elements, keyed by element id.
+var _videoElStreams = {};   // id -> object URL (kept so it can be revoked)
+
+window.handleVideoUpload = function(evt){
+  var f = evt.target.files && evt.target.files[0];
+  evt.target.value = '';                 // allow re-picking the same file
+  if(!f) return;
+  var url = URL.createObjectURL(f);
+
+  // Read the real dimensions BEFORE creating the element. Patching size
+  // afterwards went through updateEl -> updateSlide, which targets whatever
+  // slide is current when the async callback fires — so the element could be
+  // created at 640x360 and then resized against the wrong slide, or not at
+  // all, leaving the box and the video disagreeing about aspect.
+  function place(vw, vh){
+    var ar = (vw && vh) ? (vw / vh) : (16 / 9);
+    var maxW = Math.min(1280, STAGE_W - 160);
+    var maxH = Math.min(900,  STAGE_H - 160);
+    var w = maxW, h = Math.round(w / ar);
+    if(h > maxH){ h = maxH; w = Math.round(h * ar); }
+    w = Math.max(160, Math.round(w));
+    h = Math.max(90,  Math.round(h));
+
+    var p = getNextSpawnPos(w, h);
+    var el = mkVideo(p.x, p.y);
+    el.src = url;
+    el.fileName = f.name;
+    el.w = w; el.h = h;
+    el.natW = vw || 0; el.natH = vh || 0;   // kept for later re-fits
+    _videoElStreams[el.id] = url;
+    updateSlide(function(s){ s.els.push(el); return s; });
+    S.sel = el.id;
+    S.tool = 'select';
+    showToast('Video added — click it while presenting to play');
+  }
+
+  var probe = document.createElement('video');
+  probe.preload = 'metadata';
+  var done = false;
+  probe.onloadedmetadata = function(){
+    if(done) return; done = true;
+    place(probe.videoWidth, probe.videoHeight);
+  };
+  probe.onerror = function(){
+    if(done) return; done = true;
+    console.warn('[EP] Could not read video metadata; using 16:9.');
+    place(0, 0);
+  };
+  // Don't hang on a codec the browser can't parse.
+  setTimeout(function(){ if(!done){ done = true; place(0, 0); } }, 3000);
+  probe.src = url;
 };
 
 window.triggerImageInput = function(){
@@ -13158,6 +13436,9 @@ function ssDrawContent(octx, ow, oh, el, ssVideo){
 }
 
 function ssDrawContentRaw(octx, ow, oh, el, ssVideo, skipBorder){
+  // Image filters must wrap ONLY the media draw — applying ctx.filter around
+  // the border stroke would tint the frame as well as the picture.
+  var _mf = buildMediaFilterString(el);
   var ssBr = el.br || 10;
   var ssBw = el.bw || 0;
   var ssBStyle = el.borderStyle || 'solid';
@@ -13201,13 +13482,19 @@ function ssDrawContentRaw(octx, ow, oh, el, ssVideo, skipBorder){
       var _sy  = _cr ? _cr.sy : 0;
       var _sw  = _cr ? _cr.sw : _svW;
       var _sh  = _cr ? _cr.sh : _svH;
-      var _svScale = Math.min(ow / _sw, oh / _sh);
+      // 'cover' fills the box and crops the overflow; 'contain' letterboxes.
+      // Must match the DOM's object-fit or editor and export disagree.
+      var _svScale = (el.fit === 'cover')
+        ? Math.max(ow / _sw, oh / _sh)
+        : Math.min(ow / _sw, oh / _sh);
       var _svDW = _sw * _svScale, _svDH = _sh * _svScale;
       // Overdraw by 1px each way: rounding in the letterbox maths could
       // otherwise leave a sub-pixel gap at the clip edge.
+      if(_mf) octx.filter = _mf;
       octx.drawImage(ssVideo, _sx, _sy, _sw, _sh,
                      (ow - _svDW) / 2 - 1, (oh - _svDH) / 2 - 1,
                      _svDW + 2, _svDH + 2);
+      if(_mf) octx.filter = 'none';
     } catch(e){}
   } else {
     octx.fillStyle = '#1a1a22';
@@ -13632,6 +13919,17 @@ async function renderSlideToCanvas(s, scale){
         }
       }
     }
+    if(el.type === 'video'){
+      // Reuses the screenshare canvas renderer wholesale — same frame chrome,
+      // same shadow sprite, same tilt path. Only the source differs.
+      var _vEl = document.getElementById('vid-el-' + el.id);
+      var _vSp = ssShadowSprite(el, el.w, el.h);
+      x.save();
+      if(_vSp) x.drawImage(_vSp.canvas, el.x - _vSp.pad, el.y - _vSp.pad);
+      x.translate(el.x, el.y);
+      ssDrawContent(x, el.w, el.h, el, (_vEl && _vEl.readyState >= 2) ? _vEl : null);
+      x.restore();
+    }
     if(el.type === 'screenshare'){
       var ssStream = _screenShareStreams[el.id];
       var ssVideo = ssStream ? ssVideoEl(el.id) : null;
@@ -13693,6 +13991,8 @@ async function renderSlideToCanvas(s, scale){
         octx.clip();
         if(wcVideo && wcVideo.readyState >= 2){
           try {
+            var _wcf = buildMediaFilterString(el);
+            if(_wcf) octx.filter = _wcf;
             if(wcMirror){
               octx.save();
               octx.translate(ow, 0);
@@ -13702,6 +14002,7 @@ async function renderSlideToCanvas(s, scale){
             } else {
               octx.drawImage(wcVideo, 0, 0, ow, oh);
             }
+            if(_wcf) octx.filter = 'none';   // don't tint the border below
           } catch(e){}
         } else {
           octx.fillStyle = '#66667a';
@@ -14351,6 +14652,9 @@ function renderElInner(el, isPres, slideCtx){
   if(el.type === 'screenshare'){
     h += renderScreenShare(el, isPres);
   }
+  if(el.type === 'video'){
+    h += renderVideoEl(el, isPres);
+  }
   if(el.type === 'webcam'){
     h += renderWebcam(el, isPres);
   }
@@ -14360,6 +14664,63 @@ function renderElInner(el, isPres, slideCtx){
   // TradingView elements are no longer supported — silently skip in legacy decks.
   // The element data stays in saved files but produces no visible output. Users
   // can delete them from the slide (selection still works on bbox-only).
+  return h;
+}
+
+// =========================================================
+// VIDEO RENDERER
+// Shares the screenshare frame chrome (border, radius, gradient, shadow, 3D)
+// so styling behaves identically; only the source and controls differ.
+// =========================================================
+function renderVideoEl(el, isPres){
+  var bw = el.bw != null ? el.bw : 2;
+  var br = el.br != null ? el.br : 10;
+  var bc1 = el.bc || '#7ed957', bc2 = el.bc2 || '#9b59ff';
+  var bs = el.borderStyle || 'solid';
+  var useGradient = (bs === 'gradient' || bs === 'animated') && bw > 0;
+  var fx = buildMediaEffectStyle(el);
+  var h = '';
+
+  // Explicit px sizing, exactly as renderScreenShare does. width:100%/height:100%
+  // has no sized parent to resolve against here, so the box collapsed and the
+  // <video> laid out at its INTRINSIC size — a portrait clip in a landscape-
+  // looking box that overflowed the slide on play.
+  if(useGradient){
+    var gradBg = 'linear-gradient(135deg, '+bc1+' 0%, '+bc2+' 50%, '+bc1+' 100%)';
+    h += '<div class="ep-grad-border'+(bs === 'animated' ? ' ep-border-anim' : '')+'" style="' +
+         'width:'+el.w+'px;height:'+el.h+'px;padding:'+bw+'px;border-radius:'+br+'px;' +
+         'background-image:'+gradBg+';box-sizing:border-box;'+fx+'">';
+    h += '<div class="ss-el" style="width:100%;height:100%;border:none;border-radius:' +
+         Math.max(0, br - Math.min(bw,4))+'px;box-sizing:border-box">';
+  } else {
+    h += '<div class="ss-el" style="width:'+el.w+'px;height:'+el.h+'px;border:'+bw+'px solid '+bc1+';' +
+         'border-radius:'+br+'px;box-sizing:border-box;'+fx+'">';
+  }
+
+  if(el.src){
+    // Explicit max/min plus overflow containment. A <video> will otherwise
+    // lay out at its INTRINSIC size before metadata settles, which is how a
+    // 1080p clip briefly rendered far larger than its element and spilled
+    // past the slide.
+    var _vf = buildMediaFilterString(el);
+    h += '<video id="vid-el-'+el.id+'" playsinline preload="metadata"' +
+         (el.loop ? ' loop' : '') + (el.muted ? ' muted' : '') +
+         ' style="width:100%;height:100%;max-width:100%;max-height:100%;min-width:0;min-height:0;' +
+         'object-fit:contain;display:block;background:#000' +
+         (_vf ? ';filter:' + _vf : '') + '"></video>';
+    if(!isPres){
+      // Editor: a still frame is enough. A play affordance would compete with
+      // element selection and dragging.
+      h += '<div style="position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,0.7);' +
+           'color:#c8c8d4;font-size:10px;font-family:Outfit,sans-serif;padding:3px 7px;' +
+           'border-radius:4px;pointer-events:none">' + esc(el.fileName || 'Video') + '</div>';
+    }
+  } else {
+    h += '<div class="ss-placeholder"><div style="font-size:12px">No video file</div></div>';
+  }
+
+  h += '</div>';
+  if(useGradient) h += '</div>';
   return h;
 }
 
@@ -14410,7 +14771,9 @@ function renderScreenShare(el, isPres){
       h += '<button class="disconnect" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();disconnectScreenShare(\''+el.id+'\',event)">Disconnect</button>';
       h += '</div>';
     }
-    h += '<video id="ss-video-'+el.id+'" autoplay muted playsinline></video>';
+    var _ssf = buildMediaFilterString(el);
+    h += '<video id="ss-video-'+el.id+'" autoplay muted playsinline' +
+         (_ssf ? ' style="filter:'+_ssf+'"' : '') + '></video>';
   } else {
     // Placeholder — the CARD itself is NOT clickable so users can drag/select it.
     // Only the explicit "Connect Source" button triggers the picker.
@@ -18652,6 +19015,58 @@ function drawMediaElementWithEffects(mainCtx, el, x, y, w, h, drawClippedFn){
 // Live-preview only in 3a — the recording/canvas-export pipeline gets these
 // in 3b; until then, MP4/PNG output won't show them. The Effects section in
 // the props panel surfaces this.
+// =========================================================
+// MEDIA IMAGE FILTERS (adjustments + looks)
+// One CSS filter string, used verbatim by the DOM and passed to ctx.filter on
+// canvas, so editor, presentation and MP4 stay identical.
+// =========================================================
+var MEDIA_LOOKS = {
+  none:      { label:'None',      f:{} },
+  bw:        { label:'B&W',       f:{ saturate:0, contrast:115 } },
+  vintage:   { label:'Vintage',   f:{ sepia:45, saturate:80, contrast:95, brightness:105 } },
+  cool:      { label:'Cool',      f:{ hue:-12, saturate:105, brightness:102 } },
+  warm:      { label:'Warm',      f:{ hue:10, saturate:112, brightness:104 } },
+  cinematic: { label:'Cinematic', f:{ contrast:118, saturate:88, brightness:96 } },
+  vivid:     { label:'Vivid',     f:{ saturate:150, contrast:108 } },
+  soft:      { label:'Soft',      f:{ blur:0.6, brightness:104, saturate:96 } }
+};
+
+// Defaults are the identity values, so an element with no filter set produces
+// an empty string and costs nothing.
+function mediaFilterValues(el){
+  var f = (el && el.filter) || {};
+  var look = MEDIA_LOOKS[f.look || 'none'];
+  var base = (look && look.f) || {};
+  function pick(k, dflt){
+    if(typeof f[k] === 'number') return f[k];          // explicit user value
+    if(typeof base[k] === 'number') return base[k];    // from the look
+    return dflt;
+  }
+  return {
+    brightness: pick('brightness', 100),
+    contrast:   pick('contrast', 100),
+    saturate:   pick('saturate', 100),
+    hue:        pick('hue', 0),
+    sepia:      pick('sepia', 0),
+    blur:       pick('blur', 0),
+    grayscale:  pick('grayscale', 0),
+    look:       f.look || 'none'
+  };
+}
+
+function buildMediaFilterString(el){
+  var v = mediaFilterValues(el);
+  var out = [];
+  if(v.brightness !== 100) out.push('brightness(' + (v.brightness/100) + ')');
+  if(v.contrast   !== 100) out.push('contrast('   + (v.contrast/100)   + ')');
+  if(v.saturate   !== 100) out.push('saturate('   + (v.saturate/100)   + ')');
+  if(v.hue        !== 0)   out.push('hue-rotate('  + v.hue + 'deg)');
+  if(v.sepia      !== 0)   out.push('sepia('      + (v.sepia/100)      + ')');
+  if(v.grayscale  !== 0)   out.push('grayscale('  + (v.grayscale/100)  + ')');
+  if(v.blur       !== 0)   out.push('blur('       + v.blur + 'px)');
+  return out.join(' ');
+}
+
 function buildMediaEffectStyle(el){
   var parts = [];
   // Drop shadow: user-controlled offset/blur/color/opacity, single layer.
@@ -19179,6 +19594,7 @@ function render(){
   h += '<button class="tb-b tb-dd'+(S.pop==='insertMenu'?' a':'')+'" onclick="togglePop(\'insertMenu\',event)" data-tip="Insert element">'+I.plus+'<span class="tb-dd-label">Insert</span><span class="tb-dd-caret">\u25BE</span></button>';
   h += '</div>';
   h += '<input type="file" accept="image/*" id="imgInput" class="hidden" onchange="handleImageUpload(event)">';
+  h += '<input type="file" accept="video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/*" id="vidInput" class="hidden" onchange="handleVideoUpload(event)">';
   // SHAPES & CONNECTORS — kept inline because they\'re used together for diagramming
   h += '<div class="tb-g">';
   h += '<button class="tb-b'+(S.pop==='shapes'?' a':'')+'" onclick="togglePop(\'shapes\',event)" data-tip="Shapes Library">'+I.shapes+'</button>';
@@ -19688,6 +20104,59 @@ function renderPropsPanel(el){
       h += '</div>';
     });
     h += '</div>';
+    h += '</div>';
+  }
+
+  if(el.type === 'video'){
+    h += '<div class="ps"><div class="ps-t">Video</div>';
+    h += '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;word-break:break-all">' +
+         esc(el.fileName || 'No file') + '</div>';
+    h += '<button class="sp-btn" style="width:100%;margin-bottom:5px" onclick="replaceVideoFile(\''+el.id+'\')">Replace File</button>';
+    h += '<button class="sp-btn" style="width:100%;margin-bottom:5px" onclick="toggleVideoPlayback(\''+el.id+'\')">Play / Pause</button>';
+    h += '<button class="sp-btn" style="width:100%;margin-bottom:8px" onclick="fitVideoAspect(\''+el.id+'\')">Fit to Video Aspect</button>';
+
+    var _fit = el.fit === 'cover' ? 'cover' : 'contain';
+    h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Fill mode</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:4px">';
+    h += '<button class="sp-btn" style="'+(_fit==='contain'?'background:rgba(126,217,87,0.18);border-color:var(--g);color:var(--g)':'')+'" ' +
+         'onclick="updateEl(\''+el.id+'\',{fit:\'contain\'})">Fit whole</button>';
+    h += '<button class="sp-btn" style="'+(_fit==='cover'?'background:rgba(126,217,87,0.18);border-color:var(--g);color:var(--g)':'')+'" ' +
+         'onclick="updateEl(\''+el.id+'\',{fit:\'cover\'})">Fill &amp; crop</button>';
+    h += '</div>';
+    h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:8px">' +
+         (_fit==='cover' ? 'Fills the box; edges outside it are cropped.'
+                         : 'Shows the whole frame; unused space is letterboxed.') + '</div>';
+
+    h += '<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--w);margin-bottom:8px">' +
+         '<input type="checkbox"'+(el.lockAspect !== false ? ' checked':'')+' ' +
+         'onchange="updateEl(\''+el.id+'\',{lockAspect:this.checked})"> Lock aspect when resizing</label>';
+
+    h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:8px 0 4px">Playback</div>';
+    h += '<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--w);margin-bottom:5px">' +
+         '<input type="checkbox"'+(el.loop?' checked':'')+' onchange="updateEl(\''+el.id+'\',{loop:this.checked})"> Loop</label>';
+    h += '<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--w);margin-bottom:5px">' +
+         '<input type="checkbox"'+(el.muted?' checked':'')+' onchange="updateEl(\''+el.id+'\',{muted:this.checked})"> Mute</label>';
+    h += '<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--w);margin-bottom:8px">' +
+         '<input type="checkbox"'+(el.autoplay?' checked':'')+' onchange="updateEl(\''+el.id+'\',{autoplay:this.checked})"> Play when slide opens</label>';
+
+    var _vol = el.volume != null ? el.volume : 100;
+    h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Volume ' + _vol + '%</div>';
+    h += '<input type="range" min="0" max="100" value="'+_vol+'" style="width:100%;margin-bottom:8px" ' +
+         'oninput="updateEl(\''+el.id+'\',{volume:+this.value})">';
+
+    h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Trim (seconds)</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px">';
+    h += '<input type="number" min="0" step="0.1" value="'+(el.trimStart||0)+'" placeholder="Start" ' +
+         'onchange="updateEl(\''+el.id+'\',{trimStart:Math.max(0,+this.value||0)})" ' +
+         'onmousedown="event.stopPropagation()" style="padding:5px;background:rgba(255,255,255,0.04);' +
+         'border:1px solid var(--brd);color:var(--w);border-radius:5px;font-family:Outfit;font-size:11px">';
+    h += '<input type="number" min="0" step="0.1" value="'+(el.trimEnd||0)+'" placeholder="End" ' +
+         'onchange="updateEl(\''+el.id+'\',{trimEnd:Math.max(0,+this.value||0)})" ' +
+         'onmousedown="event.stopPropagation()" style="padding:5px;background:rgba(255,255,255,0.04);' +
+         'border:1px solid var(--brd);color:var(--w);border-radius:5px;font-family:Outfit;font-size:11px">';
+    h += '</div>';
+    h += '<div style="font-size:10px;color:var(--muted);line-height:1.4">End of 0 plays to the end. ' +
+         'Click the video while presenting to play or pause.</div>';
     h += '</div>';
   }
 
@@ -21631,6 +22100,7 @@ function renderInsertMenu(){
   h += '<div class="menu-group-label">Media</div>';
   h += menuItem(I.image,          'Image',               'triggerImageInput(); closePopover();',         '');
   h += menuItem(I.note,           'Sticky Note',         'addNote(); closePopover();',                   '');
+  h += menuItem(I.video,          'Video',               'triggerVideoInput(); closePopover();',         '');
   h += menuItem(I.monitor,        'Screen Share',        'addScreenShare(); closePopover();',            '');
   h += menuItem(I.webcam,         'Webcam',              'addWebcam(); closePopover();',                 '');
   h += '<div class="menu-divider"></div>';
@@ -22528,6 +22998,21 @@ function renderPres(){
   // touches them, so they must NOT be detached here. Doing so removed them
   // from the pool and nulled their srcObject, blacking the camera out for
   // good.
+  // Preserve file-video nodes across the innerHTML rebuild. Re-creating them
+  // reloads the file, which restarts playback and shows a black frame — the
+  // blink seen when toggling any control that triggers a re-render (pointer,
+  // tool changes, reveals).
+  var preservedFileVideos = {};
+  (function(){
+    var fv = document.querySelectorAll('[id^="vid-el-"]');
+    for(var i = 0; i < fv.length; i++){
+      var n = fv[i];
+      if(!n.src) continue;
+      preservedFileVideos[n.id] = n;
+      if(n.parentNode) n.parentNode.removeChild(n);
+    }
+  })();
+
   var preservedVideos = {};
   var activeIds = Object.keys(_screenShareStreams);
   for(var pi = 0; pi < activeIds.length; pi++){
@@ -22545,6 +23030,20 @@ function renderPres(){
 
   // Now restore preserved videos: find the empty placeholder video the new
   // HTML created with the same id, and replace it with the preserved one.
+  // Swap preserved file-videos back in, replacing the freshly-rendered stubs.
+  (function(){
+    var ids = Object.keys(preservedFileVideos);
+    for(var i = 0; i < ids.length; i++){
+      var oldNode = preservedFileVideos[ids[i]];
+      var stub = document.getElementById(ids[i]);
+      if(stub && stub.parentNode){
+        stub.parentNode.replaceChild(oldNode, stub);
+      }
+      // If the element is gone from the new DOM (slide changed), just drop the
+      // reference — the file source is rebuilt from el.src when it reappears.
+    }
+  })();
+
   var preservedIds = Object.keys(preservedVideos);
   for(var ri = 0; ri < preservedIds.length; ri++){
     var rid = preservedIds[ri];
@@ -23049,6 +23548,36 @@ function onCropDown(e){
 // resolved from the DOM rather than an inline attribute, so it also works in
 // presentation mode — recording usually happens while presenting, and that's
 // exactly when re-framing is wanted.
+// Click a video in presentation mode to play/pause. Elements render with
+// pointer-events:none while presenting (clicks advance the slide), so this
+// hit-tests the cursor against each video element's rect instead.
+document.addEventListener('click', function(e){
+  if(!S || !S.pres || _cropEditId) return;
+  if(typeof isDrawingTool === 'function' && isDrawingTool(S.tool)) return;
+  if(e.target && e.target.closest &&
+     e.target.closest('.ss-crop-bar, .ss-style-pan, .ss-pres-chip, .pres-bar, .pres-toolbar')) return;
+  // Ignore clicks landing on the chip's screen area even when it overlaps the
+  // video, so pressing Style never also toggles playback.
+  if(_presChip && _presChip.style.display !== 'none'){
+    var _cr = _presChip.getBoundingClientRect();
+    if(e.clientX >= _cr.left && e.clientX <= _cr.right &&
+       e.clientY >= _cr.top  && e.clientY <= _cr.bottom) return;
+  }
+  var slide = S.slides[S.presSlide];
+  if(!slide || !slide.els) return;
+  var hosts = document.querySelectorAll('[id^="vid-el-"]');
+  for(var i = hosts.length - 1; i >= 0; i--){
+    var r = hosts[i].getBoundingClientRect();
+    if(e.clientX >= r.left && e.clientX <= r.right &&
+       e.clientY >= r.top  && e.clientY <= r.bottom){
+      e.stopPropagation();
+      e.preventDefault();
+      toggleVideoPlayback(hosts[i].id.slice('vid-el-'.length));
+      return;
+    }
+  }
+}, true);
+
 document.addEventListener('dblclick', function(e){
   if(_cropEditId) return;
   var id = null;
@@ -23110,6 +23639,25 @@ function ssCssApply(node, css){
 // Push border + effect state straight onto the live DOM, no re-render.
 function ssLiveStyleDom(el){
   if(!el) return;
+  // File videos live under a different id prefix and are styled on their own
+  // element, not a pooled node — handle them separately or slider drags did
+  // nothing for video and screen-share filters.
+  if(el.type === 'video'){
+    var fvid = document.getElementById('vid-el-' + el.id);
+    if(fvid){
+      fvid.style.filter = buildMediaFilterString(el) || '';
+      var fhost = fvid.parentNode;
+      if(fhost){
+        var fOuter = fhost;
+        if(fhost.parentNode && fhost.parentNode.classList &&
+           fhost.parentNode.classList.contains('ep-grad-border')) fOuter = fhost.parentNode;
+        fOuter.style.boxShadow = '';
+        fOuter.style.transform = '';
+        ssCssApply(fOuter, buildMediaEffectStyle(el));
+      }
+    }
+    return;
+  }
   var list = document.querySelectorAll('video[id="ss-video-' + el.id + '"]');
   var bs  = el.borderStyle || 'solid';
   var bw  = el.bw != null ? el.bw : 2;
@@ -23138,6 +23686,7 @@ function ssLiveStyleDom(el){
     outer.style.boxShadow = '';
     outer.style.transform = '';
     ssCssApply(outer, fxCss);
+    list[i].style.filter = buildMediaFilterString(el) || '';
   }
   applySsCropStyle(el);
 }
@@ -23149,6 +23698,15 @@ function ssStyleSet(id, patch, live){
   for(var k in patch){ if(patch.hasOwnProperty(k)) el[k] = patch[k]; }
   if(live){
     ssLiveStyleDom(el);
+    // Filters are cheap to apply directly and must show while dragging, but
+    // the share's filter is baked into its markup at render time — so push it
+    // onto the live nodes here rather than waiting for the commit.
+    if(patch.filter){
+      var _fs = buildMediaFilterString(el);
+      var _nodes = document.querySelectorAll(
+        'video[id="ss-video-' + el.id + '"], video[id="vid-el-' + el.id + '"]');
+      for(var _n = 0; _n < _nodes.length; _n++) _nodes[_n].style.filter = _fs || '';
+    }
   } else {
     if(S.pres) renderPres(); else render();
     applySsCropStyle(id);
@@ -23267,17 +23825,61 @@ function buildStylePanel(id){
   pan.className = 'ss-style-pan';
 
   var head = '<div class="ss-sp-head"><span class="ss-sp-grip"></span>' +
-             '<span class="ss-sp-title">SHARE STYLE</span>' +
+             '<span class="ss-sp-title">' + (isVideo ? 'VIDEO STYLE' : 'SHARE STYLE') + '</span>' +
              '<button class="ss-sp-x" data-act="close">&#10005;</button></div>';
 
+  var _tabIds = isVideo ? ['playback','fx','border','shadow','depth'] : ['fx','border','shadow','depth'];
+  if(_tabIds.indexOf(_stylePanTab) < 0) _stylePanTab = isVideo ? 'playback' : 'fx';
+  var _tabName = { playback:'Play', fx:'Effects', border:'Border', shadow:'Shadow', depth:'3D' };
   var tabs = '<div class="ss-sp-tabs">' +
-    ['border','shadow','depth'].map(function(t){
+    _tabIds.map(function(t){
       return '<button data-act="tab" data-v="' + t + '"' + (_stylePanTab === t ? ' class="on"' : '') + '>' +
-             (t === 'border' ? 'Border' : t === 'shadow' ? 'Shadow' : '3D') + '</button>';
+             _tabName[t] + '</button>';
     }).join('') + '</div>';
 
+  var isVideo = el.type === 'video';
+  if(isVideo && _stylePanTab === 'depth' && false){ /* keep tabs valid */ }
+
   var body = '';
-  if(_stylePanTab === 'border'){
+  if(isVideo && _stylePanTab === 'playback'){
+    var _pv = document.getElementById('vid-el-' + id);
+    var _playing = _pv && !_pv.paused;
+    body += '<div class="ss-sp-lab">TRANSPORT</div><div class="ss-sp-seg">' +
+            '<button data-act="vplay">' + (_playing ? 'Pause' : 'Play') + '</button>' +
+            '<button data-act="vrestart">Restart</button></div>';
+    body += '<div class="ss-sp-lab">OPTIONS</div><div class="ss-sp-seg">' +
+            '<button data-act="vloop"' + (el.loop ? ' class="on"' : '') + '>Loop</button>' +
+            '<button data-act="vmute"' + (el.muted ? ' class="on"' : '') + '>Mute</button></div>';
+    body += slider('vvol', 'Volume', 0, 100, 1, (el.volume != null ? el.volume : 100), '%');
+    body += '<div class="ss-sp-lab">FILL</div><div class="ss-sp-seg">' +
+            '<button data-act="vfit" data-v="contain"' + (el.fit !== 'cover' ? ' class="on"' : '') + '>Fit whole</button>' +
+            '<button data-act="vfit" data-v="cover"' + (el.fit === 'cover' ? ' class="on"' : '') + '>Fill &amp; crop</button></div>';
+    body += '<div class="ss-sp-note">Click the video itself to play or pause while presenting.</div>';
+  }
+  else if(_stylePanTab === 'fx'){
+    var fv = mediaFilterValues(el);
+    body += '<div class="ss-sp-lab">LOOK</div><div class="ss-sp-sw" style="gap:4px">';
+    Object.keys(MEDIA_LOOKS).forEach(function(k){
+      body += '<button data-act="look" data-v="' + k + '"' +
+              (fv.look === k ? ' class="on"' : '') +
+              ' style="padding:4px 8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);' +
+              'color:#d8d8e2;border-radius:5px;cursor:pointer;font-family:Outfit,sans-serif;font-size:10px;' +
+              'font-weight:600">' + MEDIA_LOOKS[k].label + '</button>';
+    });
+    body += '</div>';
+    body += '<div class="ss-sp-lab">ADJUST</div>';
+    body += slider('fbright', 'Brightness', 20, 200, 1, fv.brightness, '%');
+    body += slider('fcontr',  'Contrast',   20, 200, 1, fv.contrast, '%');
+    body += slider('fsat',    'Saturation',  0, 200, 1, fv.saturate, '%');
+    body += slider('fhue',    'Warmth',    -60,  60, 1, fv.hue, '\u00B0');
+    body += slider('fblur',   'Blur',        0,  12, 0.2, fv.blur, 'px');
+    body += slider('fsepia',  'Sepia',       0, 100, 1, fv.sepia, '%');
+    body += '<div class="ss-sp-seg" style="margin-top:8px">' +
+            '<button data-act="fxreset">Reset effects</button></div>';
+    body += '<div class="ss-sp-note">Looks set a starting point; the sliders override individual values. ' +
+            'Applied in the editor, presentation and exported video.</div>';
+  }
+  else if(_stylePanTab === 'border'){
     body += '<div class="ss-sp-lab">STYLE</div>' +
             seg('bstyle', [['none','None'],['solid','Solid'],['gradient','Gradient'],['animated','Animated']],
                 (bw === 0 ? 'none' : bs));
@@ -23344,6 +23946,19 @@ function buildStylePanel(id){
     if(act === 'tiltx') return ssFxPatch(e2, { tiltX: parseInt(v, 10) });
     if(act === 'tilty') return ssFxPatch(e2, { tiltY: parseInt(v, 10) });
     if(act === 'persp') return ssFxPatch(e2, { persp: parseInt(v, 10) });
+    if(act === 'fbright' || act === 'fcontr' || act === 'fsat' || act === 'fhue' ||
+       act === 'fblur' || act === 'fsepia'){
+      var _fk = { fbright:'brightness', fcontr:'contrast', fsat:'saturate',
+                  fhue:'hue', fblur:'blur', fsepia:'sepia' }[act];
+      var _cf = Object.assign({}, e2.filter || {});
+      _cf[_fk] = parseFloat(v);
+      return { filter: _cf };
+    }
+    if(act === 'vvol'){
+      var _vv = document.getElementById('vid-el-' + id);
+      if(_vv) _vv.volume = Math.max(0, Math.min(1, parseInt(v, 10) / 100));
+      return { volume: parseInt(v, 10) };
+    }
     return null;
   }
 
@@ -23357,7 +23972,10 @@ function buildStylePanel(id){
     ssStyleSet(id, pt, true);
     var out = pan.querySelector('[data-out="' + act + '"]');
     if(out){
-      var unit = act === 'sho' ? '%'
+      var unit = (act === 'sho' || act === 'vvol' || act === 'fbright' || act === 'fcontr' ||
+                  act === 'fsat' || act === 'fsepia') ? '%'
+               : act === 'fhue' ? '\u00B0'
+               : act === 'fblur' ? 'px'
                : act === 'depth' ? ''
                : (act === 'tiltx' || act === 'tilty') ? '\u00B0'
                : 'px';
@@ -23382,6 +24000,37 @@ function buildStylePanel(id){
 
     if(act === 'close'){ closeStylePanel(); return; }
     if(act === 'tab'){ _stylePanTab = v; buildStylePanel(id); return; }
+    if(act === 'look'){
+      // Switching look clears explicit overrides so the preset reads cleanly.
+      ssStyleSet(id, { filter: { look: v } }, false);
+      buildStylePanel(id); return;
+    }
+    if(act === 'fxreset'){ ssStyleSet(id, { filter: { look:'none' } }, false); buildStylePanel(id); return; }
+    if(act === 'vplay'){ toggleVideoPlayback(id); buildStylePanel(id); return; }
+    if(act === 'vrestart'){
+      var _rv2 = document.getElementById('vid-el-' + id);
+      if(_rv2){ _rv2.currentTime = e2.trimStart || 0; _rv2.play().catch(function(){}); }
+      buildStylePanel(id); return;
+    }
+    if(act === 'vloop'){
+      var _nl = !e2.loop; e2.loop = _nl;
+      var _lv = document.getElementById('vid-el-' + id);
+      if(_lv) _lv.loop = _nl;
+      buildStylePanel(id); return;
+    }
+    if(act === 'vmute'){
+      var _nm = !e2.muted; e2.muted = _nm;
+      var _mv2 = document.getElementById('vid-el-' + id);
+      if(_mv2) _mv2.muted = _nm;
+      buildStylePanel(id); return;
+    }
+    if(act === 'vfit'){
+      e2.fit = v;
+      var _fv2 = document.getElementById('vid-el-' + id);
+      if(_fv2) _fv2.style.objectFit = (v === 'cover') ? 'cover' : 'contain';
+      if(typeof invalidateRecCache === 'function') invalidateRecCache();
+      buildStylePanel(id); return;
+    }
     if(act === 'bstyle'){
       if(v === 'none') ssStyleSet(id, { bw: 0 }, false);
       else ssStyleSet(id, { borderStyle: v, bw: (e2.bw || 0) === 0 ? 2 : e2.bw }, false);
@@ -23436,6 +24085,7 @@ var _wcPan = null, _wcPanPos = null, _wcPanTab = 'shape';
 function wcSet(patch, live){
   for(var k in patch){ if(patch.hasOwnProperty(k)) S[k] = patch[k]; }
   _applyFloatingWebcamStyling();
+  if(typeof invalidateRecCache === 'function') invalidateRecCache();
   if(!live && _wcPan) buildWebcamStylePanel();
 }
 function wcShadowPatch(p2){
@@ -23499,6 +24149,26 @@ window.buildWebcamStylePanel = function(){
     }
     body += sl('bw', 'Border width', 0, 24, 1, bw, 'px');
     body += sl('size', 'Camera size', 120, 460, 4, S.webcamSize || 220, 'px');
+  } else if(_wcPanTab === 'fx'){
+    var wfv = mediaFilterValues({ filter: S.webcamFilter });
+    body += '<div class="ss-sp-lab">LOOK</div><div class="ss-sp-sw" style="gap:4px">';
+    Object.keys(MEDIA_LOOKS).forEach(function(k){
+      body += '<button data-act="wlook" data-v="' + k + '"' +
+              (wfv.look === k ? ' class="on"' : '') +
+              ' style="padding:4px 8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);' +
+              'color:#d8d8e2;border-radius:5px;cursor:pointer;font-family:Outfit,sans-serif;font-size:10px;' +
+              'font-weight:600">' + MEDIA_LOOKS[k].label + '</button>';
+    });
+    body += '</div>';
+    body += '<div class="ss-sp-lab">ADJUST</div>';
+    body += sl('wfbright', 'Brightness', 20, 200, 1, wfv.brightness, '%');
+    body += sl('wfcontr',  'Contrast',   20, 200, 1, wfv.contrast, '%');
+    body += sl('wfsat',    'Saturation',  0, 200, 1, wfv.saturate, '%');
+    body += sl('wfhue',    'Warmth',    -60,  60, 1, wfv.hue, '\u00B0');
+    body += sl('wfblur',   'Blur',        0,  12, 0.2, wfv.blur, 'px');
+    body += sl('wfsepia',  'Sepia',       0, 100, 1, wfv.sepia, '%');
+    body += '<div class="ss-sp-seg" style="margin-top:8px">' +
+            '<button data-act="wfxreset">Reset effects</button></div>';
   } else if(_wcPanTab === 'shadow'){
     body += '<div class="ss-sp-lab">SHADOW</div>' + seg('shon', [['off','Off'],['on','On']], sh.on ? 'on' : 'off');
     body += '<div class="ss-sp-lab">PRESET</div><div class="ss-sp-seg">' +
@@ -23527,9 +24197,9 @@ window.buildWebcamStylePanel = function(){
     '<span class="ss-sp-title">CAMERA STYLE</span>' +
     '<button class="ss-sp-x" data-act="close">&#10005;</button></div>' +
     '<div class="ss-sp-tabs">' +
-      ['shape','shadow','depth'].map(function(t){
+      ['shape','fx','shadow','depth'].map(function(t){
         return '<button data-act="tab" data-v="' + t + '"' + (_wcPanTab === t ? ' class="on"' : '') + '>' +
-               (t === 'shape' ? 'Shape' : t === 'shadow' ? 'Shadow' : '3D') + '</button>';
+               (t === 'shape' ? 'Shape' : t === 'fx' ? 'Effects' : t === 'shadow' ? 'Shadow' : '3D') + '</button>';
       }).join('') +
     '</div><div class="ss-sp-body">' + body + '</div>' +
     '<div class="ss-sp-foot"><button data-act="reset">Reset camera styling</button></div>';
@@ -23556,6 +24226,15 @@ window.buildWebcamStylePanel = function(){
     if(act === 'tiltx')return wcFxPatch({ tiltX: parseInt(v, 10) });
     if(act === 'tilty')return wcFxPatch({ tiltY: parseInt(v, 10) });
     if(act === 'persp')return wcFxPatch({ persp: parseInt(v, 10) });
+    if(act.indexOf('wf') === 0){
+      var _wk = { wfbright:'brightness', wfcontr:'contrast', wfsat:'saturate',
+                  wfhue:'hue', wfblur:'blur', wfsepia:'sepia' }[act];
+      if(_wk){
+        var _wc = Object.assign({}, S.webcamFilter || {});
+        _wc[_wk] = parseFloat(v);
+        return { webcamFilter: _wc };
+      }
+    }
     return null;
   }
 
@@ -23567,8 +24246,10 @@ window.buildWebcamStylePanel = function(){
     wcSet(pt, true);
     var out = pan.querySelector('[data-out="' + act + '"]');
     if(out){
-      var u = act === 'sho' ? '%' : act === 'depth' ? ''
-            : (act === 'tiltx' || act === 'tilty') ? '\u00B0' : 'px';
+      var u = (act === 'sho' || act === 'wfbright' || act === 'wfcontr' ||
+               act === 'wfsat' || act === 'wfsepia') ? '%'
+            : act === 'depth' ? ''
+            : (act === 'tiltx' || act === 'tilty' || act === 'wfhue') ? '\u00B0' : 'px';
       out.textContent = t.value + u;
     }
   }, true);
@@ -23587,6 +24268,8 @@ window.buildWebcamStylePanel = function(){
     var act = b.getAttribute('data-act'), v = b.getAttribute('data-v');
     if(act === 'close'){ closeWebcamStylePanel(); return; }
     if(act === 'tab'){ _wcPanTab = v; buildWebcamStylePanel(); return; }
+    if(act === 'wlook'){ wcSet({ webcamFilter: { look: v } }); buildWebcamStylePanel(); return; }
+    if(act === 'wfxreset'){ wcSet({ webcamFilter: { look:'none' } }); buildWebcamStylePanel(); return; }
     if(act === 'shape')  wcSet({ webcamShape: v });
     else if(act === 'bstyle') wcSet({ webcamBorderStyle: v });
     else if(act === 'bc')  wcSet({ webcamBorderColor: v });
@@ -23635,19 +24318,45 @@ window.buildWebcamStylePanel = function(){
   }
 };
 
-var _presChip = null, _presChipId = null;
+var _presChip = null, _presChipId = null, _presChipKind = null;
+
+// The chip's buttons depend on what's under the cursor: a live share gets
+// crop/style/full, a file video gets transport controls plus style. Click on
+// the media itself still means play/pause — the chip floats ABOVE the element,
+// so styling never competes with playback.
+function setPresChipMode(kind, id){
+  var c = ensurePresChip();
+  _presChipKind = kind;
+  if(kind === 'video'){
+    var el = ssFindEl(id);
+    var v = document.getElementById('vid-el-' + id);
+    var playing = v && !v.paused;
+    c.innerHTML =
+      '<button data-a="play">' + (playing ? '&#10073;&#10073; Pause' : '&#9654; Play') + '</button>' +
+      '<button data-a="restart">&#8634;</button>' +
+      '<button data-a="mute"' + ((el && el.muted) ? ' class="on"' : '') + '>' +
+        ((el && el.muted) ? 'Unmute' : 'Mute') + '</button>' +
+      '<div class="sep"></div>' +
+      '<button data-a="vstyle">Style</button>' +
+      '<div class="sep"></div>' +
+      '<span class="hint">Click video to play \u00B7 Alt+drag move</span>';
+  } else {
+    c.innerHTML =
+      '<button data-a="crop">Crop</button>' +
+      '<button data-a="style">Style</button>' +
+      '<button data-a="full">Full</button>' +
+      '<div class="sep"></div>' +
+      '<span class="hint">Alt+drag move \u00B7 Alt+Shift resize</span>';
+  }
+  return c;
+}
 
 function ensurePresChip(){
   if(_presChip && document.body.contains(_presChip)) return _presChip;
   var c = document.createElement('div');
   c.className = 'ss-crop-bar ready ss-pres-chip';
   c.style.display = 'none';
-  c.innerHTML =
-    '<button data-a="crop">Crop</button>' +
-    '<button data-a="style">Style</button>' +
-    '<button data-a="full">Full</button>' +
-    '<div class="sep"></div>' +
-    '<span class="hint">Alt+drag move · Alt+Shift resize</span>';
+  c.innerHTML = '';   // filled per-hover by setPresChipMode()
   c.addEventListener('mousedown', function(e){ e.stopPropagation(); }, true);
   c.addEventListener('mouseenter', cancelPresChipHide, true);
   c.addEventListener('mouseleave', schedulePresChipHide, true);
@@ -23657,7 +24366,23 @@ function ensurePresChip(){
     e.stopPropagation();
     e.preventDefault();
     var a = b.getAttribute('data-a');
-    if(a === 'crop') enterCropMode(_presChipId, null);
+    if(a === 'play'){ toggleVideoPlayback(_presChipId); setPresChipMode(_presChipKind, _presChipId); }
+    else if(a === 'restart'){
+      var _rv = document.getElementById('vid-el-' + _presChipId);
+      var _re = ssFindEl(_presChipId);
+      if(_rv){ _rv.currentTime = (_re && _re.trimStart) || 0; _rv.play().catch(function(){}); }
+    }
+    else if(a === 'mute'){
+      var _me = ssFindEl(_presChipId);
+      if(_me){
+        _me.muted = !_me.muted;
+        var _mv = document.getElementById('vid-el-' + _presChipId);
+        if(_mv) _mv.muted = _me.muted;
+        setPresChipMode(_presChipKind, _presChipId);
+      }
+    }
+    else if(a === 'vstyle') buildStylePanel(_presChipId);
+    else if(a === 'crop') enterCropMode(_presChipId, null);
     else if(a === 'style') buildStylePanel(_presChipId);
     else if(a === 'full'){
       var el = ssFindEl(_presChipId);
@@ -23733,8 +24458,8 @@ document.addEventListener('mousemove', function(e){
       return;
     }
     cancelPresChipHide();
-    var chip = ensurePresChip();
     _presChipId = hit.id;
+    var chip = setPresChipMode(hit.kind, hit.id);
     chip.style.display = '';
     var cw = chip.offsetWidth || 260, ch = chip.offsetHeight || 32;
     var cx = hit.rect.left + (hit.rect.width - cw) / 2;
@@ -23747,16 +24472,23 @@ document.addEventListener('mousemove', function(e){
 
 var _presDrag = null;
 
+// Returns the media element under the cursor: a live screen share OR a file
+// video. `kind` lets callers offer the right controls for each.
 function presShareHostAt(clientX, clientY){
   var els = document.querySelectorAll('.ss-el');
   for(var i = els.length - 1; i >= 0; i--){
     var r = els[i].getBoundingClientRect();
-    if(clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom){
-      var v = els[i].querySelector('video[id^="ss-video-"]');
-      if(!v) continue;
+    if(clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom) continue;
+
+    var v = els[i].querySelector('video[id^="ss-video-"]');
+    if(v){
       var id = v.id.slice('ss-video-'.length);
-      if(!_screenShareStreams[id]) continue;
-      return { host:els[i], id:id, rect:r };
+      if(_screenShareStreams[id]) return { host:els[i], id:id, rect:r, kind:'share' };
+    }
+    var fv = els[i].querySelector('video[id^="vid-el-"]');
+    if(fv){
+      var vid = fv.id.slice('vid-el-'.length);
+      return { host:els[i], id:vid, rect:r, kind:'video', video:fv };
     }
   }
   return null;
@@ -23890,13 +24622,101 @@ document.addEventListener('keydown', function(e){
 
 window.addEventListener('resize', function(){ if(_cropEditId) layoutCropOverlay(); });
 
+// Re-attach video sources after a render. Playback position and paused state
+// are preserved — a reveal rebuilds the DOM, and without this every reveal
+// would restart the video from zero.
+var _videoElState = {};   // id -> { time, paused }
+
+function reattachVideoElements(){
+  // Scan the DOM rather than the slide model. Looking up S.slides tied this to
+  // one slide's element list, but the editor renders thumbnails and other
+  // contexts too — any <video> that exists needs its source, or it stays a
+  // black box until presentation mode builds a fresh one.
+  var vids = document.querySelectorAll('[id^="vid-el-"]');
+  for(var i = 0; i < vids.length; i++){
+    var v = vids[i];
+    var _vid = v.id.slice('vid-el-'.length);
+    var el = ssFindEl(_vid);
+    if(!el || el.type !== 'video' || !el.src) continue;
+
+    if(v.src !== el.src){
+      v.src = el.src;
+      var st = _videoElState[el.id];
+      if(st && st.time){
+        v.currentTime = st.time;
+        if(!st.paused) v.play().catch(function(){});
+      } else {
+        // Show a real frame rather than a black box. Seeking a fraction in is
+        // more reliable than 0, which some encoders leave blank.
+        (function(vid, startAt){
+          vid.addEventListener('loadeddata', function(){
+            try { if(vid.paused) vid.currentTime = startAt; } catch(e){}
+          }, { once:true });
+        })(v, Math.max(0.1, el.trimStart || 0));
+      }
+    }
+    // object-fit drives contain (letterbox, whole frame) vs cover (fill the
+    // box, crop the overflow). Stored per element so it survives re-render.
+    v.style.objectFit = (el.fit === 'cover') ? 'cover' : 'contain';
+    v.style.filter = buildMediaFilterString(el) || '';
+    if(S.recActive) routeVideoAudioToMixer();
+    v.volume = Math.max(0, Math.min(1, (el.volume != null ? el.volume : 100) / 100));
+    v.muted = !!el.muted;
+    v.loop = !!el.loop;
+
+    if(!v._epTracked){
+      v._epTracked = true;
+      (function(id, elRef, vid){
+        vid.addEventListener('timeupdate', function(){
+          _videoElState[id] = { time: vid.currentTime, paused: vid.paused };
+          // Honour the trim-out point.
+          var te = elRef.trimEnd || 0;
+          if(te > 0 && vid.currentTime >= te){
+            if(elRef.loop){ vid.currentTime = elRef.trimStart || 0; }
+            else { vid.pause(); }
+          }
+        });
+        vid.addEventListener('play', function(){ _videoElState[id] = { time: vid.currentTime, paused:false }; });
+        vid.addEventListener('pause', function(){ _videoElState[id] = { time: vid.currentTime, paused:true }; });
+      })(el.id, el, v);
+    }
+  }
+}
+
+// Click a video in presentation mode to play/pause it.
+window.toggleVideoPlayback = function(id){
+  var v = document.getElementById('vid-el-' + id);
+  if(!v) return;
+  var el = ssFindEl(id);
+  if(v.paused){
+    if(el && (el.trimStart || 0) > 0 && v.currentTime < el.trimStart){
+      v.currentTime = el.trimStart;
+    }
+    v.play().catch(function(e){ console.warn('[EP] video play failed:', e); });
+  } else {
+    v.pause();
+  }
+};
+
 function reattachScreenShareStreams(){
+  reattachVideoElements();
   // For every element with an active stream, find its <video> and reattach srcObject
   var ids = Object.keys(_screenShareStreams);
   for(var i=0; i<ids.length; i++){
     var id = ids[i];
     if(_screenShareStreams[id]){
       ssAttachStreamAll(id, _screenShareStreams[id]);
+      // The share <video> is PRESERVED across re-renders (detached and put
+      // back to keep the stream alive), so the freshly-rendered markup — and
+      // any filter baked into it — is thrown away. Apply the filter to the
+      // surviving node here instead.
+      (function(sid){
+        var sEl = ssFindEl(sid);
+        if(!sEl) return;
+        var fstr = buildMediaFilterString(sEl) || '';
+        var nodes = document.querySelectorAll('video[id="ss-video-' + sid + '"]');
+        for(var n = 0; n < nodes.length; n++) nodes[n].style.filter = fstr;
+      })(id);
       // Re-apply crop after every render. Element resizes rebuild this
       // markup, and the offsets are in px against the box, so they must
       // be recomputed rather than carried over.
