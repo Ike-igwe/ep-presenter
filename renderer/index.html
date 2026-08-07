@@ -28,6 +28,12 @@ body{font-family:'Outfit',sans-serif;background:var(--d1);color:var(--w);overflo
 .sp-list{flex:1;overflow-y:auto;padding:4px 0}
 .st{margin:4px 10px;border-radius:10px;border:2px solid var(--brd);cursor:pointer;position:relative;overflow:hidden;transition:all .15s;background:#000;aspect-ratio:var(--ep-stage-aspect, 16/9)}
 .st:hover{border-color:var(--gray)}
+.st.ep-dragging{opacity:0.35;border-color:var(--g)}
+/* Drop indicator: a bar on the edge the slide will land against. */
+.st.ep-drop-before::before,.st.ep-drop-after::after{content:'';position:absolute;left:0;right:0;height:3px;background:var(--g);box-shadow:0 0 8px rgba(126,217,87,0.8);z-index:5}
+.st.ep-drop-before::before{top:-3px}
+.st.ep-drop-after::after{bottom:-3px}
+.sp-list.ep-reordering .st{transition:none}
 .st.a{border-color:var(--g);box-shadow:0 0 14px rgba(126,217,87,.25)}
 .st-n{position:absolute;top:4px;left:6px;font-size:11px;font-weight:700;color:var(--w);background:rgba(0,0,0,0.55);border-radius:4px;padding:1px 5px;z-index:2;pointer-events:none}
 .st.a .st-n{background:var(--g);color:#000}
@@ -11717,6 +11723,102 @@ window.addSlide = function(){
   render();
 };
 
+// =========================================================
+// SLIDE REORDERING
+// Drag a sidebar thumbnail to move it. S.si is remapped so the slide you were
+// editing stays selected wherever it lands, and reveal/animation caches are
+// invalidated because they're keyed on slide index.
+// =========================================================
+var _slideDragFrom = null;
+
+window.slideDragStart = function(e, i){
+  _slideDragFrom = i;
+  try {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(i));   // Firefox needs data set
+  } catch(err){}
+  var node = e.currentTarget;
+  node.classList.add('ep-dragging');
+  var list = node.parentNode;
+  if(list) list.classList.add('ep-reordering');
+};
+
+window.slideDragOver = function(e, i){
+  if(_slideDragFrom === null || _slideDragFrom === i) return;
+  e.preventDefault();
+  try { e.dataTransfer.dropEffect = 'move'; } catch(err){}
+  var node = e.currentTarget;
+  var r = node.getBoundingClientRect();
+  // Above the midpoint drops before, below drops after.
+  var after = (e.clientY - r.top) > r.height / 2;
+  node.classList.toggle('ep-drop-before', !after);
+  node.classList.toggle('ep-drop-after', after);
+};
+
+window.slideDragLeave = function(e){
+  var node = e.currentTarget;
+  node.classList.remove('ep-drop-before', 'ep-drop-after');
+};
+
+window.slideDrop = function(e, i){
+  e.preventDefault();
+  e.stopPropagation();
+  var node = e.currentTarget;
+  var after = node.classList.contains('ep-drop-after');
+  node.classList.remove('ep-drop-before', 'ep-drop-after');
+  if(_slideDragFrom === null) return;
+  var to = after ? i + 1 : i;
+  moveSlide(_slideDragFrom, to);
+  _slideDragFrom = null;
+};
+
+window.slideDragEnd = function(){
+  _slideDragFrom = null;
+  var nodes = document.querySelectorAll('.st');
+  for(var i = 0; i < nodes.length; i++){
+    nodes[i].classList.remove('ep-dragging', 'ep-drop-before', 'ep-drop-after');
+  }
+  var list = document.querySelector('.sp-list');
+  if(list) list.classList.remove('ep-reordering');
+};
+
+// Move a slide from one index to another. `to` is the index in the ORIGINAL
+// array where it should land; the splice-out shifts later targets by one.
+window.moveSlide = function(from, to){
+  if(from == null || to == null) return false;
+  if(from < 0 || from >= S.slides.length) return false;
+  if(to > from) to--;                       // account for the removal
+  to = Math.max(0, Math.min(to, S.slides.length - 1));
+  if(to === from) return false;
+
+  var moving = S.slides[from];
+  S.slides.splice(from, 1);
+  S.slides.splice(to, 0, moving);
+
+  // Keep the slide the user was on selected, wherever it ended up.
+  if(S.si === from)                       S.si = to;
+  else if(S.si > from && S.si <= to)      S.si--;
+  else if(S.si < from && S.si >= to)      S.si++;
+
+  // Caches and animation timings are keyed on slide index/id ordering.
+  if(typeof invalidateRecCache === 'function') invalidateRecCache();
+  if(typeof S.slideThumbCache === 'object') S.slideThumbCache = {};
+  if(window._resetSlideTransitionTracker) window._resetSlideTransitionTracker();
+
+  S.dirty = true;
+  pushHist();
+  render();
+  showToast('Moved slide ' + (from + 1) + ' \u2192 ' + (to + 1));
+  return true;
+};
+
+// Move the current slide by one position. Bound to Ctrl+Shift+Up/Down.
+window.moveSlideBy = function(delta){
+  var target = S.si + delta;
+  if(target < 0 || target >= S.slides.length) return;
+  moveSlide(S.si, delta > 0 ? target + 1 : target);
+};
+
 window.duplicateSlide = function(){
   var d = clone(cs());
   d.id = uid();
@@ -14310,6 +14412,16 @@ document.addEventListener('keydown', function(evt){
   while(probe && probe.nodeType === 1){
     if(probe.getAttribute && probe.getAttribute('contenteditable') === 'true') return;
     probe = probe.parentNode;
+  }
+
+  // Ctrl+Shift+Up/Down reorders the current slide. Checked before the
+  // presentation branch so it's editor-only, and before arrow-key element
+  // nudging so it isn't swallowed.
+  if(!S.pres && (evt.ctrlKey || evt.metaKey) && evt.shiftKey &&
+     (evt.key === 'ArrowUp' || evt.key === 'ArrowDown')){
+    evt.preventDefault();
+    moveSlideBy(evt.key === 'ArrowDown' ? 1 : -1);
+    return;
   }
 
   if(S.pres){
@@ -19566,13 +19678,28 @@ function render(){
     for(var i=0; i<S.slides.length; i++){
       var sl = S.slides[i];
       var active = i === S.si;
-      h += '<div class="st'+(active?' a':'')+'" onclick="goSlide('+i+')">';
+      h += '<div class="st'+(active?' a':'')+'" draggable="true" data-si="'+i+'" ' +
+           'onclick="goSlide('+i+')" ' +
+           'ondragstart="slideDragStart(event,'+i+')" ' +
+           'ondragover="slideDragOver(event,'+i+')" ' +
+           'ondragleave="slideDragLeave(event,'+i+')" ' +
+           'ondrop="slideDrop(event,'+i+')" ' +
+           'ondragend="slideDragEnd(event)" ' +
+           'title="Drag to reorder">';
       h += '<span class="st-n">'+(i+1)+'</span>';
       h += '<div class="st-preview">';
       h += renderThumbnail(sl, i);
       h += '</div>';
       h += '</div>';
     }
+    h += '</div>';
+    h += '<div class="sp-btns" style="display:grid;grid-template-columns:1fr 1fr;gap:5px">';
+    h += '<button class="sp-btn" data-tip="Move slide up (Ctrl+Shift+Up)" ' +
+         (S.si <= 0 ? 'disabled style="opacity:.4" ' : '') +
+         'onclick="moveSlideBy(-1)">&#9650; Up</button>';
+    h += '<button class="sp-btn" data-tip="Move slide down (Ctrl+Shift+Down)" ' +
+         (S.si >= S.slides.length - 1 ? 'disabled style="opacity:.4" ' : '') +
+         'onclick="moveSlideBy(1)">&#9660; Down</button>';
     h += '</div>';
     h += '<div class="sp-btns"><button class="sp-btn" data-tip="Add new slide after this one" onclick="addSlide()">+ Slide</button><button class="sp-btn" data-tip="Duplicate current slide" onclick="duplicateSlide()">Dup</button><button class="sp-btn del" data-tip="Delete current slide" onclick="deleteSlide()">Del</button></div>';
     h += '</div>';
