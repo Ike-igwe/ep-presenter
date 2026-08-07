@@ -3767,7 +3767,7 @@ function mkVideo(x,y){return{id:uid(),type:'video',x:x,y:y,w:640,h:360,label:'Vi
   effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900}
 }}
 
-function mkWebcam(x,y){return{id:uid(),type:'webcam',x:x,y:y,w:280,h:280,label:'Webcam',shape:'circle',bc:'#7ed957',bc2:'#9b59ff',bw:3,br:14,borderStyle:'solid',mirror:true,badgeStyle:'off',badgePos:'tl',deviceId:'',lk:false,
+function mkWebcam(x,y){return{id:uid(),type:'webcam',camZoom:1,x:x,y:y,w:280,h:280,label:'Webcam',shape:'circle',bc:'#7ed957',bc2:'#9b59ff',bw:3,br:14,borderStyle:'solid',mirror:true,badgeStyle:'off',badgePos:'tl',deviceId:'',lk:false,
   // Phase 3a: media effects, off by default
   shadow:{on:false,x:0,y:8,blur:24,color:'#000000',opacity:0.4},
   effect3d:{style:'flat',depth:50}
@@ -9746,6 +9746,7 @@ function reattachWebcamStreams(){
       video.style.position = 'fixed';
       video.style.zIndex = '1100';   // above pres-root (1000) and slide content; below floating overlay (1500) and popovers (~2000)
       video.style.objectFit = 'cover';
+      video.style.transformOrigin = '50% 50%';
       video.style.background = '#000';
       video.style.display = 'block';
       video.style.pointerEvents = 'none'; // host wrapper handles interactions
@@ -9768,7 +9769,13 @@ function reattachWebcamStreams(){
     video.style.height = rect.height + 'px';
 
     // Mirror transform on video itself (no transform on host, so no double-scale).
-    video.style.transform = mirror ? 'scaleX(-1)' : 'none';
+    // Zoom composes with the mirror flip; both live in one transform.
+    (function(){
+      var zEl = ssFindEl(id);
+      var z = (zEl && typeof zEl.camZoom === 'number' && zEl.camZoom > 0) ? zEl.camZoom : 1;
+      var t = (mirror ? 'scaleX(-1) ' : '') + (z !== 1 ? 'scale(' + z + ')' : '');
+      video.style.transform = t || 'none';
+    })();
     // Image filter for webcam slide elements.
     (function(){
       var wcEl = ssFindEl(id);
@@ -14095,14 +14102,24 @@ async function renderSlideToCanvas(s, scale){
           try {
             var _wcf = buildMediaFilterString(el);
             if(_wcf) octx.filter = _wcf;
+            // COVER-FIT, matching the DOM's object-fit:cover. Drawing straight
+            // to (0,0,ow,oh) stretched the source to the element's shape — so
+            // making the element taller than the camera's 16:9 squashed the
+            // picture vertically in the export while looking correct on screen.
+            var _wvw = wcVideo.videoWidth  || ow;
+            var _wvh = wcVideo.videoHeight || oh;
+            var _wz = (typeof el.camZoom === 'number' && el.camZoom > 0) ? el.camZoom : 1;
+            var _wsc = Math.max(ow / _wvw, oh / _wvh) * _wz;
+            var _wdw = _wvw * _wsc, _wdh = _wvh * _wsc;
+            var _wdx = (ow - _wdw) / 2, _wdy = (oh - _wdh) / 2;
             if(wcMirror){
               octx.save();
               octx.translate(ow, 0);
               octx.scale(-1, 1);
-              octx.drawImage(wcVideo, 0, 0, ow, oh);
+              octx.drawImage(wcVideo, _wdx, _wdy, _wdw, _wdh);
               octx.restore();
             } else {
-              octx.drawImage(wcVideo, 0, 0, ow, oh);
+              octx.drawImage(wcVideo, _wdx, _wdy, _wdw, _wdh);
             }
             if(_wcf) octx.filter = 'none';   // don't tint the border below
           } catch(e){}
@@ -20417,6 +20434,13 @@ function renderPropsPanel(el){
       h += propRow('Radius', el.br || 14, "updateEl('"+el.id+"',{br:+this.value})", 'number');
     }
     h += '<div class="pr"><span class="pr-l">Mirror</span><input type="checkbox" '+(curMirror?'checked':'')+' onchange="updateEl(\''+el.id+'\',{mirror:this.checked})"></div>';
+    // Zoom: fills more of the frame with you without distorting the picture.
+    var _cz = (typeof el.camZoom === 'number' && el.camZoom > 0) ? el.camZoom : 1;
+    h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:8px 0 4px">Camera zoom ' + _cz.toFixed(2) + '\u00D7</div>';
+    h += '<input type="range" min="1" max="3" step="0.05" value="'+_cz+'" style="width:100%" ' +
+         'oninput="updateEl(\''+el.id+'\',{camZoom:parseFloat(this.value)})">';
+    h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-top:4px">' +
+         'Crops in without stretching. Resize the element for the frame shape, zoom for how much of you fills it.</div>';
     h += '</div>';
     // Border
     h += '<div class="ps"><div class="ps-t">Border</div>';
