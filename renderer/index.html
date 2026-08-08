@@ -4365,11 +4365,35 @@ function buildPresenterViewHTML(){
     '<style>' +
     '*{margin:0;padding:0;box-sizing:border-box}' +
     'body{font-family:Outfit,sans-serif;background:#0a0a0c;color:#f0f0f5;height:100vh;overflow:hidden;user-select:none}' +
-    '.pv-root{display:grid;grid-template-columns:1.4fr 1fr;grid-template-rows:auto 1fr;gap:16px;padding:16px;height:100vh}' +
-    '.pv-hdr{grid-column:1/3;display:flex;justify-content:space-between;align-items:center;padding:0 4px}' +
-    '.pv-hdr h1{font-size:14px;font-weight:700;color:#7ed957;letter-spacing:2px;text-transform:uppercase}' +
+    '.pv-root{display:grid;gap:14px;padding:14px;height:100vh}' +
+    /* Layout A — notes on top, full width. Keeps the eyeline high so the
+       presenter reads near the camera instead of looking down. */
+    '.pv-root.lay-notesTop{grid-template-columns:1.4fr 1fr;grid-template-rows:auto minmax(0,var(--notes-h,34vh)) 1fr;}' +
+    '.pv-root.lay-notesTop .pv-hdr{grid-column:1/3}' +
+    '.pv-root.lay-notesTop .pv-notes{grid-column:1/3;grid-row:2}' +
+    '.pv-root.lay-notesTop .pv-left{grid-column:1;grid-row:3}' +
+    '.pv-root.lay-notesTop .pv-right{grid-column:2;grid-row:3}' +
+    /* Layout B — the original: slide left, next + notes right. */
+    '.pv-root.lay-classic{grid-template-columns:1.4fr 1fr;grid-template-rows:auto 1fr}' +
+    '.pv-root.lay-classic .pv-hdr{grid-column:1/3}' +
+    '.pv-root.lay-classic .pv-left{grid-column:1;grid-row:2}' +
+    '.pv-root.lay-classic .pv-right{grid-column:2;grid-row:2;display:flex;flex-direction:column;gap:12px;min-height:0}' +
+    '.pv-root.lay-classic .pv-notes{flex:1;min-height:0}' +
+    /* Layout C — notes only, maximum reading size. */
+    '.pv-root.lay-notesOnly{grid-template-columns:1fr;grid-template-rows:auto 1fr}' +
+    '.pv-root.lay-notesOnly .pv-hdr{grid-column:1}' +
+    '.pv-root.lay-notesOnly .pv-left,.pv-root.lay-notesOnly .pv-right{display:none}' +
+    '.pv-root.lay-notesOnly .pv-notes{grid-column:1;grid-row:2}' +
+    /* Layout D — notes beside the slide, no "up next". */
+    '.pv-root.lay-sideBySide{grid-template-columns:1fr 1fr;grid-template-rows:auto 1fr}' +
+    '.pv-root.lay-sideBySide .pv-hdr{grid-column:1/3}' +
+    '.pv-root.lay-sideBySide .pv-left{grid-column:1;grid-row:2}' +
+    '.pv-root.lay-sideBySide .pv-notes{grid-column:2;grid-row:2}' +
+    '.pv-root.lay-sideBySide .pv-right{display:none}' +
+    '.pv-hdr{display:flex;justify-content:space-between;align-items:center;padding:0 4px;gap:14px;flex-wrap:wrap}' +
+    '.pv-hdr h1{font-size:13px;font-weight:700;color:#7ed957;letter-spacing:2px;text-transform:uppercase;white-space:nowrap}' +
     '.pv-timer{font-size:24px;font-weight:800;color:#f0f0f5;font-variant-numeric:tabular-nums;letter-spacing:1px}' +
-    '.pv-counter{font-size:14px;color:#a0a0b0;font-weight:600}' +
+    '.pv-counter{font-size:14px;color:#a0a0b0;font-weight:600;white-space:nowrap}' +
     '.pv-counter span{color:#7ed957}' +
     '.pv-left{display:flex;flex-direction:column;gap:12px;min-height:0}' +
     '.pv-current{flex:1;background:#111;border:2px solid #7ed957;border-radius:10px;overflow:hidden;position:relative;min-height:0;display:flex;align-items:center;justify-content:center}' +
@@ -4377,29 +4401,54 @@ function buildPresenterViewHTML(){
     '.pv-slide-wrap{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}' +
     '.pv-slide{position:relative;background:#111;overflow:hidden}' +
     '.pv-right{display:flex;flex-direction:column;gap:12px;min-height:0}' +
-    '.pv-next{height:40%;background:#111;border:1px solid #3a3a44;border-radius:10px;overflow:hidden;position:relative}' +
+    '.pv-next{flex:1;background:#111;border:1px solid #3a3a44;border-radius:10px;overflow:hidden;position:relative;min-height:0}' +
     '.pv-next-label{position:absolute;top:10px;left:12px;font-size:10px;font-weight:700;color:#ffa500;letter-spacing:2px;text-transform:uppercase;background:rgba(0,0,0,0.65);padding:4px 8px;border-radius:4px;z-index:10}' +
-    '.pv-notes{flex:1;background:#1a1a1e;border:1px solid #3a3a44;border-radius:10px;padding:18px;overflow-y:auto;min-height:0}' +
-    '.pv-notes-hdr{font-size:10px;font-weight:700;color:#a0a0b0;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px}' +
-    '.pv-notes-content{font-size:16px;line-height:1.6;white-space:pre-wrap;color:#f0f0f5}' +
+    '.pv-notes{background:#1a1a1e;border:1px solid #3a3a44;border-radius:10px;padding:16px 18px;overflow-y:auto;min-height:0;display:flex;flex-direction:column}' +
+    '.pv-notes-hdr{font-size:10px;font-weight:700;color:#a0a0b0;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;flex:none;display:flex;justify-content:space-between;align-items:center}' +
+    '.pv-notes-content{font-size:var(--notes-size,18px);line-height:var(--notes-lh,1.6);white-space:pre-wrap;color:var(--notes-color,#f0f0f5);flex:1;font-weight:var(--notes-weight,400)}' +
     '.pv-notes-empty{color:#66667a;font-style:italic}' +
-    '.pv-controls{display:flex;gap:8px}' +
-    '.pv-btn{padding:8px 14px;background:#222228;color:#f0f0f5;border:1px solid #3a3a44;border-radius:6px;cursor:pointer;font-family:Outfit;font-weight:600;font-size:12px}' +
+    '.pv-controls{display:flex;gap:8px;align-items:center}' +
+    '.pv-btn{padding:7px 12px;background:#222228;color:#f0f0f5;border:1px solid #3a3a44;border-radius:6px;cursor:pointer;font-family:Outfit;font-weight:600;font-size:12px;white-space:nowrap}' +
     '.pv-btn:hover{background:#2c2c34;border-color:#7ed957}' +
     '.pv-btn.primary{background:#7ed957;color:#000;border-color:#7ed957}' +
     '.pv-btn.primary:hover{background:#6bc946}' +
-    '::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#1a1a1e}::-webkit-scrollbar-thumb{background:#3a3a44;border-radius:3px}' +
+    '.pv-btn.sm{padding:5px 9px;font-size:11px}' +
+    '.pv-btn.on{background:rgba(126,217,87,0.2);border-color:#7ed957;color:#7ed957}' +
+    /* Settings drawer */
+    '.pv-cog{background:none;border:0;color:#a0a0b0;cursor:pointer;font-size:16px;padding:4px 6px;border-radius:5px}' +
+    '.pv-cog:hover{color:#7ed957;background:rgba(255,255,255,0.06)}' +
+    '.pv-set{position:fixed;top:0;right:0;width:280px;height:100vh;background:rgba(16,16,20,0.98);border-left:1px solid #2a2a32;padding:16px;z-index:50;overflow-y:auto;transform:translateX(100%);transition:transform .18s ease}' +
+    '.pv-set.open{transform:translateX(0)}' +
+    '.pv-set h2{font-size:11px;letter-spacing:1.5px;color:#7ed957;text-transform:uppercase;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}' +
+    '.pv-set .lab{font-size:9px;letter-spacing:1px;color:#7a7a88;text-transform:uppercase;font-weight:700;margin:14px 0 6px}' +
+    '.pv-set .row{display:grid;grid-template-columns:1fr 1fr;gap:6px}' +
+    '.pv-set input[type=range]{width:100%;accent-color:#7ed957}' +
+    '.pv-set .val{float:right;color:#7ed957;font-weight:700;font-variant-numeric:tabular-nums}' +
+    '.pv-sw{display:flex;gap:6px;flex-wrap:wrap}' +
+    '.pv-sw button{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;padding:0}' +
+    '.pv-sw button.on{border-color:#fff;box-shadow:0 0 0 2px #7ed957}' +
+    '::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:#1a1a1e}::-webkit-scrollbar-thumb{background:#3a3a44;border-radius:4px}' +
     '</style></head><body>' +
-    '<div class="pv-root">' +
+    '<div class="pv-root lay-notesTop" id="pvRoot">' +
     '<div class="pv-hdr">' +
-    '<h1>EP Presenter — Presenter View</h1>' +
-    '<div style="display:flex;align-items:center;gap:20px">' +
+    '<h1>Presenter View</h1>' +
+    '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">' +
     '<div class="pv-counter">Slide <span id="pvCurNum">-</span> / <span id="pvTotal">-</span></div>' +
     '<div class="pv-timer" id="pvTimer">00:00</div>' +
+    '<button class="pv-btn sm" onclick="pvResetTimer()">Reset</button>' +
     '<div class="pv-controls">' +
-    '<button class="pv-btn" onclick="opener.presPrev()">← Prev</button>' +
-    '<button class="pv-btn primary" onclick="opener.presNext()">Next →</button>' +
+    '<button class="pv-btn" onclick="opener.presPrev()">&#8592; Prev</button>' +
+    '<button class="pv-btn primary" onclick="opener.presNext()">Next &#8594;</button>' +
+    '<button class="pv-cog" onclick="pvToggleSettings()" title="Layout &amp; text settings">&#9881;</button>' +
     '</div></div></div>' +
+    '<div class="pv-notes">' +
+    '<div class="pv-notes-hdr"><span>Speaker Notes</span>' +
+    '<span style="display:flex;gap:5px">' +
+    '<button class="pv-btn sm" onclick="pvFont(-2)" title="Smaller text">A&#8722;</button>' +
+    '<button class="pv-btn sm" onclick="pvFont(2)" title="Larger text">A+</button>' +
+    '</span></div>' +
+    '<div class="pv-notes-content" id="pvNotes"></div>' +
+    '</div>' +
     '<div class="pv-left">' +
     '<div class="pv-current">' +
     '<div class="pv-current-label">Current</div>' +
@@ -4409,23 +4458,114 @@ function buildPresenterViewHTML(){
     '<div class="pv-next">' +
     '<div class="pv-next-label">Up Next</div>' +
     '<div class="pv-slide-wrap" id="pvNextSlide"></div>' +
+    '</div></div>' +
     '</div>' +
-    '<div class="pv-notes">' +
-    '<div class="pv-notes-hdr">Speaker Notes</div>' +
-    '<div class="pv-notes-content" id="pvNotes"></div>' +
-    '</div></div></div>' +
+    /* Settings drawer */
+    '<div class="pv-set" id="pvSet">' +
+    '<h2>Presenter Settings <button class="pv-cog" onclick="pvToggleSettings()">&#10005;</button></h2>' +
+    '<div class="lab">Layout</div>' +
+    '<div class="row">' +
+    '<button class="pv-btn sm" data-lay="notesTop">Notes on top</button>' +
+    '<button class="pv-btn sm" data-lay="classic">Classic</button>' +
+    '<button class="pv-btn sm" data-lay="sideBySide">Side by side</button>' +
+    '<button class="pv-btn sm" data-lay="notesOnly">Notes only</button>' +
+    '</div>' +
+    '<div class="lab">Notes height <span class="val" id="pvNhVal">34vh</span></div>' +
+    '<input type="range" id="pvNh" min="15" max="70" step="1" value="34" oninput="pvNotesHeight(this.value)">' +
+    '<div class="lab">Text size <span class="val" id="pvFsVal">18px</span></div>' +
+    '<input type="range" id="pvFs" min="12" max="64" step="1" value="18" oninput="pvSetFont(this.value)">' +
+    '<div class="lab">Line spacing <span class="val" id="pvLhVal">1.6</span></div>' +
+    '<input type="range" id="pvLh" min="1.1" max="2.4" step="0.05" value="1.6" oninput="pvLineHeight(this.value)">' +
+    '<div class="lab">Weight</div>' +
+    '<div class="row">' +
+    '<button class="pv-btn sm" onclick="pvWeight(400)">Normal</button>' +
+    '<button class="pv-btn sm" onclick="pvWeight(700)">Bold</button>' +
+    '</div>' +
+    '<div class="lab">Text colour</div>' +
+    '<div class="pv-sw" id="pvColors"></div>' +
+    '<div class="lab">Reset</div>' +
+    '<button class="pv-btn sm" style="width:100%" onclick="pvReset()">Restore defaults</button>' +
+    '<div style="margin-top:16px;font-size:10px;color:#66667a;line-height:1.5">' +
+    'Settings are saved for next time. Keyboard: arrows or space to advance, ' +
+    'Ctrl +/&#8722; for text size, Esc to end.</div>' +
+    '</div>' +
     '<script>' +
     'var startTime = Date.now();' +
     'function fmtTime(ms){var s=Math.floor(ms/1000);var m=Math.floor(s/60);s=s%60;return (m<10?"0":"")+m+":"+(s<10?"0":"")+s}' +
     'setInterval(function(){var el=document.getElementById("pvTimer");if(el)el.textContent=fmtTime(Date.now()-startTime)},1000);' +
+    'function pvResetTimer(){startTime=Date.now();var el=document.getElementById("pvTimer");if(el)el.textContent="00:00"}' +
+    /* Preferences persist in the OPENER, so they survive closing this window
+       and are saved with the app rather than this throwaway document. */
+    'function pvPrefs(){try{return (opener && opener.epGetPresenterPrefs && opener.epGetPresenterPrefs()) || {}}catch(e){return {}}}' +
+    'function pvSave(k,v){try{opener && opener.epSetPresenterPref && opener.epSetPresenterPref(k,v)}catch(e){}}' +
+    'function pvToggleSettings(){document.getElementById("pvSet").classList.toggle("open")}' +
+    'function pvLayout(l){' +
+    'var r=document.getElementById("pvRoot");' +
+    'r.className="pv-root lay-"+l;' +
+    'var bs=document.querySelectorAll("[data-lay]");' +
+    'for(var i=0;i<bs.length;i++){bs[i].classList.toggle("on",bs[i].getAttribute("data-lay")===l)}' +
+    'pvSave("layout",l);}' +
+    'function pvSetFont(px){px=Math.max(12,Math.min(64,parseInt(px,10)||18));' +
+    'document.documentElement.style.setProperty("--notes-size",px+"px");' +
+    'document.getElementById("pvFsVal").textContent=px+"px";' +
+    'var sl=document.getElementById("pvFs"); if(sl) sl.value=px;' +
+    'pvSave("fontSize",px);}' +
+    'function pvFont(d){var cur=parseInt(getComputedStyle(document.documentElement).getPropertyValue("--notes-size"),10)||18;pvSetFont(cur+d)}' +
+    'function pvLineHeight(v){document.documentElement.style.setProperty("--notes-lh",v);' +
+    'document.getElementById("pvLhVal").textContent=parseFloat(v).toFixed(2);' +
+    'var sl=document.getElementById("pvLh"); if(sl) sl.value=v;' +
+    'pvSave("lineHeight",parseFloat(v));}' +
+    'function pvNotesHeight(v){document.documentElement.style.setProperty("--notes-h",v+"vh");' +
+    'document.getElementById("pvNhVal").textContent=v+"vh";' +
+    'var sl=document.getElementById("pvNh"); if(sl) sl.value=v;' +
+    'pvSave("notesHeight",parseInt(v,10));}' +
+    'function pvWeight(w){document.documentElement.style.setProperty("--notes-weight",w);pvSave("weight",w)}' +
+    'function pvColor(c){document.documentElement.style.setProperty("--notes-color",c);' +
+    'var bs=document.querySelectorAll("#pvColors button");' +
+    'for(var i=0;i<bs.length;i++){bs[i].classList.toggle("on",bs[i].getAttribute("data-c")===c)}' +
+    'pvSave("color",c);}' +
+    'function pvReset(){pvLayout("notesTop");pvSetFont(18);pvLineHeight(1.6);pvNotesHeight(34);pvWeight(400);pvColor("#f0f0f5")}' +
+    /* Colour swatches */
+    '(function(){var lb=document.querySelectorAll("[data-lay]");' +
+    'for(var i=0;i<lb.length;i++){(function(b){b.onclick=function(){pvLayout(b.getAttribute("data-lay"))}})(lb[i])}})();' +
+    '(function(){var cols=["#f0f0f5","#7ed957","#ffa500","#6ec3ff","#ff8fb1","#ffffff"];' +
+    'var box=document.getElementById("pvColors");' +
+    'cols.forEach(function(c){var b=document.createElement("button");b.style.background=c;' +
+    'b.setAttribute("data-c",c);b.onclick=function(){pvColor(c)};box.appendChild(b)});})();' +
+    /* Restore saved preferences */
+    '(function(){var p=pvPrefs();' +
+    'pvLayout(p.layout||"notesTop");' +
+    'pvSetFont(p.fontSize||18);' +
+    'pvLineHeight(p.lineHeight||1.6);' +
+    'pvNotesHeight(p.notesHeight||34);' +
+    'pvWeight(p.weight||400);' +
+    'pvColor(p.color||"#f0f0f5");})();' +
     'document.addEventListener("keydown",function(e){' +
+    'if((e.ctrlKey||e.metaKey)&&(e.key==="="||e.key==="+")){e.preventDefault();pvFont(2);return}' +
+    'if((e.ctrlKey||e.metaKey)&&e.key==="-"){e.preventDefault();pvFont(-2);return}' +
     'if(e.key==="ArrowRight"||e.key===" "||e.key==="PageDown"){e.preventDefault();if(opener&&!opener.closed)opener.presNext()}' +
     'if(e.key==="ArrowLeft"||e.key==="PageUp"){e.preventDefault();if(opener&&!opener.closed)opener.presPrev()}' +
     'if(e.key==="Escape"){if(opener&&!opener.closed)opener.exitPresent();window.close()}' +
     '});' +
     'window.addEventListener("beforeunload",function(){try{opener.presenterWinClosing&&opener.presenterWinClosing()}catch(e){}});' +
-    '<\/script></body></html>';
+    '</scr' + 'ipt></body></html>';
 }
+
+// Presenter-view preferences live in the main window so they persist across
+// opening and closing the presenter window.
+window.epGetPresenterPrefs = function(){
+  try {
+    var raw = localStorage.getItem('ep-presenter-view-prefs');
+    return raw ? JSON.parse(raw) : {};
+  } catch(e){ return {}; }
+};
+window.epSetPresenterPref = function(k, v){
+  try {
+    var p = window.epGetPresenterPrefs();
+    p[k] = v;
+    localStorage.setItem('ep-presenter-view-prefs', JSON.stringify(p));
+  } catch(e){}
+};
 
 // Called from main window whenever slide/reveal changes
 function syncPresenterView(){
