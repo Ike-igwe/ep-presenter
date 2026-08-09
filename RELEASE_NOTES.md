@@ -1,40 +1,20 @@
-## v1.0.33 — Element layering, drag and drop, PPTX notes
+## v1.0.34 — Style presets
 
-### Element layering fixed
+### Style presets
 
-Elements added after a webcam no longer disappear behind it. The slide's
-element layer carries a CSS transform for zoom, which creates a stacking
-context — so per-element z-index only ordered elements against each other,
-never against the camera video. The layer now has its own stacking level.
+Save a look once and apply it to any element, on any slide, in any deck.
 
-- **Front / Back / Forward / Backward** controls in the properties panel
-- New elements spawn in free space instead of landing on existing ones
+- **Ten built-ins**: Clean, Soft Card, Floating, Neon Glow, Brand Gradient,
+  Animated Ring, Tilted, Mono Film, Cinematic, None
+- **Save your own** from any styled element — captures border, shadow, 3D tilt
+  and image effects together
+- Your presets are stored in the app, so they're available in every deck
+- A preset only writes the fields it defines, so it won't wipe styling it
+  doesn't set
 
-### Drag and drop
+### Universal element styling
 
-Drop files anywhere on the window: **.pptx** imports, **.json** opens a saved
-deck, **video** and **image** files insert onto the current slide.
-
-### PowerPoint speaker notes
-
-Notes now survive import and export. They live in a separate part of the PPTX
-package that the importer never read, and the exporter never wrote — so notes
-were dropped in both directions.
-
-### Webcam styling
-
-Rebuilt to work with the new layering, where the camera video sits beneath the
-element layer.
-
-- Border radius, solid and gradient borders, and drop shadow restored
-- Animated borders animate on screen again
-- Shadows fall outside the frame instead of bleeding across the border
-- Fixed webcam elements rendering stretched in exported video
-- Added a camera zoom control (1×–3×)
-
-### Also
-
-- Configurable presenter view: four layouts, adjustable notes text and panel
-  height, persistent settings
-- Slide reordering by drag, buttons, or Ctrl+Shift+Up/Down
-- Wider snapping thresholds with a larger catch on stage centre
+Text, lists, charts and sticky notes gained drop shadow and 3D lift, which
+previously only images, shapes and media elements had. All element types now
+share the same styling fields, which is what lets a preset copied from a
+webcam apply cleanly to a chart.
