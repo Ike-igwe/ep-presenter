@@ -3250,6 +3250,9 @@ var S = {
   recChunks:[],         // blob chunks
   recCanvas:null,       // the compositing canvas
   recAudioStream:null,  // mic MediaStream
+  micDeviceId:'',       // chosen microphone; '' = system default
+  micLabel:'',          // its display name, for the panel
+  micLevel:0,           // live input level 0-1, for the meter
   recRAF:null,          // requestAnimationFrame id for the compositor loop
   selIds:[], ed:null,
   pres:false, presSlide:0,
@@ -4014,6 +4017,13 @@ function updateSlide(fn){
 }
 
 window.updateEl = function(id, patch){
+  // Editing any styling field means the element no longer matches the preset
+  // that was applied, so drop the marker rather than showing a stale one.
+  if(patch && typeof STYLE_PRESET_FIELDS !== 'undefined'){
+    for(var _k in patch){
+      if(STYLE_PRESET_FIELDS.indexOf(_k) >= 0){ patch.stylePreset = ''; break; }
+    }
+  }
   updateSlide(function(s){
     s.els = s.els.map(function(e){return e.id===id ? Object.assign({},e,patch) : e});
     return s;
@@ -7152,6 +7162,149 @@ function ensureRecIndicator(){
     '<button class="stop" onclick="stopRecording()"'+(S._recStopping?' disabled style="opacity:0.4;cursor:not-allowed"':'')+'>'+(S._recStopping?'Stopping…':'Stop')+'</button>';
 }
 
+// Microphone picker. getUserMedia({audio:true}) always takes the system
+// default, so there was no way to choose between headset, interface and
+// webcam mics — this exposes the same device list the camera picker uses.
+window.openMicPicker = async function(evt){
+  if(evt){ evt.stopPropagation(); evt.preventDefault(); }
+  var devices = [];
+  try {
+    // Labels are empty until permission has been granted at least once.
+    var probe = null;
+    try { probe = await navigator.mediaDevices.getUserMedia({ audio:true }); } catch(e){}
+    devices = (await navigator.mediaDevices.enumerateDevices())
+                .filter(function(d){ return d.kind === 'audioinput'; });
+    if(probe) probe.getTracks().forEach(function(t){ t.stop(); });
+  } catch(e){
+    showToast('Could not list microphones');
+    return;
+  }
+  if(!devices.length){ showToast('No microphones found'); return; }
+
+  var old = document.getElementById('epMicPop');
+  if(old) old.remove();
+
+  var pop = document.createElement('div');
+  pop.id = 'epMicPop';
+  pop.className = 'ss-style-pan';
+  pop.style.width = '300px';
+  var h = '<div class="ss-sp-head"><span class="ss-sp-grip"></span>' +
+          '<span class="ss-sp-title">MICROPHONE</span>' +
+          '<button class="ss-sp-x" data-act="close">&#10005;</button></div><div class="ss-sp-body">';
+  h += '<div class="ss-sp-lab">INPUT DEVICE</div>';
+  h += '<button class="sp-btn" style="width:100%;margin-bottom:5px;text-align:left;' +
+       (!S.micDeviceId ? 'border-color:var(--g);color:var(--g)' : '') + '" data-mic="">' +
+       'System default</button>';
+  devices.forEach(function(d, i){
+    var label = d.label || ('Microphone ' + (i+1));
+    h += '<button class="sp-btn" style="width:100%;margin-bottom:5px;text-align:left;' +
+         (S.micDeviceId === d.deviceId ? 'border-color:var(--g);color:var(--g)' : '') + '" ' +
+         'data-mic="' + d.deviceId + '">' + esc(label) + '</button>';
+  });
+  h += '<div class="ss-sp-lab">INPUT LEVEL</div>';
+  h += '<div style="height:10px;background:rgba(255,255,255,0.08);border-radius:5px;overflow:hidden">' +
+       '<div id="epMicMeter" style="height:100%;width:0%;background:#7ed957;transition:width .06s"></div></div>';
+  h += '<div class="ss-sp-note">Speak to test. Changing device applies to the next recording.</div>';
+  h += '</div>';
+  pop.innerHTML = h;
+  document.body.appendChild(pop);
+
+  // Position near the toolbar button that opened it.
+  var r = evt && evt.currentTarget ? evt.currentTarget.getBoundingClientRect() : null;
+  var pw = pop.offsetWidth || 300, ph = pop.offsetHeight || 320;
+  var px = r ? Math.min(r.left, window.innerWidth - pw - 12) : window.innerWidth - pw - 20;
+  var py = r ? Math.max(12, r.top - ph - 10) : 80;
+  if(py + ph > window.innerHeight - 8) py = Math.max(8, window.innerHeight - ph - 8);
+  pop.style.left = Math.max(8, px) + 'px';
+  pop.style.top  = py + 'px';
+
+  // Live level meter so the chosen device can be verified before recording.
+  var meterCtx = null, meterStream = null, meterRaf = null;
+  function stopMeter(){
+    if(meterRaf) cancelAnimationFrame(meterRaf);
+    if(meterStream) try { meterStream.getTracks().forEach(function(t){ t.stop(); }); } catch(e){}
+    if(meterCtx) try { meterCtx.close(); } catch(e){}
+    meterRaf = meterStream = meterCtx = null;
+  }
+  async function startMeter(){
+    stopMeter();
+    try {
+      var c = S.micDeviceId ? { deviceId:{ exact:S.micDeviceId } } : true;
+      meterStream = await navigator.mediaDevices.getUserMedia({ audio:c });
+      meterCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var src = meterCtx.createMediaStreamSource(meterStream);
+      var an = meterCtx.createAnalyser();
+      an.fftSize = 512;
+      src.connect(an);
+      var data = new Uint8Array(an.frequencyBinCount);
+      (function tick(){
+        if(!document.getElementById('epMicPop')){ stopMeter(); return; }
+        an.getByteTimeDomainData(data);
+        var peak = 0;
+        for(var i = 0; i < data.length; i++){
+          var v = Math.abs(data[i] - 128) / 128;
+          if(v > peak) peak = v;
+        }
+        var bar = document.getElementById('epMicMeter');
+        if(bar) bar.style.width = Math.min(100, Math.round(peak * 180)) + '%';
+        meterRaf = requestAnimationFrame(tick);
+      })();
+    } catch(e){ console.warn('[EP] Mic meter failed:', e); }
+  }
+  startMeter();
+
+  pop.addEventListener('mousedown', function(e){
+    if(e.target.closest('.ss-sp-head') && !e.target.closest('.ss-sp-x')){
+      ssStylePanelDrag(pop, e); return;
+    }
+    e.stopPropagation();
+  }, true);
+
+  pop.addEventListener('click', function(e){
+    var b = e.target.closest('button');
+    if(!b) return;
+    e.stopPropagation();
+    if(b.getAttribute('data-act') === 'close'){ stopMeter(); pop.remove(); return; }
+    var id = b.getAttribute('data-mic');
+    if(id === null) return;
+    S.micDeviceId = id;
+    try { localStorage.setItem('ep-mic-device', id); } catch(err){}
+    S.micLabel = (b.textContent || '').trim();
+    try { localStorage.setItem('ep-mic-label', S.micLabel); } catch(err){}
+
+    // Reflect the choice immediately rather than rebuilding the popover.
+    var btns = pop.querySelectorAll('[data-mic]');
+    for(var i = 0; i < btns.length; i++){
+      var on = btns[i].getAttribute('data-mic') === id;
+      btns[i].style.borderColor = on ? 'var(--g)' : '';
+      btns[i].style.color = on ? 'var(--g)' : '';
+    }
+    showToast(id ? ('Microphone: ' + S.micLabel) : 'Using system default');
+    startMeter();     // re-point the meter at the new device
+    render();
+  }, true);
+
+  // Some devices (NVIDIA Broadcast in particular) are exclusive-mode: while
+  // the meter holds the mic open, the recorder's own getUserMedia call gets
+  // a stream that produces silence. Always release it when the popover goes.
+  var _closeGuard = function(ev){
+    if(!document.getElementById('epMicPop')) return;
+    if(pop.contains(ev.target)) return;
+    stopMeter();
+    pop.remove();
+    document.removeEventListener('mousedown', _closeGuard, true);
+  };
+  setTimeout(function(){ document.addEventListener('mousedown', _closeGuard, true); }, 0);
+};
+
+// Restore the saved microphone at startup.
+try {
+  var _savedMic = localStorage.getItem('ep-mic-device');
+  if(_savedMic !== null) S.micDeviceId = _savedMic;
+  var _savedMicLabel = localStorage.getItem('ep-mic-label');
+  if(_savedMicLabel !== null) S.micLabel = _savedMicLabel;
+} catch(e){}
+
 window.toggleRecAudio = function(evt){
   if(evt) evt.stopPropagation();
   S.recAudio = !S.recAudio;
@@ -7364,9 +7517,33 @@ window.startRecording = async function(){
         // Route mic if requested
         if(S.recAudio){
           try {
-            S.recAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            // Honour the chosen input device. Previously this always took the
+            // system default, with no way to pick a different microphone.
+            // Close the picker's meter first — an exclusive-mode device held
+            // open there would hand the recorder a silent stream.
+            var _pop = document.getElementById('epMicPop');
+            if(_pop) _pop.remove();
+            await new Promise(function(r){ setTimeout(r, 150); });
+            var _micId = S.micDeviceId || '';
+            var _micConstraints = _micId
+              ? { deviceId: { exact: _micId }, echoCancellation:true, noiseSuppression:true }
+              : { echoCancellation:true, noiseSuppression:true };
+            try {
+              S.recAudioStream = await navigator.mediaDevices.getUserMedia({ audio: _micConstraints, video: false });
+            } catch(_micErr){
+              // Saved device may have been unplugged — fall back to default
+              // rather than failing the whole recording.
+              console.warn('[EP] Mic "' + _micId + '" unavailable, using default:', _micErr);
+              S.recAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            }
             var micSrc = S.recAudioCtx.createMediaStreamSource(S.recAudioStream);
             micSrc.connect(S.recAudioDest);
+            var _mt = S.recAudioStream.getAudioTracks()[0];
+            console.log('[EP] Mic:', _mt ? (_mt.label + ' / ' + _mt.readyState +
+                        ' / muted=' + _mt.muted) : 'NO TRACK');
+            if(_mt && _mt.muted){
+              showToast('Warning: the selected microphone is muted at source');
+            }
           } catch(e){
             console.warn('Mic denied or unavailable, recording without mic:', e);
             showToast('Mic unavailable — continuing without mic');
@@ -21890,7 +22067,9 @@ function renderPropsPanel(el){
     h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:10px 0 5px">Style presets</div>';
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px">';
     _bi.forEach(function(pr){
-      h += '<button class="sp-btn" style="font-size:10px;padding:5px 4px" ' +
+      var on = (el.stylePreset === pr.id);
+      h += '<button class="sp-btn" style="font-size:10px;padding:5px 4px' +
+           (on ? ';background:rgba(126,217,87,0.18);border-color:var(--g);color:var(--g)' : '') + '" ' +
            'onclick="applyStylePreset(\''+el.id+'\',\''+pr.id+'\')">'+esc(pr.name)+'</button>';
     });
     h += '</div>';
@@ -21898,7 +22077,9 @@ function renderPropsPanel(el){
       h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:8px 0 5px">My presets</div>';
       _us.forEach(function(pr){
         h += '<div style="display:flex;gap:4px;margin-bottom:4px">';
-        h += '<button class="sp-btn" style="flex:1;font-size:10px;padding:5px 4px" ' +
+        var uon = (el.stylePreset === pr.id);
+        h += '<button class="sp-btn" style="flex:1;font-size:10px;padding:5px 4px' +
+             (uon ? ';background:rgba(126,217,87,0.18);border-color:var(--g);color:var(--g)' : '') + '" ' +
              'onclick="applyStylePreset(\''+el.id+'\',\''+pr.id+'\')">'+esc(pr.name)+'</button>';
         h += '<button class="sp-btn del" style="padding:5px 8px;font-size:10px" ' +
              'onclick="deleteStylePreset(\''+pr.id+'\')" data-tip="Delete preset">&#10005;</button>';
@@ -21908,7 +22089,8 @@ function renderPropsPanel(el){
     h += '<button class="sp-btn" style="width:100%;margin-bottom:4px;font-size:10px" ' +
          'onclick="saveStylePreset(\''+el.id+'\')">+ Save current style</button>';
     h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:8px">' +
-         'Presets carry border, shadow, 3D and image effects, and apply to any element type.</div>';
+         'Presets set border, shadow and 3D only \u2014 they never change the picture. ' +
+         'Click an active preset again to clear it.</div>';
   }
 
   // Layer controls — stacking is array order, so these just move the element
@@ -22166,6 +22348,12 @@ function renderSlidePropsPanel(){
   h += '<div class="ps"><div class="ps-t">Slide Actions</div>';
   h += '<button class="sp-btn" style="width:100%;margin-bottom:5px" onclick="duplicateSlide()">Duplicate Slide</button>';
   h += '<button class="sp-btn del" style="width:100%;margin-bottom:8px" onclick="deleteSlide()">Delete Slide</button>';
+  var _micName = S.micLabel || '';
+  h += '<button class="sp-btn" style="width:100%;margin-bottom:2px" onclick="openMicPicker(event)" ' +
+       'data-tip="Choose which microphone records">&#127908; Microphone…</button>';
+  h += '<div style="font-size:10px;color:'+(_micName?'var(--g)':'var(--muted)')+';margin-bottom:8px;' +
+       'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+       esc(_micName || 'System default') + '</div>';
   h += '<button class="sp-btn" style="width:100%;border-color:var(--g);color:var(--g)" onclick="openGlobalPreferences()">⚙ Global Preferences…</button>';
   h += '</div>';
 
@@ -23681,7 +23869,7 @@ function renderPres(){
   // Webcam toggle
   h += '<button class="tb-b'+(S.webcamActive?' a':'')+'" onclick="toggleWebcam()" data-tip="Floating Camera (W) — separate from slide-element webcams" style="'+(S.webcamActive?'color:var(--g)':'')+'">'+I.webcam+'</button>';
   // Mic toggle (for recording)
-  h += '<button class="tb-b" onclick="toggleRecAudio(event)" data-tip="Record audio: '+(S.recAudio?'ON':'OFF')+'" style="'+(S.recAudio?'color:var(--g)':'color:var(--muted)')+'">'+(S.recAudio?I.mic:I.micOff)+'</button>';
+  h += '<button class="tb-b" onclick="toggleRecAudio(event)" oncontextmenu="openMicPicker(event);return false" data-tip="Record audio: '+(S.recAudio?'ON':'OFF')+' — right-click to choose microphone" style="'+(S.recAudio?'color:var(--g)':'color:var(--muted)')+'">'+(S.recAudio?I.mic:I.micOff)+'</button>';
   // Screen-share audio toggle (only visible when at least one screen-share with audio is connected)
   var ssAudioState = getScreenAudioToolbarState();
   if(ssAudioState.visible){
@@ -25784,7 +25972,11 @@ window.epZDebug = function(){
 // borderStyle/shadow/effect3d/filter), so a look copied from a webcam applies
 // cleanly to a chart or a video.
 // =========================================================
-var STYLE_PRESET_FIELDS = ['bc','bc2','bw','br','borderStyle','shadow','effect3d','filter'];
+// Deliberately EXCLUDES 'filter'. Image effects (B&W, warmth, blur...) live in
+// the Effects tab and are a property of the footage, not the frame. Bundling
+// them into presets meant applying a border style silently desaturated the
+// camera — surprising, and hard to undo.
+var STYLE_PRESET_FIELDS = ['bc','bc2','bw','br','borderStyle','shadow','effect3d'];
 
 var BUILTIN_STYLE_PRESETS = [
   { id:'clean',    name:'Clean',
@@ -25815,21 +26007,19 @@ var BUILTIN_STYLE_PRESETS = [
     style:{ borderStyle:'solid', bc:'#ffffff', bw:4, br:16,
             shadow:{on:true,x:18,y:22,blur:50,color:'#000000',opacity:0.55},
             effect3d:{style:'lift',depth:55,tiltX:4,tiltY:-12,persp:900} } },
-  { id:'mono',     name:'Mono Film',
+  // No preset carries `filter` — see STYLE_PRESET_FIELDS above.
+  { id:'film',     name:'Film Frame',
     style:{ borderStyle:'solid', bc:'#e8e8ef', bw:5, br:4,
             shadow:{on:true,x:0,y:10,blur:28,color:'#000000',opacity:0.5},
-            effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900},
-            filter:{ look:'bw' } } },
-  { id:'cine',     name:'Cinematic',
+            effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900} } },
+  { id:'inset',    name:'Inset Dark',
     style:{ borderStyle:'solid', bc:'#1a1a1e', bw:2, br:8,
             shadow:{on:true,x:0,y:20,blur:56,color:'#000000',opacity:0.6},
-            effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900},
-            filter:{ look:'cinematic' } } },
+            effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900} } },
   { id:'bare',     name:'None',
     style:{ borderStyle:'solid', bc:'#7ed957', bw:0, br:0,
             shadow:{on:false,x:0,y:8,blur:24,color:'#000000',opacity:0.4},
-            effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900},
-            filter:{ look:'none' } } }
+            effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900} } }
 ];
 
 function loadUserStylePresets(){
@@ -25852,6 +26042,16 @@ function captureStyleFromEl(el){
   var out = {};
   STYLE_PRESET_FIELDS.forEach(function(k){
     if(el[k] === undefined) return;
+    // Skip a no-op image filter, so a saved FRAME style doesn't silently
+    // reset the picture on whatever it's applied to later.
+    if(k === 'filter'){
+      var f = el.filter || {};
+      var meaningful = (f.look && f.look !== 'none') ||
+        ['brightness','contrast','saturate','hue','sepia','blur','grayscale'].some(function(kk){
+          return typeof f[kk] === 'number';
+        });
+      if(!meaningful) return;
+    }
     out[k] = (typeof el[k] === 'object' && el[k] !== null)
       ? JSON.parse(JSON.stringify(el[k]))
       : el[k];
@@ -25880,6 +26080,28 @@ window.deleteStylePreset = function(pid){
 };
 
 window.applyStylePreset = function(elId, pid){
+  // Clicking the active preset again clears it, restoring plain defaults —
+  // otherwise there's no way to get back out of a preset from the panel.
+  var _cur = ssFindEl(elId);
+  if(_cur && _cur.stylePreset === pid){
+    var slide0 = cs();
+    if(slide0){
+      var t0 = slide0.els.filter(function(e){ return e.id === elId; })[0];
+      if(t0){
+        t0.borderStyle = 'solid';
+        t0.bw = 2; t0.br = 10;
+        t0.shadow = { on:false, x:0, y:8, blur:24, color:'#000000', opacity:0.4 };
+        t0.effect3d = { style:'flat', depth:50, tiltX:0, tiltY:0, persp:900 };
+        t0.stylePreset = '';
+      }
+    }
+    S.dirty = true;
+    pushHist();
+    if(typeof invalidateRecCache === 'function') invalidateRecCache();
+    render();
+    showToast('Preset cleared');
+    return;
+  }
   var all = BUILTIN_STYLE_PRESETS.concat(loadUserStylePresets());
   var preset = null;
   for(var i = 0; i < all.length; i++){ if(all[i].id === pid){ preset = all[i]; break; } }
@@ -25897,6 +26119,7 @@ window.applyStylePreset = function(elId, pid){
       : preset.style[k];
   });
 
+  patch.stylePreset = pid;      // remembered so the panel can show it as active
   var slide = cs();
   if(slide){
     var tgt = slide.els.filter(function(e){ return e.id === elId; })[0];
