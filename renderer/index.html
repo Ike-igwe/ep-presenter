@@ -3640,7 +3640,7 @@ setStageAspect('landscape');
 // =========================================================
 // FACTORIES
 // =========================================================
-function mkText(x,y){return{id:uid(),type:'text',x:x,y:y,w:420,h:70,text:'Double-click to edit',fs:28,fw:'700',color:'#f0f0f5',bc:'#7ed957',bw:3,br:8,bg:'rgba(0,0,0,0.45)',align:'center',vAlign:'center',italic:false,transform:'none',letterSpacing:0,lk:false}}
+function mkText(x,y){return{shadow:{on:false,x:0,y:8,blur:24,color:'#000000',opacity:0.4},effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900},id:uid(),type:'text',x:x,y:y,w:420,h:70,text:'Double-click to edit',fs:28,fw:'700',color:'#f0f0f5',bc:'#7ed957',bw:3,br:8,bg:'rgba(0,0,0,0.45)',align:'center',vAlign:'center',italic:false,transform:'none',letterSpacing:0,lk:false}}
 function mkLine(x1,y1,x2,y2,arrow){return{id:uid(),type:'line',x1:x1,y1:y1,x2:x2,y2:y2,stroke:'#7ed957',sw:3,arrow:!!arrow,style:'straight',lk:false}}
 function mkShape(sh,x,y){
   // Icons default to fill = stroke so colored accent dots (target bullseye,
@@ -3659,7 +3659,7 @@ function mkImage(src,x,y,w,h){return{id:uid(),type:'image',x:x,y:y,w:w,h:h,src:s
   shadow:{on:false,x:0,y:8,blur:24,color:'#000000',opacity:0.4},
   effect3d:{style:'flat',depth:50}
 }}
-function mkNote(x,y){return{id:uid(),type:'note',x:x,y:y,w:200,h:160,text:'Note...',bg:NOTE_COLORS[0],lk:false,style:'lifted',fontSize:14,fontFamily:'Outfit',fontColor:'#1a1a1a',bold:false,italic:false,underline:false}}
+function mkNote(x,y){return{shadow:{on:false,x:0,y:8,blur:24,color:'#000000',opacity:0.4},effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900},id:uid(),type:'note',x:x,y:y,w:200,h:160,text:'Note...',bg:NOTE_COLORS[0],lk:false,style:'lifted',fontSize:14,fontFamily:'Outfit',fontColor:'#1a1a1a',bold:false,italic:false,underline:false}}
 // Phase 4f: animated sticker. `kind` selects which animation; `t` is a phase
 // offset so identical stickers can animate out of sync. Stickers render via
 // the STICKER_LIBRARY render functions (live SVG with browser-driven CSS
@@ -3685,7 +3685,7 @@ function mkScreenShare(x,y){return{id:uid(),type:'screenshare',x:x,y:y,w:640,h:3
 //   'palette'  — bars cycle through palette
 //   'threshold'— bars colored by value vs colorThresholdLow/High
 function mkChart(x, y){
-  return {
+  return {shadow:{on:false,x:0,y:8,blur:24,color:'#000000',opacity:0.4},effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900},
     id: uid(), type:'chart', x:x, y:y, w:560, h:340, lk:false,
     chartType: 'bar',
     data: [
@@ -3806,7 +3806,7 @@ function mkList(style, x, y){
   };
   var accentColors = ['#7ed957','#ffa500','#3b82f6','#a855f7','#ec4899','#f43f5e'];
   if(style === 'stacked-card'){
-    return Object.assign(base, {
+    return Object.assign(base, {shadow:{on:false,x:0,y:8,blur:24,color:'#000000',opacity:0.4},effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900},
       w:480, h:420,
       items:[
         {id:uid(), title:'Pivot Analysis', body:'Daily PP, TC, BC anchor key levels', color:'#7ed957'},
@@ -21883,6 +21883,34 @@ function renderPropsPanel(el){
 
   // Common actions
   h += '<div class="ps"><div class="ps-t">Actions</div>';
+  // ---- Style presets -------------------------------------------------
+  // Only for elements that actually carry styling fields.
+  if(el.bw !== undefined || el.shadow !== undefined){
+    var _bi = BUILTIN_STYLE_PRESETS, _us = loadUserStylePresets();
+    h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:10px 0 5px">Style presets</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px">';
+    _bi.forEach(function(pr){
+      h += '<button class="sp-btn" style="font-size:10px;padding:5px 4px" ' +
+           'onclick="applyStylePreset(\''+el.id+'\',\''+pr.id+'\')">'+esc(pr.name)+'</button>';
+    });
+    h += '</div>';
+    if(_us.length){
+      h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:8px 0 5px">My presets</div>';
+      _us.forEach(function(pr){
+        h += '<div style="display:flex;gap:4px;margin-bottom:4px">';
+        h += '<button class="sp-btn" style="flex:1;font-size:10px;padding:5px 4px" ' +
+             'onclick="applyStylePreset(\''+el.id+'\',\''+pr.id+'\')">'+esc(pr.name)+'</button>';
+        h += '<button class="sp-btn del" style="padding:5px 8px;font-size:10px" ' +
+             'onclick="deleteStylePreset(\''+pr.id+'\')" data-tip="Delete preset">&#10005;</button>';
+        h += '</div>';
+      });
+    }
+    h += '<button class="sp-btn" style="width:100%;margin-bottom:4px;font-size:10px" ' +
+         'onclick="saveStylePreset(\''+el.id+'\')">+ Save current style</button>';
+    h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:8px">' +
+         'Presets carry border, shadow, 3D and image effects, and apply to any element type.</div>';
+  }
+
   // Layer controls — stacking is array order, so these just move the element
   // within slide.els.
   var _li = -1, _lslide = cs();
@@ -25747,6 +25775,164 @@ window.epZDebug = function(){
     };
   });
   console.table ? console.table(rows) : console.log(rows);
+};
+
+// =========================================================
+// STYLE PRESETS
+// A preset is a snapshot of the shared styling fields, applicable to any
+// element type. All types now carry the same field names (bc/bc2/bw/br/
+// borderStyle/shadow/effect3d/filter), so a look copied from a webcam applies
+// cleanly to a chart or a video.
+// =========================================================
+var STYLE_PRESET_FIELDS = ['bc','bc2','bw','br','borderStyle','shadow','effect3d','filter'];
+
+var BUILTIN_STYLE_PRESETS = [
+  { id:'clean',    name:'Clean',
+    style:{ borderStyle:'solid', bc:'#7ed957', bw:2, br:10,
+            shadow:{on:false,x:0,y:8,blur:24,color:'#000000',opacity:0.4},
+            effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900} } },
+  { id:'soft',     name:'Soft Card',
+    style:{ borderStyle:'solid', bc:'#2a2a32', bw:1, br:18,
+            shadow:{on:true,x:0,y:14,blur:40,color:'#000000',opacity:0.45},
+            effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900} } },
+  { id:'float',    name:'Floating',
+    style:{ borderStyle:'solid', bc:'#ffffff', bw:0, br:22,
+            shadow:{on:true,x:0,y:26,blur:70,color:'#000000',opacity:0.6},
+            effect3d:{style:'lift',depth:60,tiltX:0,tiltY:0,persp:900} } },
+  { id:'neon',     name:'Neon Glow',
+    style:{ borderStyle:'solid', bc:'#7ed957', bw:3, br:14,
+            shadow:{on:true,x:0,y:0,blur:48,color:'#7ed957',opacity:0.85},
+            effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900} } },
+  { id:'brand',    name:'Brand Gradient',
+    style:{ borderStyle:'gradient', bc:'#7ed957', bc2:'#ffa500', bw:6, br:18,
+            shadow:{on:true,x:0,y:16,blur:44,color:'#000000',opacity:0.5},
+            effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900} } },
+  { id:'pulse',    name:'Animated Ring',
+    style:{ borderStyle:'animated', bc:'#7ed957', bc2:'#9b59ff', bw:8, br:20,
+            shadow:{on:true,x:0,y:12,blur:36,color:'#000000',opacity:0.5},
+            effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900} } },
+  { id:'tilted',   name:'Tilted',
+    style:{ borderStyle:'solid', bc:'#ffffff', bw:4, br:16,
+            shadow:{on:true,x:18,y:22,blur:50,color:'#000000',opacity:0.55},
+            effect3d:{style:'lift',depth:55,tiltX:4,tiltY:-12,persp:900} } },
+  { id:'mono',     name:'Mono Film',
+    style:{ borderStyle:'solid', bc:'#e8e8ef', bw:5, br:4,
+            shadow:{on:true,x:0,y:10,blur:28,color:'#000000',opacity:0.5},
+            effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900},
+            filter:{ look:'bw' } } },
+  { id:'cine',     name:'Cinematic',
+    style:{ borderStyle:'solid', bc:'#1a1a1e', bw:2, br:8,
+            shadow:{on:true,x:0,y:20,blur:56,color:'#000000',opacity:0.6},
+            effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900},
+            filter:{ look:'cinematic' } } },
+  { id:'bare',     name:'None',
+    style:{ borderStyle:'solid', bc:'#7ed957', bw:0, br:0,
+            shadow:{on:false,x:0,y:8,blur:24,color:'#000000',opacity:0.4},
+            effect3d:{style:'flat',depth:50,tiltX:0,tiltY:0,persp:900},
+            filter:{ look:'none' } } }
+];
+
+function loadUserStylePresets(){
+  try {
+    var raw = localStorage.getItem('ep-style-presets');
+    var arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch(e){ return []; }
+}
+function saveUserStylePresets(list){
+  try { localStorage.setItem('ep-style-presets', JSON.stringify(list)); }
+  catch(e){ console.warn('[EP] Could not save presets:', e); }
+}
+window.epStylePresets = function(){
+  return { builtin: BUILTIN_STYLE_PRESETS, user: loadUserStylePresets() };
+};
+
+// Copy the styling fields off an element.
+function captureStyleFromEl(el){
+  var out = {};
+  STYLE_PRESET_FIELDS.forEach(function(k){
+    if(el[k] === undefined) return;
+    out[k] = (typeof el[k] === 'object' && el[k] !== null)
+      ? JSON.parse(JSON.stringify(el[k]))
+      : el[k];
+  });
+  return out;
+}
+
+window.saveStylePreset = function(id){
+  var el = ssFindEl(id);
+  if(!el){ showToast('Select an element first'); return; }
+  var name = prompt('Name this style preset:', 'My Style');
+  if(!name) return;
+  var list = loadUserStylePresets();
+  var pid = 'u' + Date.now();
+  list.push({ id:pid, name:String(name).slice(0,40), style: captureStyleFromEl(el) });
+  saveUserStylePresets(list);
+  showToast('Saved preset: ' + name);
+  render();
+};
+
+window.deleteStylePreset = function(pid){
+  var list = loadUserStylePresets().filter(function(p){ return p.id !== pid; });
+  saveUserStylePresets(list);
+  showToast('Preset deleted');
+  render();
+};
+
+window.applyStylePreset = function(elId, pid){
+  var all = BUILTIN_STYLE_PRESETS.concat(loadUserStylePresets());
+  var preset = null;
+  for(var i = 0; i < all.length; i++){ if(all[i].id === pid){ preset = all[i]; break; } }
+  if(!preset){ showToast('Preset not found'); return; }
+  var el = ssFindEl(elId);
+  if(!el){ showToast('Select an element first'); return; }
+
+  // Apply only the fields the preset defines, so a border-only preset doesn't
+  // silently wipe an element's shadow.
+  var patch = {};
+  STYLE_PRESET_FIELDS.forEach(function(k){
+    if(preset.style[k] === undefined) return;
+    patch[k] = (typeof preset.style[k] === 'object' && preset.style[k] !== null)
+      ? JSON.parse(JSON.stringify(preset.style[k]))
+      : preset.style[k];
+  });
+
+  var slide = cs();
+  if(slide){
+    var tgt = slide.els.filter(function(e){ return e.id === elId; })[0];
+    if(tgt) Object.assign(tgt, patch);
+  }
+  S.dirty = true;
+  pushHist();
+  if(typeof invalidateRecCache === 'function') invalidateRecCache();
+  render();
+  showToast('Applied: ' + preset.name);
+};
+
+// Apply a preset to EVERY element on the slide that supports styling.
+window.applyStylePresetToSlide = function(pid){
+  var all = BUILTIN_STYLE_PRESETS.concat(loadUserStylePresets());
+  var preset = null;
+  for(var i = 0; i < all.length; i++){ if(all[i].id === pid){ preset = all[i]; break; } }
+  if(!preset) return;
+  var slide = cs();
+  if(!slide || !slide.els) return;
+  var n = 0;
+  slide.els.forEach(function(e){
+    if(e.bw === undefined && e.shadow === undefined) return;   // not styleable
+    STYLE_PRESET_FIELDS.forEach(function(k){
+      if(preset.style[k] === undefined) return;
+      e[k] = (typeof preset.style[k] === 'object' && preset.style[k] !== null)
+        ? JSON.parse(JSON.stringify(preset.style[k]))
+        : preset.style[k];
+    });
+    n++;
+  });
+  S.dirty = true;
+  pushHist();
+  if(typeof invalidateRecCache === 'function') invalidateRecCache();
+  render();
+  showToast('Applied "' + preset.name + '" to ' + n + ' element(s)');
 };
 
 window.resetStartupPreference = function(){
