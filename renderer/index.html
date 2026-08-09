@@ -584,6 +584,11 @@ body.ep-speed-slow{--ep-trans-dur:1.1s;--ep-reveal-dur:0.85s}
 
 /* ========= WEBCAM SLIDE ELEMENT ========= */
 .wc-el{width:100%;height:100%;overflow:hidden;background:#0a0a0c;position:relative}
+/* When a camera is connected its pooled <video> sits BELOW the slide element
+   layer (which is a stacking context because it's transformed), so the
+   element's own fill has to be transparent or it would hide the picture.
+   The unconnected placeholder keeps its solid background. */
+.wc-el.wc-live{background:transparent}
 .wc-placeholder{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#a0a0b0;background:repeating-linear-gradient(135deg,rgba(255,255,255,0.015) 0 10px,rgba(255,255,255,0.04) 10px 20px);padding:12px;box-sizing:border-box;text-align:center}
 .wc-placeholder svg{width:40px;height:40px;color:#7ed957;opacity:0.8}
 .wc-controls{position:absolute;top:8px;right:8px;display:flex;gap:6px;opacity:0;transition:opacity 0.15s;z-index:3}
@@ -4988,7 +4993,10 @@ function setupPointerOverlay(){
     c.style.width = '100%';
     c.style.height = '100%';
     c.style.pointerEvents = 'none';
-    c.style.zIndex = '1000';
+    // Above the slide-element band (1100 + n*10) so the laser/spotlight is
+    // never hidden behind a webcam or a late-added element, but below the
+    // floating camera overlay (1500) and popovers (~2000).
+    c.style.zIndex = '1450';
     // Promote to its own compositor layer. This canvas repaints every frame
     // the cursor is on the slide; without its own layer that repaint can pull
     // the live screen-share video into a repaint too, which shows up as
@@ -8492,6 +8500,16 @@ document.addEventListener('mousemove', function(evt){
     // Apply snap
     var snap = computeSnap(drag.ids, proposedDx, proposedDy);
     S.snapGuides = snap.guides;
+    if(window._epSnapDebug){
+      var _mb = getElBounds(gEl(drag.ids[0]));
+      console.log('[snap] elCx=' + Math.round(_mb.x + _mb.w/2) +
+                  ' stageCx=' + (STAGE_W/2) +
+                  ' dist=' + Math.round(Math.abs((_mb.x + _mb.w/2) - STAGE_W/2)) +
+                  ' | scale=' + (S.stageScale||1).toFixed(3) +
+                  ' engage=' + Math.round(SNAP_ENGAGE_THRESHOLD / S.stageScale) +
+                  ' | guides=' + snap.guides.length +
+                  ' ' + JSON.stringify(snap.guides.map(function(g){ return g.type + Math.round(g.x != null ? g.x : g.y); })));
+    }
     // Apply delta to every dragged element from its original snapshot
     drag.ids.forEach(function(id){
       var el = gEl(id);
@@ -8935,6 +8953,27 @@ window.showContext = function(evt, id){
   S.sel = id;
   render();
 };
+
+// Stacking order IS array order in slide.els, so layering is a reorder.
+function _moveElInArray(id, mover){
+  var slide = cs();
+  if(!slide || !slide.els) return;
+  var i = -1;
+  for(var q = 0; q < slide.els.length; q++){ if(slide.els[q].id === id){ i = q; break; } }
+  if(i < 0) return;
+  var el = slide.els[i];
+  slide.els.splice(i, 1);
+  var to = mover(i, slide.els.length);
+  to = Math.max(0, Math.min(to, slide.els.length));
+  slide.els.splice(to, 0, el);
+  S.dirty = true;
+  pushHist();
+  if(typeof invalidateRecCache === 'function') invalidateRecCache();
+  render();
+}
+window.elToFront  = function(id){ _moveElInArray(id, function(i, n){ return n; }); };
+window.elToBack   = function(id){ _moveElInArray(id, function(){ return 0; }); };
+window.elLayerBy  = function(id, d){ _moveElInArray(id, function(i){ return i + d; }); };
 
 window.duplicateEl = function(id){
   var el = gEl(id);
@@ -9884,7 +9923,8 @@ function reattachWebcamStreams(){
       video.muted = true;
       video.playsInline = true;
       video.style.position = 'fixed';
-      video.style.zIndex = '1100';   // above pres-root (1000) and slide content; below floating overlay (1500) and popovers (~2000)
+      // Base only; the real value is computed per render from slide order.
+      video.style.zIndex = '1100';
       video.style.objectFit = 'cover';
       video.style.transformOrigin = '50% 50%';
       video.style.background = '#000';
@@ -9909,6 +9949,28 @@ function reattachWebcamStreams(){
     video.style.height = rect.height + 'px';
 
     // Mirror transform on video itself (no transform on host, so no double-scale).
+    // Z-ORDER. The pooled video is position:fixed on <body>, so it can't
+    // inherit the slide's stacking — it used a flat 1100 and therefore covered
+    // every slide element regardless of insertion order. That's why a list
+    // added after a large webcam appeared to vanish behind it. Derive the
+    // value from the element's position in the slide instead.
+    (function(){
+      var sl = S.pres ? S.slides[S.presSlide] : cs();
+      var idx = -1;
+      if(sl && sl.els){
+        for(var q = 0; q < sl.els.length; q++){ if(sl.els[q].id === id){ idx = q; break; } }
+      }
+      // #elsLayer (the transformed slide layer) sits at 1200 and forms its own
+      // stacking context, so ALL slide elements are above anything below that
+      // value. The pooled video must therefore land just under 1200 — visible
+      // over the slide background, beneath every element. Ordering among
+      // multiple webcams is preserved with a small offset.
+      video.style.zIndex = String(1150 + Math.max(0, idx));
+      // The element's own box would otherwise paint over its video.
+      var hostBox = document.querySelector('[data-wc-host="' + id + '"]');
+      if(hostBox) hostBox.style.background = 'transparent';
+    })();
+
     // Zoom composes with the mirror flip; both live in one transform.
     (function(){
       var zEl = ssFindEl(id);
@@ -9922,16 +9984,57 @@ function reattachWebcamStreams(){
       video.style.filter = wcEl ? (buildMediaFilterString(wcEl) || '') : '';
     })();
 
-    // Clip path / border radius from data-* attributes (set in renderWebcam)
+    // Shape + border. The video now sits BENEATH the element layer rather than
+    // inside the element's overflow:hidden box, so it has to clip itself and
+    // draw its own frame — otherwise a circular webcam renders as a square
+    // with no border. Radii are in screen px here (the video is
+    // position:fixed, outside the stage's scale transform), so anything taken
+    // from element units must be multiplied by stageScale.
     var shape = host.getAttribute('data-wc-shape') || 'circle';
     var br = parseInt(host.getAttribute('data-wc-br') || '14', 10);
+    var sc = (S.stageScale || 1);
+    var wcEl2 = ssFindEl(id);
+    var bw2 = wcEl2 && wcEl2.bw != null ? wcEl2.bw : 3;
+    var bStyle = (wcEl2 && wcEl2.borderStyle) || 'solid';
+    var bc1c = (wcEl2 && wcEl2.bc) || '#7ed957';
+
+    var isGrad = (bStyle === 'gradient' || bStyle === 'animated') && bw2 > 0;
     if(shape === 'circle'){
       video.style.borderRadius = '50%';
     } else if(shape === 'rect'){
       video.style.borderRadius = '0';
     } else {
-      video.style.borderRadius = br + 'px';
+      // Under a gradient ring the video sits INSIDE the frame, so its corner
+      // radius is the outer radius minus the border width — same relationship
+      // a solid border gets from box-sizing.
+      // The frame overlay sits on top with the outer radius; the video sits
+      // inside it, so its radius is reduced by the border width.
+      var effBr = bw2 > 0 ? Math.max(0, br - bw2) : br;
+      video.style.borderRadius = Math.round(effBr * sc) + 'px';
     }
+
+    // Solid borders are drawn on the video itself. Gradient/animated frames
+    // stay on the wrapper above (masked into a ring), so the video must not
+    // draw one as well — but it does have to shrink to sit inside that ring.
+    // Borders are drawn by an overlay leaf above the video now (so the shadow
+    // can hug the outside of the frame without a filter trapping the fixed
+    // video). Drawing one here as well would double the stroke.
+    video.style.border = 'none';
+
+    // Shadow goes on the VIDEO itself. It's the only opaque, correctly-shaped,
+    // correctly-positioned element in this stacking context — every attempt to
+    // cast it from the element layer failed because that layer is transparent
+    // (so box-shadow had no shape), and the workarounds each broke something
+    // else: drop-shadow needs a solid shape which then hid the camera, a ring
+    // cast inward as well as outward, and a mask on the same node clipped the
+    // filter away.
+    //
+    // The border is drawn by an overlay ABOVE the video, so a shadow here sits
+    // under that border rather than bleeding across the picture.
+    // Shadow is NOT on the video: it spreads past the video's edge and paints
+    // across the border from underneath. It goes on the border overlay, which
+    // is the outermost opaque shape.
+    video.style.boxShadow = '';
 
     // Attach stream and ensure it's playing
     if(video.srcObject !== stream){
@@ -9992,21 +10095,54 @@ async function populateWebcamDeviceList(elId){
 // Returns {x, y} that cascades down-and-right based on existing element count,
 // so successive adds don't perfectly stack. Wraps after 12 elements to stay on canvas.
 // `w` / `h` are the new element's dimensions so we can center the cascade origin.
+// Find a spot for a new element that doesn't bury an existing one. The old
+// behaviour was a fixed cascade from (240,160), so a new element frequently
+// landed straight on top of something already there — and if the newcomer was
+// a webcam, the thing underneath vanished completely.
 function getNextSpawnPos(w, h){
   var slide = cs();
-  var n = (slide && slide.els) ? slide.els.length : 0;
-  // Wrap after 12 elements so we don't drift off-screen
-  var step = n % 12;
-  // Base position: roughly 1/4 in from top-left of stage so cascade has room to grow
-  var baseX = 240, baseY = 160;
-  var dx = step * 35;
-  var dy = step * 30;
-  var x = baseX + dx;
-  var y = baseY + dy;
-  // Clamp inside stage so it's always visible
-  if(w && x + w > STAGE_W - 20) x = Math.max(20, STAGE_W - w - 20);
-  if(h && y + h > STAGE_H - 20) y = Math.max(20, STAGE_H - h - 20);
-  return { x: x, y: y };
+  var els = (slide && slide.els) ? slide.els : [];
+  w = w || 400; h = h || 300;
+  var M = 20;                                  // margin from stage edges
+  var maxX = Math.max(M, STAGE_W - w - M);
+  var maxY = Math.max(M, STAGE_H - h - M);
+
+  function overlaps(x, y){
+    for(var i = 0; i < els.length; i++){
+      var b = getElBounds(els[i]);
+      if(!b.w || !b.h) continue;
+      // Treat a small gap as still overlapping so elements don't end up
+      // touching edge-to-edge.
+      var pad = 12;
+      if(x < b.x + b.w + pad && x + w > b.x - pad &&
+         y < b.y + b.h + pad && y + h > b.y - pad) return true;
+    }
+    return false;
+  }
+
+  // 1. Preferred spots, in order: the classic cascade start, then a coarse
+  //    grid sweep across the stage.
+  var candidates = [{ x: Math.min(240, maxX), y: Math.min(160, maxY) }];
+  var stepX = Math.max(60, Math.round(w / 2));
+  var stepY = Math.max(60, Math.round(h / 2));
+  for(var gy = M; gy <= maxY; gy += stepY){
+    for(var gx = M; gx <= maxX; gx += stepX){
+      candidates.push({ x: gx, y: gy });
+    }
+  }
+  for(var c = 0; c < candidates.length; c++){
+    var p = candidates[c];
+    if(!overlaps(p.x, p.y)){
+      return { x: Math.round(Math.min(p.x, maxX)), y: Math.round(Math.min(p.y, maxY)) };
+    }
+  }
+
+  // 2. Everything is occupied — fall back to the cascade so it at least
+  //    offsets from the last element rather than landing exactly on it.
+  var step = els.length % 12;
+  var fx = Math.min(240 + step * 35, maxX);
+  var fy = Math.min(160 + step * 30, maxY);
+  return { x: Math.round(fx), y: Math.round(fy) };
 }
 window.getNextSpawnPos = getNextSpawnPos;
 
@@ -12354,8 +12490,15 @@ window.alignSelection = function(mode){
 // snapped until cursor moves more than SNAP_RELEASE_THRESHOLD beyond the
 // target. This eliminates the "flicker" where cursor wobble of 1-2 pixels
 // makes the element oscillate between snapped and unsnapped positions.
-var SNAP_ENGAGE_THRESHOLD = 8;     // pixels at stage scale — initial bite
-var SNAP_RELEASE_THRESHOLD = 18;   // pixels — must drag this far to break snap
+// 8px was measured in STAGE units then divided by stageScale, so on a 1920
+// stage shown at ~0.5 the real catch window was only ~4 screen px — hence
+// snapping that "doesn't catch". These are generous enough to feel magnetic
+// without fighting deliberate placement.
+var SNAP_ENGAGE_THRESHOLD = 14;    // pixels at stage scale — initial bite
+var SNAP_RELEASE_THRESHOLD = 26;   // pixels — must drag this far to break snap
+// Stage centre and edges get a wider catch than object-to-object, because
+// centring is the alignment people reach for most.
+var SNAP_CENTER_BONUS = 8;
 var SNAP_THRESHOLD = SNAP_ENGAGE_THRESHOLD;  // back-compat alias
 var GRID_SIZE = 20;
 
@@ -12492,11 +12635,14 @@ function computeSnap(movingIds, proposedDx, proposedDy){
   if(S.snapEnabled){
     var xTargets = [0, STAGE_W/2, STAGE_W];
     var yTargets = [0, STAGE_H/2, STAGE_H];
+    // Stage guides are the first three entries; anything beyond is an object.
+    var stageTargetCount = 3;
     others.forEach(function(el){
       var b = getElBounds(el);
       xTargets.push(b.x, b.x+b.w/2, b.x+b.w);
       yTargets.push(b.y, b.y+b.h/2, b.y+b.h);
     });
+    var bonus = SNAP_CENTER_BONUS / S.stageScale;
     // If we're currently snapped to a specific target, prefer staying on it
     // (use release threshold). If we drift further than release, drop the
     // snap and consider engaging on a different target with engage threshold.
@@ -12514,10 +12660,11 @@ function computeSnap(movingIds, proposedDx, proposedDy){
     }
     if(!bestX){
       // No sticky engagement — try fresh engagement at the smaller threshold
-      xTargets.forEach(function(tx){
+      xTargets.forEach(function(tx, ti){
+        var th = engageThreshold + (ti < stageTargetCount ? bonus : 0);
         [mx1, mcx, mx2].forEach(function(p){
           var d = tx - p;
-          if(Math.abs(d) < engageThreshold){
+          if(Math.abs(d) < th){
             if(!bestX || Math.abs(d) < Math.abs(bestX.d)){
               bestX = {d:d, tx:tx, kind:'object'};
             }
@@ -12537,10 +12684,11 @@ function computeSnap(movingIds, proposedDx, proposedDy){
       });
     }
     if(!bestY){
-      yTargets.forEach(function(ty){
+      yTargets.forEach(function(ty, ti){
+        var thy = engageThreshold + (ti < stageTargetCount ? bonus : 0);
         [my1, mcy, my2].forEach(function(p){
           var d = ty - p;
-          if(Math.abs(d) < engageThreshold){
+          if(Math.abs(d) < thy){
             if(!bestY || Math.abs(d) < Math.abs(bestY.d)){
               bestY = {d:d, ty:ty, kind:'object'};
             }
@@ -13185,6 +13333,39 @@ function pptxParseSlideRels(relsXml){
 }
 
 // Main import function: takes a .pptx File, returns array of EP slides.
+// Pull the speaker-note text out of a notesSlide part.
+// A notesSlide contains TWO placeholders: a thumbnail of the slide itself and
+// the notes body. Only the body (ph type="body") is wanted — taking all text
+// would prepend the slide's own content to every note.
+function pptxExtractNotesText(notesXml){
+  var doc = new DOMParser().parseFromString(notesXml, 'application/xml');
+  var shapes = doc.querySelectorAll('sp');
+  var bodyTxt = '';
+  var fallback = '';
+
+  for(var i = 0; i < shapes.length; i++){
+    var sp = shapes[i];
+    var ph = sp.querySelector('nvSpPr ph');
+    var phType = ph ? (ph.getAttribute('type') || '') : '';
+    if(phType === 'sldImg') continue;               // the slide thumbnail
+
+    var paras = sp.querySelectorAll('txBody p');
+    var lines = [];
+    for(var j = 0; j < paras.length; j++){
+      var runs = paras[j].querySelectorAll('t');
+      var line = '';
+      for(var k = 0; k < runs.length; k++) line += (runs[k].textContent || '');
+      lines.push(line);
+    }
+    var txt = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    if(!txt) continue;
+
+    if(phType === 'body'){ bodyTxt = txt; break; }
+    if(!fallback) fallback = txt;                    // unlabelled shape
+  }
+  return bodyTxt || fallback || '';
+}
+
 async function pptxImport(file){
   if(typeof JSZip === 'undefined'){
     throw new Error('JSZip not loaded');
@@ -13242,6 +13423,9 @@ async function pptxImport(file){
     imageMap[mp] = 'data:'+mime+';base64,'+b64;
   }
 
+  console.log('[EP][pptx] slide parts found:', slideFilePaths.length, slideFilePaths);
+  console.log('[EP][pptx] media files:', Object.keys(imageMap).length);
+
   // 4. Process each slide in order
   var newSlides = [];
   for(var si=0; si<slideFilePaths.length; si++){
@@ -13256,6 +13440,39 @@ async function pptxImport(file){
       slideRels = pptxParseSlideRels(relsXml);
     }
     var slide = pptxParseSlide(slideXml, imageMap, slideRels);
+    console.log('[EP][pptx] slide ' + (si+1) + '/' + slideFilePaths.length +
+                ' -> ' + ((slide && slide.els) ? slide.els.length : 'NULL') + ' element(s)');
+
+    // Speaker notes live in a SEPARATE part (ppt/notesSlides/notesSlideN.xml),
+    // linked from this slide's .rels — they are not in the slide XML at all,
+    // which is why importing dropped them.
+    try {
+      var notesTarget = null;
+      if(relsFile){
+        var rd = new DOMParser().parseFromString(relsXml, 'application/xml');
+        var rels = rd.querySelectorAll('Relationship');
+        for(var ri = 0; ri < rels.length; ri++){
+          var ty = rels[ri].getAttribute('Type') || '';
+          if(ty.indexOf('notesSlide') !== -1){
+            notesTarget = rels[ri].getAttribute('Target');
+            break;
+          }
+        }
+      }
+      if(notesTarget){
+        // Targets are relative to ppt/slides/, e.g. "../notesSlides/notesSlide1.xml"
+        var np = notesTarget.replace(/^\.\.\//, 'ppt/');
+        if(np.indexOf('ppt/') !== 0) np = 'ppt/notesSlides/' + np.split('/').pop();
+        var nf = zip.file(np);
+        if(nf){
+          var notesXml = await nf.async('string');
+          slide.notes = pptxExtractNotesText(notesXml);
+        }
+      }
+    } catch(e){
+      console.warn('[EP] Could not read notes for slide ' + (si+1) + ':', e);
+    }
+
     newSlides.push(slide);
   }
 
@@ -13275,6 +13492,13 @@ window.handlePptxImport = async function(evt){
     if(!imported || !imported.length){
       showToast('No slides found in file');
       return;
+    }
+    var _totalEls = imported.reduce(function(n, sl){ return n + ((sl.els && sl.els.length) || 0); }, 0);
+    var _withNotes = imported.filter(function(sl){ return sl.notes && sl.notes.trim(); }).length;
+    console.log('[EP][pptx] imported ' + imported.length + ' slide(s), ' +
+                _totalEls + ' element(s) total, ' + _withNotes + ' with notes');
+    if(_totalEls === 0){
+      console.warn('[EP][pptx] Slides parsed but every one is EMPTY — the shape parser matched nothing.');
     }
     // Ask user: replace current or append?
     var choice = confirm('Import ' + imported.length + ' slide' + (imported.length>1?'s':'') + '?\n\nClick OK to REPLACE current deck.\nClick Cancel to APPEND to existing deck.');
@@ -14400,7 +14624,13 @@ window.exportPPTX = async function(){
       '<Default Extension="jpeg" ContentType="image/jpeg"/>' +
       '<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>' +
       S.slides.map(function(_, i){
-        return '<Override PartName="/ppt/slides/slide' + (i+1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>';
+        var ov = '<Override PartName="/ppt/slides/slide' + (i+1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>';
+        // A notesSlide part MUST be declared here too, or PowerPoint reports
+        // the file as corrupt rather than just ignoring the notes.
+        if(S.slides[i] && S.slides[i].notes){
+          ov += '<Override PartName="/ppt/notesSlides/notesSlide' + (i+1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"/>';
+        }
+        return ov;
       }).join('') +
       '<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>' +
       '<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>' +
@@ -14507,12 +14737,45 @@ window.exportPPTX = async function(){
       zip.file('ppt/slides/slide' + (si+1) + '.xml', slideXml);
 
       // Slide rels
+      // Speaker notes: written as a notesSlide part and linked from the slide,
+      // so PowerPoint/Keynote/Slides show them. Without this a round trip
+      // through EP Presenter silently discarded every note.
+      var noteTxt = (S.slides[si] && S.slides[si].notes) ? String(S.slides[si].notes) : '';
       var slideRels =
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
         '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
         '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/slide' + (si+1) + '.jpeg"/>' +
+        (noteTxt ? '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/notesSlide' + (si+1) + '.xml"/>' : '') +
         '</Relationships>';
       zip.file('ppt/slides/_rels/slide' + (si+1) + '.xml.rels', slideRels);
+
+      if(noteTxt){
+        var noteParas = noteTxt.split(/\r?\n/).map(function(ln){
+          return '<a:p><a:r><a:rPr lang="en-US" dirty="0"/><a:t>' + esc(ln) + '</a:t></a:r></a:p>';
+        }).join('');
+        var notesXml =
+          '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<p:notes xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ' +
+          'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ' +
+          'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">' +
+          '<p:cSld><p:spTree>' +
+          '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>' +
+          '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/>' +
+          '<a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>' +
+          '<p:sp><p:nvSpPr>' +
+          '<p:cNvPr id="2" name="Notes Placeholder"/>' +
+          '<p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>' +
+          '<p:nvPr><p:ph type="body" idx="1"/></p:nvPr>' +
+          '</p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/>' + noteParas +
+          '</p:txBody></p:sp>' +
+          '</p:spTree></p:cSld></p:notes>';
+        zip.file('ppt/notesSlides/notesSlide' + (si+1) + '.xml', notesXml);
+        zip.file('ppt/notesSlides/_rels/notesSlide' + (si+1) + '.xml.rels',
+          '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+          '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="../slides/slide' + (si+1) + '.xml"/>' +
+          '</Relationships>');
+      }
     }
 
     showToast('Compressing PPTX...');
@@ -15084,17 +15347,111 @@ function renderWebcam(el, isPres){
   // follows the rounded/circular outline (not a square bbox). For circle
   // webcams the box-shadow with border-radius:50% naturally renders a
   // circular shadow — exactly the visual we want.
+  // Shadow belongs on the OUTERMOST box. Putting it on the video (which sits
+  // inside the gradient ring) made it bleed inward across the border instead
+  // of falling outside the element. The wrapper is transparent while a camera
+  // is live, so box-shadow alone would have nothing to hug — a matching
+  // drop-shadow filter is used instead, which follows the actual painted
+  // shape including the ring and rounded corners.
   var wcFx = buildMediaEffectStyle(el);
+  var wcRingShadow = '';   // plain box-shadow for the backing plate
+  if(hasStream){
+    // FINAL APPROACH: a solid "backing plate" sits behind the video at the
+    // element's exact size and shape, and carries an ordinary box-shadow.
+    //
+    // Everything before this fought CSS: box-shadow needs an opaque box (the
+    // frame is transparent so the video can show through from below);
+    // drop-shadow() needs a shape to trace, but a filled shape hides the
+    // camera, a ring casts inward as well as outward, and a mask on the same
+    // element clips the filter away entirely. A plate behind the video has
+    // none of those problems — the video covers it completely, so only its
+    // shadow is ever visible.
+    var _sh = el.shadow || {};
+    var _fx3 = el.effect3d || {};
+    var _layers = [];
+    if(_sh.on){
+      var _op = (typeof _sh.opacity === 'number') ? _sh.opacity : 0.4;
+      _layers.push((_sh.x||0) + 'px ' + ((_sh.y!=null)?_sh.y:8) + 'px ' +
+                   (_sh.blur||0) + 'px ' + applyOpacity(_sh.color || '#000000', _op));
+    }
+    if(_fx3.style === 'lift'){
+      var _d = (typeof _fx3.depth === 'number' ? _fx3.depth : 50) / 100;
+      _layers.push('0px ' + Math.round(4 + _d*8) + 'px ' + Math.round(8 + _d*16) + 'px ' +
+                   applyOpacity('#000000', 0.10 + _d*0.08));
+      _layers.push('0px ' + Math.round(12 + _d*20) + 'px ' + Math.round(28 + _d*40) + 'px ' +
+                   applyOpacity('#000000', 0.18 + _d*0.10));
+    }
+    wcRingShadow = _layers.join(', ');
+    wcFx = wcFx.replace(/box-shadow:[^;]+;?/, '');
+  }
+
   var h = '';
   if(useGradient){
     var gradBg = 'linear-gradient(135deg, '+bc1+' 0%, '+bc2+' 50%, '+bc1+' 100%)';
     var animClass = (borderStyle === 'animated') ? ' ep-border-anim' : '';
     // background-image (not the shorthand) so background-position is left to
     // the keyframe animation; background-size is on the class.
-    h += '<div class="ep-grad-border'+animClass+'" style="width:'+el.w+'px;height:'+el.h+'px;background-image:'+gradBg+';border-radius:'+borderRadius+';padding:'+bw+'px;box-sizing:border-box;'+wcFx+'">';
-    h += '<div class="wc-el" style="width:100%;height:100%;border:none;border-radius:'+(shape==='rect'?'0':(shape==='circle'?'50%':((el.br||14)-Math.min(bw,4))+'px'))+';box-sizing:border-box">';
+    // The gradient frame is a FILLED box; it only reads as a ring because an
+    // opaque child covers the middle. With a live camera that child is
+    // transparent (the video sits beneath this layer), so the fill covered the
+    // picture. CSS masking fought .ep-grad-border's background-size:300%, so
+    // instead the ring is produced the plain way: the gradient div is given
+    // ONLY the border band, and the middle is left as a hole by pushing the
+    // gradient behind a transparent inner box that clips it.
+    //
+    // Rather than mask, put the gradient on a pseudo-free wrapper and let the
+    // video's own border-radius show through the padding gap.
+    h += '<div class="ep-grad-border'+(hasStream ? '' : animClass)+'" style="width:'+el.w+'px;height:'+el.h+'px;' +
+         (hasStream ? '' : 'background-image:'+gradBg+';') +
+         'border-radius:'+borderRadius+';padding:'+bw+'px;box-sizing:border-box;'+wcFx+'">';
+    if(hasStream){
+      // Ring drawn as an absolutely-positioned overlay with a transparent
+      // centre: border-image paints the gradient into the border box only.
+      // The animation class lives on this ring div, not the outer wrapper —
+      // the wrapper no longer paints the gradient, so the keyframes had
+      // nothing to move and the border sat static on screen (it still
+      // animated in exports, which render the border on canvas per frame).
+      // background-size is required for the keyframes' background-position
+      // shift to have anywhere to travel.
+      // SHADOW and MASK must live on DIFFERENT elements. A mask clips the
+      // element's entire rendered output, drop-shadow included — so putting
+      // both here generated the shadow and then masked it away. This div is
+      // shadow-only: a plain rounded box the same size as the frame, sitting
+      // BEHIND everything, with no mask of its own.
+      if(wcRingShadow){
+        // The ring below is masked, and a mask clips box-shadow as well — so
+        // the shadow needs its own unmasked element. A 1px transparent-fill
+        // box at the frame's outline: nothing visible, but box-shadow is cast
+        // from its outer edge, which coincides with the frame's outer edge.
+        h += '<div style="position:absolute;inset:0;border-radius:'+borderRadius+';' +
+             'pointer-events:none;box-shadow:'+wcRingShadow+'"></div>';
+      }
+      // Ring div: mask only, no filter.
+      h += '<div class="ep-grad-border'+animClass+'" style="position:absolute;inset:0;' +
+           'border-radius:'+borderRadius+';padding:'+bw+'px;background-image:'+gradBg+';' +
+           'background-size:300% 300%;pointer-events:none;' +
+           '-webkit-mask:linear-gradient(#fff,#fff) content-box,linear-gradient(#fff,#fff);' +
+           '-webkit-mask-composite:xor;mask:linear-gradient(#fff,#fff) content-box,linear-gradient(#fff,#fff);' +
+           'mask-composite:exclude;box-sizing:border-box"></div>';
+    }
+    h += '<div class="wc-el'+(hasStream?' wc-live':'')+'" style="width:100%;height:100%;border:none;border-radius:'+(shape==='rect'?'0':(shape==='circle'?'50%':((el.br||14)-Math.min(bw,4))+'px'))+';box-sizing:border-box">';
   } else {
-    h += '<div class="wc-el" style="width:'+el.w+'px;height:'+el.h+'px;border:'+bw+'px solid '+bc1+';border-radius:'+borderRadius+';box-sizing:border-box;'+wcFx+'">';
+    // With a live stream the pooled video draws its own solid border (it sits
+    // beneath this layer and would otherwise be un-framed). Drawing it here as
+    // well would double the stroke, so the wrapper goes borderless.
+    h += '<div class="wc-el'+(hasStream?' wc-live':'')+'" style="width:'+el.w+'px;height:'+el.h+'px;border:' +
+         (hasStream ? 'none' : (bw+'px solid '+bc1)) +
+         ';border-radius:'+borderRadius+';box-sizing:border-box;'+(hasStream?'':wcFx)+'">';
+    if(hasStream && (bw > 0 || wcRingShadow)){
+      // The border overlay carries the shadow. box-shadow is cast from an
+      // element's OUTER edge, so on the outermost shape it can only ever fall
+      // outside the frame — never across the border, which is what happened
+      // when it lived on the video underneath.
+      h += '<div style="position:absolute;inset:0;pointer-events:none;box-sizing:border-box;' +
+           'border-radius:'+borderRadius+';' +
+           (bw > 0 ? 'border:'+bw+'px solid '+bc1+';' : '') +
+           (wcRingShadow ? 'box-shadow:'+wcRingShadow+';' : '') + '"></div>';
+    }
   }
 
   if(hasStream){
@@ -19239,6 +19596,21 @@ function drawMediaElementWithEffects(mainCtx, el, x, y, w, h, drawClippedFn){
   _mfxScale = Math.max(1, Math.min(4, _mfxScale));
   var ow = Math.max(1, Math.round(_mfxW * _mfxScale));
   var oh = Math.max(1, Math.round(_mfxH * _mfxScale));
+
+  // PAD the offscreen. ctx.filter drop-shadow paints OUTSIDE the source's
+  // bounds, so an offscreen sized exactly to the element clipped the shadow
+  // away entirely — which is why shadows showed on screen (CSS box-shadow,
+  // unclipped) but never in exported video.
+  var _shp = el.shadow || {};
+  var _fxp = el.effect3d || {};
+  var _liftOn = _fxp.style === 'lift';
+  var _blurMax = Math.max(_shp.on ? (_shp.blur || 0) : 0, _liftOn ? 108 : 0);
+  var _offMax  = Math.max(_shp.on ? Math.abs(_shp.x || 0) : 0,
+                          _shp.on ? Math.abs(_shp.y || 0) : 0, _liftOn ? 56 : 0);
+  var _padEl = Math.ceil(_blurMax + _offMax + 16);        // element units
+  var _pad   = Math.ceil(_padEl * _mfxScale);             // device px
+  ow += _pad * 2; oh += _pad * 2;
+
   if(!_mediaFxOffscreen){
     _mediaFxOffscreen = document.createElement('canvas');
   }
@@ -19254,7 +19626,8 @@ function drawMediaElementWithEffects(mainCtx, el, x, y, w, h, drawClippedFn){
   octx.imageSmoothingEnabled = true;
   octx.imageSmoothingQuality = 'high';
   // Callback keeps working in element units — it never has to know about DPR.
-  octx.setTransform(_mfxScale, 0, 0, _mfxScale, 0, 0);
+  // Offset by the padding so the element sits centred in the larger canvas.
+  octx.setTransform(_mfxScale, 0, 0, _mfxScale, _pad, _pad);
   drawClippedFn(octx, _mfxW, _mfxH);
   octx.setTransform(1, 0, 0, 1, 0, 0);
 
@@ -19269,9 +19642,10 @@ function drawMediaElementWithEffects(mainCtx, el, x, y, w, h, drawClippedFn){
 
   mainCtx.save();
   mainCtx.filter = entry.filter;
-  // Explicit dest width/height — the offscreen is now larger than the element
-  // box, so drawing it at natural size would blow the element up.
-  mainCtx.drawImage(oc, x, y, _mfxW, _mfxH);
+  // Draw back at the padded position so the element lands exactly where it
+  // would have without padding, with the shadow spreading into the margin.
+  mainCtx.drawImage(oc, x - _padEl, y - _padEl,
+                    _mfxW + _padEl * 2, _mfxH + _padEl * 2);
   mainCtx.restore();
 }
 
@@ -19555,7 +19929,7 @@ function renderElsHtml(slide, isPres){
       // must have pointer-events:none so it doesn't swallow clicks on shapes
       // underneath — only the .line-hit SVG element catches clicks (it has its
       // own pointer-events:stroke which is narrowly scoped to the line itself).
-      h += '<div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:'+(i+2)+'"';
+      h += '<div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:'+(1100+i*10)+'"';
       if(!isPres) h += ' oncontextmenu="showContext(event,\''+el.id+'\')"';
       h += '>';
       h += renderElInner(el, isPres, slide);
@@ -19577,7 +19951,16 @@ function renderElsHtml(slide, isPres){
     if(el.revealAnim){
       elAnimClass = ' ep-anim-' + el.revealAnim;
     }
-    h += '<div class="el'+(sel?' sel':'')+(el.lk?' locked':'')+(isRevealing ? ' ep-revealing' : '')+elAnimClass+'" style="left:'+el.x+'px;top:'+el.y+'px;z-index:'+(i+2)+';pointer-events:'+pe+'"';
+    // Slide elements share the 1100+ band with pooled webcam videos (which are
+    // position:fixed and can't inherit stacking). Using i+2 here put every
+    // element below every webcam, so anything inserted after a webcam looked
+    // invisible. Same base + index keeps true insertion order across types.
+    // Slide elements share the global stacking space with pooled media videos
+    // (position:fixed on <body>; the stage has z-index:auto so there is no
+    // local context to shield them). Both use 1100+index, so a list inserted
+    // after a webcam genuinely lands above it. Verified via computed styles:
+    // webcam 1100, list 1101.
+    h += '<div class="el'+(sel?' sel':'')+(el.lk?' locked':'')+(isRevealing ? ' ep-revealing' : '')+elAnimClass+'" style="left:'+el.x+'px;top:'+el.y+'px;z-index:'+(1100+i*10)+';pointer-events:'+pe+'"';
     if(!isPres){
       // Phase 4e: hover tooltip for grouped elements — reminds the user that
       // Alt+click drills into a single piece. Shows on every hover so the
@@ -19933,7 +20316,14 @@ function render(){
   h += '<div style="flex:1;display:flex;flex-direction:column;min-width:0">';
   h += '<div class="canvas-stage" id="stageContainer">';
   h += '<div class="canvas" id="canvasStage" style="width:'+(STAGE_W*S.stageScale)+'px;height:'+(STAGE_H*S.stageScale)+'px;background:'+s.bg+';cursor:'+cursor+'" onmousedown="onCanvasDown(event)">';
-  h += '<div id="elsLayer" style="position:absolute;inset:0;transform:scale('+S.stageScale+');transform-origin:0 0;width:'+STAGE_W+'px;height:'+STAGE_H+'px">';
+  // z-index here is ESSENTIAL. This div carries transform:scale(), which
+  // creates a stacking context — so every slide element inside it is flattened
+  // into ONE layer when compared against anything outside. Pooled media videos
+  // are position:fixed on <body> at 1100+, so without a z-index of its own this
+  // whole layer counted as `auto` and sat below them: a chart at z-index 1120
+  // still rendered behind a webcam's video. Per-element z-index only ever
+  // ordered elements against each other INSIDE this context.
+  h += '<div id="elsLayer" style="position:absolute;inset:0;transform:scale('+S.stageScale+');transform-origin:0 0;width:'+STAGE_W+'px;height:'+STAGE_H+'px;z-index:1200">';
   syncAllConnectors(s);
   h += renderElsHtml(s, false);
   h += '</div>';
@@ -21493,6 +21883,26 @@ function renderPropsPanel(el){
 
   // Common actions
   h += '<div class="ps"><div class="ps-t">Actions</div>';
+  // Layer controls — stacking is array order, so these just move the element
+  // within slide.els.
+  var _li = -1, _lslide = cs();
+  if(_lslide && _lslide.els){
+    for(var _q = 0; _q < _lslide.els.length; _q++){ if(_lslide.els[_q].id === el.id){ _li = _q; break; } }
+  }
+  var _ln = _lslide && _lslide.els ? _lslide.els.length : 0;
+  h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:8px 0 4px">Layer ' + (_li+1) + ' of ' + _ln + '</div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:5px">';
+  h += '<button class="sp-btn" ' + (_li >= _ln-1 ? 'disabled style="opacity:.4" ' : '') +
+       'onclick="elToFront(\''+el.id+'\')" data-tip="Bring to front">&#9650; Front</button>';
+  h += '<button class="sp-btn" ' + (_li <= 0 ? 'disabled style="opacity:.4" ' : '') +
+       'onclick="elToBack(\''+el.id+'\')" data-tip="Send to back">&#9660; Back</button>';
+  h += '</div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px">';
+  h += '<button class="sp-btn" ' + (_li >= _ln-1 ? 'disabled style="opacity:.4" ' : '') +
+       'onclick="elLayerBy(\''+el.id+'\',1)">Forward</button>';
+  h += '<button class="sp-btn" ' + (_li <= 0 ? 'disabled style="opacity:.4" ' : '') +
+       'onclick="elLayerBy(\''+el.id+'\',-1)">Backward</button>';
+  h += '</div>';
   h += '<button class="sp-btn" style="width:100%;margin-bottom:5px" onclick="duplicateEl(\''+el.id+'\')">Duplicate</button>';
   h += '<button class="sp-btn" style="width:100%;margin-bottom:5px" onclick="toggleLock(\''+el.id+'\')">'+(el.lk?'Unlock':'Lock')+'</button>';
   h += '<button class="sp-btn del" style="width:100%" onclick="deleteEl(\''+el.id+'\')">Delete</button>';
@@ -25228,6 +25638,117 @@ function showStartupModal(savedDraft, onDone){
 }
 
 // Lets users reset their startup preference from a menu / keyboard shortcut
+// =========================================================
+// DRAG AND DROP FILE OPENING
+// Drop a .pptx, .json deck, video or image anywhere on the window.
+// Reuses the existing import handlers by synthesising the event shape they
+// expect, so there's one code path per file type rather than two.
+// =========================================================
+(function(){
+  var dz = null;
+  function showDropZone(msg){
+    if(!dz){
+      dz = document.createElement('div');
+      dz.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(10,10,12,0.82);' +
+        'backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;' +
+        'pointer-events:none;font-family:Outfit,sans-serif';
+      dz.innerHTML = '<div style="border:2px dashed #7ed957;border-radius:16px;padding:38px 54px;' +
+        'text-align:center;background:rgba(16,16,20,0.9)">' +
+        '<div style="font-size:34px;margin-bottom:10px">&#128228;</div>' +
+        '<div id="epDropMsg" style="color:#7ed957;font-size:16px;font-weight:700;letter-spacing:0.5px"></div>' +
+        '<div style="color:#8a8a99;font-size:11px;margin-top:8px">' +
+        'PowerPoint (.pptx) &middot; Deck (.json) &middot; Video &middot; Image</div></div>';
+      document.body.appendChild(dz);
+    }
+    var m = dz.querySelector('#epDropMsg');
+    if(m) m.textContent = msg || 'Drop to open';
+    dz.style.display = 'flex';
+  }
+  function hideDropZone(){ if(dz) dz.style.display = 'none'; }
+
+  // Only react to real file drags, not text or element drags within the app.
+  function isFileDrag(e){
+    if(!e.dataTransfer) return false;
+    var t = e.dataTransfer.types;
+    if(!t) return false;
+    for(var i = 0; i < t.length; i++){ if(t[i] === 'Files') return true; }
+    return false;
+  }
+
+  var depth = 0;
+  window.addEventListener('dragenter', function(e){
+    if(!isFileDrag(e)) return;
+    e.preventDefault();
+    depth++;
+    showDropZone('Drop to open');
+  });
+  window.addEventListener('dragover', function(e){
+    if(!isFileDrag(e)) return;
+    e.preventDefault();
+    try { e.dataTransfer.dropEffect = 'copy'; } catch(err){}
+  });
+  window.addEventListener('dragleave', function(e){
+    if(!isFileDrag(e)) return;
+    depth = Math.max(0, depth - 1);
+    if(depth === 0) hideDropZone();
+  });
+
+  window.addEventListener('drop', function(e){
+    if(!isFileDrag(e)) return;
+    e.preventDefault();
+    depth = 0;
+    hideDropZone();
+    var f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if(!f) return;
+    var name = (f.name || '').toLowerCase();
+    // The import handlers read evt.target.files and clear evt.target.value,
+    // so hand them an object with that shape.
+    var fake = { target: { files: [f], value: '' } };
+
+    if(name.endsWith('.pptx')){
+      if(typeof window.handlePptxImport === 'function') window.handlePptxImport(fake);
+      else showToast('PowerPoint import unavailable');
+    } else if(name.endsWith('.json')){
+      if(typeof window.loadPresentation === 'function') window.loadPresentation(fake);
+      else showToast('Deck loading unavailable');
+    } else if(f.type.indexOf('video/') === 0){
+      if(typeof window.handleVideoUpload === 'function') window.handleVideoUpload(fake);
+      else showToast('Video insert unavailable');
+    } else if(f.type.indexOf('image/') === 0){
+      if(typeof window.handleImageUpload === 'function') window.handleImageUpload(fake);
+      else showToast('Image insert unavailable');
+    } else {
+      showToast('Unsupported file type: ' + (f.name || ''));
+    }
+  });
+})();
+
+// epSnapDebug() logs live snap maths while dragging: where the element centre
+// is, where the stage centre is, the active threshold, and which guides fired.
+window.epSnapDebug = function(on){
+  window._epSnapDebug = (on !== false);
+  console.log('[snap] debug', window._epSnapDebug ? 'ON — drag an element' : 'OFF');
+  console.log('[snap] snapEnabled =', S.snapEnabled, ' gridSnapEnabled =', S.gridSnapEnabled,
+              ' stageScale =', S.stageScale);
+};
+
+// epZDebug() prints the z-index actually applied to each element on the slide.
+window.epZDebug = function(){
+  var slide = S.pres ? S.slides[S.presSlide] : cs();
+  if(!slide) return;
+  var rows = slide.els.map(function(e, i){
+    var node = document.querySelector('.el [id="wc-video-' + e.id + '"], .el');
+    var pooled = document.getElementById('wc-video-' + e.id) ||
+                 document.getElementById('ss-video-' + e.id);
+    return {
+      i: i, type: e.type, id: e.id.slice(0,6),
+      expectedZ: 1100 + i,
+      pooledZ: pooled ? (pooled.style.zIndex || '(none)') : '-'
+    };
+  });
+  console.table ? console.table(rows) : console.log(rows);
+};
+
 window.resetStartupPreference = function(){
   try { localStorage.removeItem(STARTUP_PREF_KEY); } catch(e){}
   showToast('Startup preference cleared — you will be asked next launch');
