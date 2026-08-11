@@ -138,7 +138,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 /* A visible edge and surrounding shadow so the slide boundary is obvious —
    previously the canvas and the workspace were near-identical dark greys,
    which made content look like it ran into the panel. */
-.canvas{position:relative;background:#111;box-shadow:0 0 0 1px rgba(255,255,255,0.10),0 16px 50px rgba(0,0,0,0.65);border-radius:4px;overflow:hidden}
+/* No background here: the shorthand would reset background-image, and the
+   slide's own background (colour, gradient, pattern or image) is applied
+   inline per render. */
+.canvas{position:relative;background-color:#111;box-shadow:0 0 0 1px rgba(255,255,255,0.10),0 16px 50px rgba(0,0,0,0.65);border-radius:4px;overflow:hidden}
 .canvas-stage{background:#08080a}
 .draw-canvas{position:absolute;inset:0;pointer-events:none;z-index:100}
 .draw-canvas.active{pointer-events:auto;cursor:none}
@@ -584,6 +587,28 @@ body.ep-speed-slow{--ep-trans-dur:1.1s;--ep-reveal-dur:0.85s}
    that follows any shape (circle, rounded rect, sharp rect). */
 .ep-grad-border{display:block;position:relative;background-size:300% 300%;background-position:0% 50%}
 .ep-grad-border.ep-border-anim{animation:ep-border-shift 4s linear infinite;will-change:background-position}
+/* Slide background animations. Purely decorative and paused during recording
+   composition, since the canvas export paints a static frame. */
+@keyframes ep-bg-aurora{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+@keyframes ep-bg-drift{0%{background-position:0% 0%}50%{background-position:100% 100%}100%{background-position:0% 0%}}
+@keyframes ep-bg-pulse{0%,100%{background-size:150% 150%;opacity:0.9}50%{background-size:185% 185%;opacity:1}}
+@keyframes ep-bg-sweep{0%{background-position:-60% 0}100%{background-position:160% 0}}
+@keyframes ep-bg-waves{0%{background-position:0% 0%}33%{background-position:60% 40%}66%{background-position:30% 80%}100%{background-position:0% 0%}}
+@keyframes ep-bg-orbs{0%{background-position:0% 0%,100% 0%,50% 100%,0% 100%}
+  33%{background-position:30% 20%,70% 30%,30% 70%,60% 80%}
+  66%{background-position:60% 40%,30% 60%,70% 40%,20% 50%}
+  100%{background-position:0% 0%,100% 0%,50% 100%,0% 100%}}
+@keyframes ep-bg-plasma{0%{background-position:0% 50%;filter:hue-rotate(0deg)}
+  50%{background-position:100% 50%;filter:hue-rotate(25deg)}
+  100%{background-position:0% 50%;filter:hue-rotate(0deg)}}
+@keyframes ep-bg-beams{0%{background-position:0 0,0 0}100%{background-position:400px 0,-400px 0}}
+@keyframes ep-bg-grid{0%{background-position:0 0,0 0}100%{background-position:54px 54px,54px 54px}}
+@keyframes ep-bg-nebula{0%,100%{background-position:0% 0%,100% 100%,50% 100%}
+  50%{background-position:40% 30%,60% 60%,30% 60%}}
+@keyframes ep-bg-ripple{0%{background-size:110% 110%;opacity:0.9}100%{background-size:190% 190%;opacity:0.25}}
+@keyframes ep-bg-dots{0%{background-position:0 0,0 0}100%{background-position:40px 70px,-70px 40px}}
+@keyframes ep-bg-scan{0%{background-position:0 0}100%{background-position:0 200%}}
+@keyframes ep-bg-hue{0%{filter:hue-rotate(0deg)}50%{filter:hue-rotate(40deg)}100%{filter:hue-rotate(0deg)}}
 @keyframes ep-border-shift{
   0%{background-position:0% 50%}
   50%{background-position:100% 50%}
@@ -717,7 +742,7 @@ select option:hover{background:#22272e}
 
 /* ========= PRESENTATION MODE ========= */
 .pres-root{position:fixed;inset:0;background:#000;z-index:1000;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.pres-stage{position:relative;background:#111;overflow:hidden}
+.pres-stage{position:relative;background-color:#111;overflow:hidden}
 .pres-el{position:absolute}
 .pres-hud{position:fixed;top:16px;right:16px;color:var(--w);font-size:12px;background:rgba(0,0,0,.72);padding:6px 12px;border-radius:8px;font-weight:600;letter-spacing:0.5px;z-index:1100;pointer-events:none}
 
@@ -2398,6 +2423,228 @@ function buildTemplateChartShowcase(theme){
 // are NOT applied to existing chart palettes or shape fills (see scope note in
 // applyThemeToSlide). The dark palette mirrors current defaults so applying
 // "Dark" to a fresh slide is effectively a no-op.
+// =========================================================
+// SLIDE BACKGROUNDS
+// slide.bgType: 'color' | 'gradient' | 'pattern' | 'animated' | 'image'
+// slide.bg stays the flat colour and is used as the fallback everywhere
+// (canvas export, thumbnails), so old decks keep working untouched.
+// Each preset takes the THEME's accent colours, so backgrounds and themes stay
+// consistent instead of being two unrelated pickers.
+// =========================================================
+var BG_PRESETS = {
+  // ---- Gradients (static, export identically) ----
+  'grad-soft':    { label:'Soft Fade',    type:'gradient',
+    css:function(p){ return 'linear-gradient(160deg, '+p.slideBg+' 0%, '+shadeColor(p.slideBg, 14)+' 100%)'; } },
+  'grad-accent':  { label:'Accent Wash',  type:'gradient',
+    css:function(p){ return 'linear-gradient(135deg, '+p.slideBg+' 55%, '+applyOpacity(p.accentPrimary,0.18)+' 100%)'; } },
+  'grad-duo':     { label:'Duotone',      type:'gradient',
+    css:function(p){ return 'linear-gradient(120deg, '+applyOpacity(p.accentPrimary,0.22)+' 0%, '+p.slideBg+' 45%, '+applyOpacity(p.accentSecondary,0.20)+' 100%)'; } },
+  'grad-spot':    { label:'Spotlight',    type:'gradient',
+    css:function(p){ return 'radial-gradient(ellipse at 50% 35%, '+shadeColor(p.slideBg, 22)+' 0%, '+p.slideBg+' 70%)'; } },
+  'grad-corner':  { label:'Corner Glow',  type:'gradient',
+    css:function(p){ return 'radial-gradient(circle at 0% 0%, '+applyOpacity(p.accentPrimary,0.20)+' 0%, transparent 45%), radial-gradient(circle at 100% 100%, '+applyOpacity(p.accentSecondary,0.18)+' 0%, transparent 45%)'; } },
+  'grad-vignette':{ label:'Vignette',     type:'gradient',
+    css:function(p){ return 'radial-gradient(ellipse at center, '+shadeColor(p.slideBg,10)+' 40%, '+shadeColor(p.slideBg,-25)+' 100%)'; } },
+
+  // ---- Patterns (static) ----
+  'pat-grid':     { label:'Grid',         type:'pattern',
+    css:function(p){ return 'linear-gradient('+applyOpacity(p.borderStrong,0.10)+' 1px, transparent 1px), linear-gradient(90deg, '+applyOpacity(p.borderStrong,0.10)+' 1px, transparent 1px)'; },
+    size:'44px 44px, 44px 44px, auto' },
+  'pat-dots':     { label:'Dots',         type:'pattern',
+    css:function(p){ return 'radial-gradient('+applyOpacity(p.borderStrong,0.16)+' 1.5px, transparent 1.6px)'; },
+    size:'26px 26px, auto' },
+  'pat-diag':     { label:'Diagonal',     type:'pattern',
+    css:function(p){ return 'repeating-linear-gradient(45deg, '+applyOpacity(p.borderStrong,0.06)+' 0 2px, transparent 2px 14px)'; } },
+  'pat-topo':     { label:'Contour',      type:'pattern',
+    css:function(p){ return 'repeating-radial-gradient(circle at 30% 40%, transparent 0 22px, '+applyOpacity(p.accentPrimary,0.05)+' 22px 24px)'; } },
+  'pat-mesh':     { label:'Mesh',         type:'pattern',
+    css:function(p){ return 'radial-gradient(at 20% 20%, '+applyOpacity(p.accentPrimary,0.16)+' 0px, transparent 50%), radial-gradient(at 80% 15%, '+applyOpacity(p.accentSecondary,0.14)+' 0px, transparent 50%), radial-gradient(at 65% 85%, '+applyOpacity(p.accentTertiary,0.12)+' 0px, transparent 50%)'; } },
+
+  // ---- Animated ----
+  // NOTE: these animate on screen and in the live presentation. The recording
+  // path paints a static frame from slide.bg, so exports show the base colour.
+  'anim-aurora':  { label:'Aurora',       type:'animated', anim:'ep-bg-aurora 18s ease infinite',
+    css:function(p){ return 'linear-gradient(120deg, '+applyOpacity(p.accentPrimary,0.20)+', '+p.slideBg+' 40%, '+applyOpacity(p.accentSecondary,0.18)+' 70%, '+p.slideBg+')'; },
+    size:'300% 300%' },
+  'anim-drift':   { label:'Slow Drift',   type:'animated', anim:'ep-bg-drift 30s linear infinite',
+    css:function(p){ return 'radial-gradient(circle at 25% 30%, '+applyOpacity(p.accentPrimary,0.16)+' 0%, transparent 40%), radial-gradient(circle at 75% 70%, '+applyOpacity(p.accentSecondary,0.14)+' 0%, transparent 40%)'; },
+    size:'200% 200%' },
+  'anim-pulse':   { label:'Pulse',        type:'animated', anim:'ep-bg-pulse 8s ease-in-out infinite',
+    css:function(p){ return 'radial-gradient(ellipse at 50% 50%, '+applyOpacity(p.accentPrimary,0.14)+' 0%, transparent 60%)'; },
+    size:'160% 160%' },
+  'anim-sweep':   { label:'Light Sweep',  type:'animated', anim:'ep-bg-sweep 12s linear infinite',
+    css:function(p){ return 'linear-gradient(100deg, transparent 30%, '+applyOpacity(p.accentPrimary,0.14)+' 50%, transparent 70%)'; },
+    size:'250% 100%' },
+  'anim-waves':   { label:'Waves',        type:'animated', anim:'ep-bg-waves 22s ease-in-out infinite',
+    css:function(p){ return 'linear-gradient(60deg, '+applyOpacity(p.accentPrimary,0.14)+' 0%, transparent 35%), linear-gradient(200deg, '+applyOpacity(p.accentSecondary,0.12)+' 0%, transparent 40%)'; },
+    size:'220% 220%' },
+  'anim-noir':    { label:'Noir Drift',   type:'animated', anim:'ep-bg-drift 40s linear infinite',
+    css:function(p){ return 'radial-gradient(circle at 30% 20%, '+shadeColor(p.slideBg,26)+' 0%, transparent 45%), radial-gradient(circle at 70% 80%, '+shadeColor(p.slideBg,18)+' 0%, transparent 45%)'; },
+    size:'180% 180%' },
+
+  // ---- Animated abstract / motion-graphic style ----
+  'anim-orbs':    { label:'Floating Orbs', type:'animated', anim:'ep-bg-orbs 26s ease-in-out infinite',
+    css:function(p){ return 'radial-gradient(circle at 18% 28%, '+applyOpacity(p.accentPrimary,0.28)+' 0%, transparent 22%), ' +
+      'radial-gradient(circle at 78% 22%, '+applyOpacity(p.accentSecondary,0.24)+' 0%, transparent 20%), ' +
+      'radial-gradient(circle at 62% 74%, '+applyOpacity(p.accentTertiary,0.22)+' 0%, transparent 24%), ' +
+      'radial-gradient(circle at 30% 82%, '+applyOpacity(p.accentPrimary,0.18)+' 0%, transparent 18%)'; },
+    size:'170% 170%' },
+  'anim-plasma':  { label:'Plasma',        type:'animated', anim:'ep-bg-plasma 20s ease infinite',
+    css:function(p){ return 'conic-gradient(from 0deg at 30% 40%, '+applyOpacity(p.accentPrimary,0.22)+', transparent 30%, '+applyOpacity(p.accentSecondary,0.20)+' 55%, transparent 75%, '+applyOpacity(p.accentTertiary,0.18)+')'; },
+    size:'200% 200%' },
+  'anim-beams':   { label:'Light Beams',   type:'animated', anim:'ep-bg-beams 16s linear infinite',
+    css:function(p){ return 'repeating-linear-gradient(75deg, transparent 0 60px, '+applyOpacity(p.accentPrimary,0.07)+' 60px 70px, transparent 70px 140px), ' +
+      'repeating-linear-gradient(105deg, transparent 0 90px, '+applyOpacity(p.accentSecondary,0.05)+' 90px 100px, transparent 100px 190px)'; },
+    size:'220% 220%' },
+  'anim-grid3d':  { label:'Moving Grid',   type:'animated', anim:'ep-bg-grid 14s linear infinite',
+    css:function(p){ return 'linear-gradient('+applyOpacity(p.accentPrimary,0.14)+' 1px, transparent 1px), ' +
+      'linear-gradient(90deg, '+applyOpacity(p.accentPrimary,0.14)+' 1px, transparent 1px)'; },
+    size:'54px 54px, 54px 54px' },
+  'anim-nebula':  { label:'Nebula',        type:'animated', anim:'ep-bg-nebula 34s ease-in-out infinite',
+    css:function(p){ return 'radial-gradient(ellipse 60% 40% at 25% 30%, '+applyOpacity(p.accentPrimary,0.24)+' 0%, transparent 60%), ' +
+      'radial-gradient(ellipse 50% 60% at 75% 65%, '+applyOpacity(p.accentTertiary,0.22)+' 0%, transparent 60%), ' +
+      'radial-gradient(ellipse 70% 50% at 50% 90%, '+applyOpacity(p.accentSecondary,0.18)+' 0%, transparent 60%)'; },
+    size:'240% 240%' },
+  'anim-ripple':  { label:'Ripple',        type:'animated', anim:'ep-bg-ripple 12s ease-out infinite',
+    css:function(p){ return 'repeating-radial-gradient(circle at 50% 50%, transparent 0 40px, '+applyOpacity(p.accentPrimary,0.08)+' 40px 42px)'; },
+    size:'150% 150%' },
+  'anim-dots':    { label:'Drifting Dots', type:'animated', anim:'ep-bg-dots 24s linear infinite',
+    css:function(p){ return 'radial-gradient('+applyOpacity(p.accentPrimary,0.22)+' 2px, transparent 2.5px), ' +
+      'radial-gradient('+applyOpacity(p.accentSecondary,0.16)+' 1.5px, transparent 2px)'; },
+    size:'40px 40px, 70px 70px' },
+  'anim-mesh2':   { label:'Mesh Flow',     type:'animated', anim:'ep-bg-aurora 28s ease infinite',
+    css:function(p){ return 'radial-gradient(at 15% 20%, '+applyOpacity(p.accentPrimary,0.26)+' 0px, transparent 45%), ' +
+      'radial-gradient(at 85% 10%, '+applyOpacity(p.accentSecondary,0.22)+' 0px, transparent 45%), ' +
+      'radial-gradient(at 70% 85%, '+applyOpacity(p.accentTertiary,0.20)+' 0px, transparent 45%), ' +
+      'radial-gradient(at 20% 90%, '+applyOpacity(p.accentPrimary,0.16)+' 0px, transparent 45%)'; },
+    size:'260% 260%' },
+  'anim-scan':    { label:'Scanlines',     type:'animated', anim:'ep-bg-scan 8s linear infinite',
+    css:function(p){ return 'repeating-linear-gradient(0deg, '+applyOpacity(p.accentPrimary,0.05)+' 0 2px, transparent 2px 6px)'; },
+    size:'100% 200%' },
+  'anim-shift':   { label:'Colour Shift',  type:'animated', anim:'ep-bg-hue 24s linear infinite',
+    css:function(p){ return 'linear-gradient(135deg, '+applyOpacity(p.accentPrimary,0.20)+' 0%, '+applyOpacity(p.accentSecondary,0.16)+' 50%, '+applyOpacity(p.accentTertiary,0.20)+' 100%)'; },
+    size:'100% 100%' }
+};
+
+// Lighten (positive) or darken (negative) a hex colour by a percentage.
+function shadeColor(hex, pct){
+  try {
+    var h = String(hex).replace('#','');
+    if(h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    var r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+    var f = pct / 100;
+    r = Math.round(Math.min(255, Math.max(0, r + 255*f)));
+    g = Math.round(Math.min(255, Math.max(0, g + 255*f)));
+    b = Math.round(Math.min(255, Math.max(0, b + 255*f)));
+    return 'rgb('+r+','+g+','+b+')';
+  } catch(e){ return hex; }
+}
+
+// Build the CSS for a slide's background, resolved against its theme palette.
+// Canvas equivalent of buildSlideBgStyle, so recordings and PNG/PDF exports
+// carry the same background as the editor.
+function paintSlideBgToCanvas(x, slide, W, H){
+  if(!slide) return;
+  var type = slide.bgType || 'color';
+  if(type === 'color') return;                 // flat fill already applied
+  if(type === 'image' && slide._bgImageEl && slide._bgImageEl.complete){
+    var im = slide._bgImageEl;
+    var fit = slide.bgImageFit || 'cover';
+    if(fit === 'tile'){
+      var tw = W * ((slide.bgTileSize || 20) / 100);
+      var th = tw * (im.height / im.width);
+      x.save();
+      for(var ty = 0; ty < H; ty += th){
+        for(var tx2 = 0; tx2 < W; tx2 += tw){ x.drawImage(im, tx2, ty, tw, th); }
+      }
+      x.restore();
+      return;
+    }
+    var sc = (fit === 'contain') ? Math.min(W/im.width, H/im.height)
+                                 : Math.max(W/im.width, H/im.height);
+    var dw = im.width*sc, dh = im.height*sc;
+    x.drawImage(im, (W-dw)/2, (H-dh)/2, dw, dh);
+    return;
+  }
+  var pal = THEME_PALETTES[slide.theme || 'dark'] || THEME_PALETTES.dark;
+  var a1 = applyOpacity(pal.accentPrimary, 0.18);
+  var a2 = applyOpacity(pal.accentSecondary, 0.16);
+  var key = slide.bgPreset || '';
+
+  if(key.indexOf('grad-') === 0 || key.indexOf('anim-') === 0){
+    var g;
+    if(key === 'grad-spot' || key === 'grad-vignette' || key === 'anim-pulse'){
+      g = x.createRadialGradient(W/2, H*0.4, 0, W/2, H/2, Math.max(W,H)*0.75);
+      g.addColorStop(0, key === 'grad-vignette' ? shadeColor(slide.bg,10) : a1);
+      g.addColorStop(1, key === 'grad-vignette' ? shadeColor(slide.bg,-25) : 'rgba(0,0,0,0)');
+    } else {
+      g = x.createLinearGradient(0, 0, W, H);
+      g.addColorStop(0, a1);
+      g.addColorStop(0.5, 'rgba(0,0,0,0)');
+      g.addColorStop(1, a2);
+    }
+    x.save(); x.fillStyle = g; x.fillRect(0,0,W,H); x.restore();
+    return;
+  }
+  if(key === 'pat-grid'){
+    x.save(); x.strokeStyle = applyOpacity(pal.borderStrong, 0.10); x.lineWidth = 1;
+    for(var gx = 0; gx < W; gx += 44){ x.beginPath(); x.moveTo(gx,0); x.lineTo(gx,H); x.stroke(); }
+    for(var gy = 0; gy < H; gy += 44){ x.beginPath(); x.moveTo(0,gy); x.lineTo(W,gy); x.stroke(); }
+    x.restore(); return;
+  }
+  if(key === 'pat-dots'){
+    x.save(); x.fillStyle = applyOpacity(pal.borderStrong, 0.16);
+    for(var dy = 0; dy < H; dy += 26){
+      for(var dx = 0; dx < W; dx += 26){ x.beginPath(); x.arc(dx, dy, 1.5, 0, Math.PI*2); x.fill(); }
+    }
+    x.restore(); return;
+  }
+  if(key === 'pat-diag'){
+    x.save(); x.strokeStyle = applyOpacity(pal.borderStrong, 0.06); x.lineWidth = 2;
+    for(var i = -H; i < W; i += 14){ x.beginPath(); x.moveTo(i,0); x.lineTo(i+H,H); x.stroke(); }
+    x.restore(); return;
+  }
+  if(key === 'pat-mesh' || key === 'pat-topo'){
+    var mg = x.createRadialGradient(W*0.2, H*0.2, 0, W*0.2, H*0.2, W*0.6);
+    mg.addColorStop(0, a1); mg.addColorStop(1, 'rgba(0,0,0,0)');
+    x.save(); x.fillStyle = mg; x.fillRect(0,0,W,H);
+    var mg2 = x.createRadialGradient(W*0.8, H*0.85, 0, W*0.8, H*0.85, W*0.6);
+    mg2.addColorStop(0, a2); mg2.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = mg2; x.fillRect(0,0,W,H); x.restore();
+    return;
+  }
+}
+
+function buildSlideBgStyle(slide){
+  if(!slide) return 'background:#111113';
+  var type = slide.bgType || 'color';
+  if(type === 'image' && slide.bgImage){
+    var fit = slide.bgImageFit || 'cover';
+    // 'tile' repeats the image across the slide at a chosen scale, rather than
+    // stretching one copy to fill it.
+    if(fit === 'tile'){
+      var tp = (slide.bgTileSize || 20);          // % of slide width per tile
+      return 'background-image:url(' + slide.bgImage + ');' +
+             'background-size:' + tp + '% auto;' +
+             'background-repeat:repeat;background-position:0 0;' +
+             'background-color:' + (slide.bg || '#111113');
+    }
+    return 'background-image:url(' + slide.bgImage + ');' +
+           'background-size:' + fit + ';' +
+           'background-position:center;background-repeat:no-repeat;' +
+           'background-color:' + (slide.bg || '#111113');
+  }
+  var preset = BG_PRESETS[slide.bgPreset];
+  if(!preset) return 'background:' + (slide.bg || '#111113');
+  // Resolve against the slide's theme so a background follows a theme change.
+  var pal = THEME_PALETTES[slide.theme || 'dark'] || THEME_PALETTES.dark;
+  pal = Object.assign({}, pal, { slideBg: slide.bg || pal.slideBg });
+  var css = 'background-image:' + preset.css(pal) + ';background-color:' + (slide.bg || pal.slideBg) + ';';
+  if(preset.size) css += 'background-size:' + preset.size + ';';
+  if(preset.anim) css += 'animation:' + preset.anim + ';';
+  return css;
+}
+
 var THEME_PALETTES = {
   dark: {
     label: 'Dark',
@@ -2474,6 +2721,60 @@ var THEME_PALETTES = {
     accentTertiary:    '#ff00ff',
     textOnAccent:      '#000000',
     divider:           '#000000'
+  },
+  midnight: {
+    label: 'Midnight',
+    slideBg:'#0d1220', textPrimary:'#e8ecf5', textSecondary:'#9aa4bd', textMuted:'#5e6a85',
+    surfaceBg:'rgba(28,36,58,0.75)', surfaceBgSubtle:'rgba(0,0,0,0.3)', surfaceBgAlt:'rgba(255,255,255,0.04)',
+    border:'rgba(255,255,255,0.07)', borderStrong:'rgba(160,180,255,0.3)',
+    placeholderBg:'#151d31', placeholderBorder:'#2c3a55',
+    accentPrimary:'#5b9dff', accentSecondary:'#7ee0ff', accentTertiary:'#b98bff',
+    textOnAccent:'#0d1220', divider:'#080c16'
+  },
+  forest: {
+    label: 'Forest',
+    slideBg:'#0f1a14', textPrimary:'#eaf3ec', textSecondary:'#9fb8a8', textMuted:'#5f7568',
+    surfaceBg:'rgba(26,44,34,0.75)', surfaceBgSubtle:'rgba(0,0,0,0.3)', surfaceBgAlt:'rgba(255,255,255,0.04)',
+    border:'rgba(255,255,255,0.07)', borderStrong:'rgba(150,220,170,0.3)',
+    placeholderBg:'#14251b', placeholderBorder:'#2b4536',
+    accentPrimary:'#5fd68a', accentSecondary:'#d4c26a', accentTertiary:'#e08a5f',
+    textOnAccent:'#0f1a14', divider:'#0a120d'
+  },
+  crimson: {
+    label: 'Crimson',
+    slideBg:'#1a0e12', textPrimary:'#f6eaee', textSecondary:'#c39aa6', textMuted:'#7d5c66',
+    surfaceBg:'rgba(48,24,32,0.75)', surfaceBgSubtle:'rgba(0,0,0,0.3)', surfaceBgAlt:'rgba(255,255,255,0.04)',
+    border:'rgba(255,255,255,0.07)', borderStrong:'rgba(255,150,170,0.3)',
+    placeholderBg:'#25141a', placeholderBorder:'#452630',
+    accentPrimary:'#ff5f7e', accentSecondary:'#ffa86a', accentTertiary:'#c96bff',
+    textOnAccent:'#1a0e12', divider:'#120a0d'
+  },
+  slate: {
+    label: 'Slate',
+    slideBg:'#1c1f24', textPrimary:'#eceef2', textSecondary:'#a7adb8', textMuted:'#6b7280',
+    surfaceBg:'rgba(42,47,56,0.75)', surfaceBgSubtle:'rgba(0,0,0,0.3)', surfaceBgAlt:'rgba(255,255,255,0.04)',
+    border:'rgba(255,255,255,0.07)', borderStrong:'rgba(255,255,255,0.28)',
+    placeholderBg:'#23272e', placeholderBorder:'#3a4049',
+    accentPrimary:'#60c5f1', accentSecondary:'#f1b860', accentTertiary:'#f16081',
+    textOnAccent:'#1c1f24', divider:'#15181c'
+  },
+  cream: {
+    label: 'Cream',
+    slideBg:'#faf7f0', textPrimary:'#2a2620', textSecondary:'#6b6459', textMuted:'#9b9488',
+    surfaceBg:'rgba(255,255,255,0.9)', surfaceBgSubtle:'rgba(0,0,0,0.04)', surfaceBgAlt:'rgba(0,0,0,0.03)',
+    border:'rgba(0,0,0,0.08)', borderStrong:'rgba(0,0,0,0.28)',
+    placeholderBg:'#f2ece1', placeholderBorder:'#d8cfbe',
+    accentPrimary:'#2f8f5b', accentSecondary:'#c98a2b', accentTertiary:'#b5473f',
+    textOnAccent:'#ffffff', divider:'#ffffff'
+  },
+  ocean: {
+    label: 'Ocean',
+    slideBg:'#0a1a22', textPrimary:'#e6f4f8', textSecondary:'#93b6c2', textMuted:'#587483',
+    surfaceBg:'rgba(20,44,56,0.75)', surfaceBgSubtle:'rgba(0,0,0,0.3)', surfaceBgAlt:'rgba(255,255,255,0.04)',
+    border:'rgba(255,255,255,0.07)', borderStrong:'rgba(140,215,235,0.3)',
+    placeholderBg:'#0f2530', placeholderBorder:'#26454f',
+    accentPrimary:'#3fd2c7', accentSecondary:'#5fa8ff', accentTertiary:'#ffd166',
+    textOnAccent:'#0a1a22', divider:'#06121a'
   }
 };
 
@@ -2486,6 +2787,10 @@ function applyThemeToSlide(slide, themeKey){
   var pal = THEME_PALETTES[themeKey];
   if(!pal) return false;
   slide.bg = pal.slideBg;
+  // Remember the theme on the slide so background presets can resolve their
+  // accent colours against it — that's what makes the two systems agree
+  // instead of being independent pickers.
+  slide.theme = themeKey;
   slide.theme = themeKey;
   (slide.els || []).forEach(function(el){
     switch(el.type){
@@ -4647,7 +4952,7 @@ function buildPresenterSlidePreview(slide, maxW, maxH, respectReveal){
   maxH = maxH || 340;
   var scale = Math.min((maxW - 20) / STAGE_W, (maxH - 20) / STAGE_H);
   var dispW = STAGE_W * scale, dispH = STAGE_H * scale;
-  var inner = '<div style="position:relative;width:'+dispW+'px;height:'+dispH+'px;background:'+slide.bg+';border-radius:4px;overflow:hidden">';
+  var inner = '<div style="position:relative;width:'+dispW+'px;height:'+dispH+'px;'+buildSlideBgStyle(slide)+';border-radius:4px;overflow:hidden">';
   inner += '<div style="position:absolute;left:0;top:0;width:'+STAGE_W+'px;height:'+STAGE_H+'px;transform:scale('+scale+');transform-origin:0 0">';
   for(var i=0; i<slide.els.length; i++){
     var el = slide.els[i];
@@ -14299,6 +14604,10 @@ async function renderSlideToCanvas(s, scale){
   if(!s._noBg){
     x.fillStyle = s.bg;
     x.fillRect(0, 0, STAGE_W, STAGE_H);
+    // Paint gradient/pattern backgrounds so exports match the editor. Animated
+    // presets are drawn as their static base — a moving background would have
+    // to be recomputed per frame and offers little in a recording.
+    try { paintSlideBgToCanvas(x, s, STAGE_W, STAGE_H); } catch(e){}
   }
   for(var i=0; i<s.els.length; i++){
     var el = s.els[i];
@@ -20435,7 +20744,10 @@ function renderThumbnail(slide, index){
   var thumbW = 150;
   var scale = thumbW / STAGE_W;
   var thumbH = STAGE_H * scale;
-  var inner = '<div class="st-preview-inner" style="width:'+STAGE_W+'px;height:'+STAGE_H+'px;background:'+slide.bg+';transform:scale('+scale+')">';
+  // Thumbnails show the background but never animate — dozens of animated
+  // gradients in the sidebar would burn CPU for no benefit.
+  var _tbg = buildSlideBgStyle(slide).replace(/animation:[^;]+;?/, '');
+  var inner = '<div class="st-preview-inner" style="width:'+STAGE_W+'px;height:'+STAGE_H+'px;'+_tbg+';transform:scale('+scale+')">';
   // Render elements (simplified - no selection handles, no interactivity)
   for(var i=0; i<slide.els.length; i++){
     var el = slide.els[i];
@@ -20617,7 +20929,9 @@ function render(){
   h += '<div class="canvas-wrap">';
   h += '<div style="flex:1;display:flex;flex-direction:column;min-width:0">';
   h += '<div class="canvas-stage" id="stageContainer">';
-  h += '<div class="canvas" id="canvasStage" style="width:'+(STAGE_W*S.stageScale)+'px;height:'+(STAGE_H*S.stageScale)+'px;background:'+s.bg+';cursor:'+cursor+'" onmousedown="onCanvasDown(event)">';
+  // This is the REAL editor canvas. An earlier patch wired the background into
+  // the thumbnail preview instead, which is why presets appeared to do nothing.
+  h += '<div class="canvas" id="canvasStage" style="width:'+(STAGE_W*S.stageScale)+'px;height:'+(STAGE_H*S.stageScale)+'px;'+buildSlideBgStyle(s)+';cursor:'+cursor+'" onmousedown="onCanvasDown(event)">';
   // z-index here is ESSENTIAL. This div carries transform:scale(), which
   // creates a stacking context — so every slide element inside it is flattened
   // into ONE layer when compared against anything outside. Pooled media videos
@@ -22409,7 +22723,7 @@ function renderSlidePropsPanel(){
   h += '<div class="ps"><div class="ps-t">Theme</div>';
   h += '<div style="font-size:10px;color:var(--muted);margin-bottom:8px;line-height:1.4">Recolors text, lists, charts, notes, and the slide BG to match the chosen theme. Shape fills, chart data colors, and line strokes are preserved. Ctrl+Z undoes.</div>';
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
-  ['dark','light','sepia','high-contrast'].forEach(function(key){
+  Object.keys(THEME_PALETTES).forEach(function(key){
     var p = THEME_PALETTES[key];
     var active = slide.theme === key;
     // Mini swatch row preview: slide BG + 2 text shades + accent
@@ -22431,6 +22745,92 @@ function renderSlidePropsPanel(){
          '</button>';
   });
   h += '</div>';
+  h += '</div>';
+
+  // ---- Background (collapsible) ------------------------------------------
+  // Collapsed by default and grouped behind tabs — 17 swatches expanded made
+  // the panel unusably long and buried the settings below it.
+  var curBg = slide.bgPreset || '';
+  var curType = slide.bgType || 'color';
+  var bgOpen = S.bgPanelOpen === true;
+  var curLabel = curType === 'image' ? 'Image'
+               : (BG_PRESETS[curBg] ? BG_PRESETS[curBg].label : 'Solid colour');
+
+  h += '<div class="ps"><div class="ps-t" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center" ' +
+       'onclick="toggleBgPanel()">Background' +
+       '<span style="font-size:10px;font-weight:600;color:var(--g)">' + esc(curLabel) +
+       ' <span style="color:var(--muted)">' + (bgOpen ? '&#9650;' : '&#9660;') + '</span></span></div>';
+
+  if(bgOpen){
+    var bgTab = S.bgPanelTab || 'gradient';
+    var tabs = [['color','Solid'],['gradient','Gradient'],['pattern','Pattern'],['animated','Animated'],['image','Image']];
+    h += '<div style="display:flex;gap:3px;margin-bottom:8px;flex-wrap:wrap">';
+    tabs.forEach(function(t){
+      var on = bgTab === t[0];
+      h += '<button onclick="setBgTab(\''+t[0]+'\')" style="flex:1;padding:5px 2px;font-size:9px;font-weight:700;' +
+           'border-radius:5px;cursor:pointer;font-family:Outfit;' +
+           (on ? 'background:rgba(126,217,87,0.16);border:1px solid var(--g);color:var(--g)'
+               : 'background:rgba(255,255,255,0.04);border:1px solid var(--brd);color:var(--muted)') +
+           '">'+t[1]+'</button>';
+    });
+    h += '</div>';
+
+    function bgSwatch(key, label, preset){
+      var active = (key === '' && curType === 'color') || (curBg === key && curType !== 'color');
+      var pal = THEME_PALETTES[slide.theme || 'dark'] || THEME_PALETTES.dark;
+      var pv = preset
+        ? (preset.css(Object.assign({}, pal, { slideBg: slide.bg || pal.slideBg })) +
+           (preset.size ? ';background-size:'+preset.size : ''))
+        : (slide.bg || pal.slideBg);
+      return '<button onclick="setSlideBg(\''+key+'\')" style="padding:0;border-radius:6px;cursor:pointer;' +
+             'overflow:hidden;font-family:Outfit;font-size:9px;font-weight:600;background:transparent;' +
+             (active ? 'border:1.5px solid var(--g);color:var(--g)' : 'border:1px solid var(--brd);color:var(--muted)') +
+             '"><div style="height:26px;background-color:'+(slide.bg||pal.slideBg)+';' +
+             (preset ? 'background-image:'+pv : '') + '"></div>' +
+             '<div style="padding:2px">'+label+'</div></button>';
+    }
+
+    if(bgTab === 'color'){
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">' +
+           bgSwatch('', 'Solid', null) + '</div>';
+      h += '<div style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.4">' +
+           'Uses the Background colour above.</div>';
+    } else if(bgTab === 'image'){
+      h += '<button class="sp-btn" style="width:100%;margin-bottom:5px" onclick="pickSlideBgImage()">' +
+           (curType === 'image' ? 'Change image\u2026' : '+ Choose image\u2026') + '</button>';
+      if(curType === 'image'){
+        h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:5px">';
+        [['cover','Fill'],['contain','Fit'],['tile','Tile']].forEach(function(f){
+          var on = (slide.bgImageFit || 'cover') === f[0];
+          h += '<button class="sp-btn" style="font-size:9px;padding:5px 2px' +
+               (on ? ';border-color:var(--g);color:var(--g)' : '') + '" ' +
+               'onclick="setSlideBgImageFit(\''+f[0]+'\')">'+f[1]+'</button>';
+        });
+        h += '</div>';
+        if((slide.bgImageFit || 'cover') === 'tile'){
+          var _ts = slide.bgTileSize || 20;
+          h += '<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">' +
+               'Tile size ' + _ts + '%</div>';
+          h += '<input type="range" min="5" max="50" step="1" value="'+_ts+'" style="width:100%;margin-bottom:5px" ' +
+               'oninput="setSlideBgTileSize(this.value)">';
+        }
+        h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-bottom:5px">' +
+             'Tile repeats the image across the slide \u2014 smaller size means more copies.</div>';
+        h += '<button class="sp-btn del" style="width:100%" onclick="clearSlideBgImage()">Remove image</button>';
+      }
+    } else {
+      var list = Object.keys(BG_PRESETS).filter(function(k){ return BG_PRESETS[k].type === bgTab; });
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">';
+      list.forEach(function(k){ h += bgSwatch(k, BG_PRESETS[k].label, BG_PRESETS[k]); });
+      h += '</div>';
+      if(bgTab === 'animated'){
+        h += '<div style="font-size:10px;color:var(--muted);line-height:1.4;margin-top:6px">' +
+             'Plays in the editor and presentation; recordings capture the static form.</div>';
+      }
+    }
+    h += '<button class="sp-btn" style="width:100%;margin-top:8px;font-size:10px" onclick="applyBgToAllSlides()">' +
+         'Apply to all slides</button>';
+  }
   h += '</div>';
 
   // Slide transition (per-slide override)
@@ -23961,7 +24361,7 @@ function renderPres(){
   var h = '<div class="pres-root'+revealClass+'">';
   // Don't include the transition class in the initial HTML — we add it post-render
   // after a forced reflow so the browser sees a fresh animation each render.
-  h += '<div class="pres-stage" data-trans="'+effTrans+'" data-anim-key="'+animKey+'" style="width:'+stageDispW+'px;height:'+stageDispH+'px;background:'+slide.bg+';cursor:'+cursor+'" id="presStage" onmousedown="onCanvasDown(event)">';
+  h += '<div class="pres-stage" data-trans="'+effTrans+'" data-anim-key="'+animKey+'" style="width:'+stageDispW+'px;height:'+stageDispH+'px;'+buildSlideBgStyle(slide)+';cursor:'+cursor+'" id="presStage" onmousedown="onCanvasDown(event)">';
   h += '<div id="elsLayer" style="position:absolute;inset:0;transform:scale('+scale+');transform-origin:0 0;width:'+STAGE_W+'px;height:'+STAGE_H+'px">';
   syncAllConnectors(slide);
   h += renderElsHtml(slide, true);
@@ -25923,6 +26323,9 @@ var STARTUP_PREF_KEY = 'epPresenterStartupPref';
       if(!s.els) s.els = [];
       if(s.notes == null) s.notes = '';
     });
+    // Background images serialise as data URLs but their decoded Image object
+    // doesn't — rebuild it so canvas export can draw them.
+    if(typeof rehydrateSlideBgImages === 'function') rehydrateSlideBgImages();
   }
 
   function finishBoot(){
@@ -26368,6 +26771,131 @@ try {
   var _sco = localStorage.getItem('ep-snap-centers-only');
   if(_sco !== null) S.snapCentersOnly = (_sco === '1');
 } catch(e){}
+
+// ---- Slide background actions -------------------------------------------
+window.toggleBgPanel = function(){
+  S.bgPanelOpen = !S.bgPanelOpen;
+  try { localStorage.setItem('ep-bg-panel-open', S.bgPanelOpen ? '1':'0'); } catch(e){}
+  render();
+};
+window.setBgTab = function(t){
+  S.bgPanelTab = t;
+  try { localStorage.setItem('ep-bg-panel-tab', t); } catch(e){}
+  render();
+};
+try {
+  var _bpo = localStorage.getItem('ep-bg-panel-open');
+  if(_bpo !== null) S.bgPanelOpen = (_bpo === '1');
+  var _bpt = localStorage.getItem('ep-bg-panel-tab');
+  if(_bpt) S.bgPanelTab = _bpt;
+} catch(e){}
+
+window.setSlideBg = function(presetKey){
+  var slide = cs();
+  if(!slide) return;
+  if(!presetKey){
+    slide.bgType = 'color';
+    slide.bgPreset = '';
+  } else {
+    var pr = BG_PRESETS[presetKey];
+    if(!pr) return;
+    slide.bgType = pr.type;
+    slide.bgPreset = presetKey;
+  }
+  S.dirty = true;
+  pushHist();
+  if(typeof invalidateRecCache === 'function') invalidateRecCache();
+  if(typeof S.slideThumbCache === 'object') S.slideThumbCache = {};
+  render();
+};
+
+window.pickSlideBgImage = function(){
+  var inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'image/*';
+  inp.onchange = function(){
+    var f = inp.files && inp.files[0];
+    if(!f) return;
+    var rd = new FileReader();
+    rd.onload = function(ev){
+      var slide = cs();
+      if(!slide) return;
+      slide.bgImage = ev.target.result;      // data URL so it saves with the deck
+      slide.bgType = 'image';
+      slide.bgImageFit = slide.bgImageFit || 'cover';
+      // Preload for the canvas export path.
+      var im = new Image();
+      im.onload = function(){ slide._bgImageEl = im; render(); };
+      im.src = slide.bgImage;
+      S.dirty = true;
+      pushHist();
+      if(typeof invalidateRecCache === 'function') invalidateRecCache();
+      render();
+      showToast('Background image set');
+    };
+    rd.readAsDataURL(f);
+  };
+  inp.click();
+};
+
+window.setSlideBgTileSize = function(v){
+  var slide = cs();
+  if(!slide) return;
+  slide.bgTileSize = parseInt(v, 10) || 20;
+  S.dirty = true;
+  if(typeof invalidateRecCache === 'function') invalidateRecCache();
+  render();
+};
+
+window.setSlideBgImageFit = function(fit){
+  var slide = cs();
+  if(!slide) return;
+  slide.bgImageFit = fit;
+  S.dirty = true; pushHist();
+  if(typeof invalidateRecCache === 'function') invalidateRecCache();
+  render();
+};
+
+window.clearSlideBgImage = function(){
+  var slide = cs();
+  if(!slide) return;
+  delete slide.bgImage; delete slide._bgImageEl;
+  slide.bgType = 'color'; slide.bgPreset = '';
+  S.dirty = true; pushHist();
+  if(typeof invalidateRecCache === 'function') invalidateRecCache();
+  render();
+  showToast('Background image removed');
+};
+
+window.applyBgToAllSlides = function(){
+  var src = cs();
+  if(!src) return;
+  S.slides.forEach(function(sl){
+    sl.bgType = src.bgType || 'color';
+    sl.bgPreset = src.bgPreset || '';
+    sl.bg = src.bg;
+    if(src.bgImage){ sl.bgImage = src.bgImage; sl.bgImageFit = src.bgImageFit; sl._bgImageEl = src._bgImageEl; }
+    else { delete sl.bgImage; delete sl._bgImageEl; }
+  });
+  S.dirty = true; pushHist();
+  if(typeof invalidateRecCache === 'function') invalidateRecCache();
+  if(typeof S.slideThumbCache === 'object') S.slideThumbCache = {};
+  render();
+  showToast('Background applied to ' + S.slides.length + ' slide(s)');
+};
+
+// Restore background images after a deck loads (they save as data URLs but the
+// decoded Image element can't be serialised).
+function rehydrateSlideBgImages(){
+  if(!S.slides) return;
+  S.slides.forEach(function(sl){
+    if(sl.bgImage && !sl._bgImageEl){
+      var im = new Image();
+      im.onload = function(){ sl._bgImageEl = im; };
+      im.src = sl.bgImage;
+    }
+  });
+}
 
 window.alignElToSlide = function(id, how){
   var slide = cs();
