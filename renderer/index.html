@@ -12990,6 +12990,7 @@ var AUTOSAVE_KEY = 'ep-presenter-autosave-v4';
 var AUTOSAVE_PREF_KEY = 'ep-presenter-autosave-enabled';
 var AUTOSAVE_DEBOUNCE_MS = 3000; // 3s — save after user pauses for 3 seconds
 var autosaveTimer = null;
+var autosaveFailCount = 0;
 var lastAutoSaveAt = 0;
 
 // Load preference (default ON)
@@ -13228,7 +13229,34 @@ function autoSave(){
         setTimeout(function(){ if(ind) ind.textContent = S.autoSaveEnabled ? 'Auto-save on' : 'Auto-save OFF'; }, 1500);
       }
     } catch(e){
+      // localStorage is ~5MB. A deck with embedded images blows past that,
+      // and the write then fails EVERY time — silently, because this only
+      // warned to the console. The stale entry stays put, which is why
+      // "Restore Autosaved" kept offering a months-old deck.
       console.warn('Autosave failed:', e);
+      autosaveFailCount++;
+      var ind2 = document.getElementById('autosaveInd');
+      if(ind2){
+        ind2.textContent = 'Auto-save FAILED';
+        ind2.style.color = '#ff6b6b';
+      }
+      if(autosaveFailCount === 1 || autosaveFailCount % 20 === 0){
+        var mb = 0;
+        try { mb = (JSON.stringify({slides:S.slides}).length / 1048576).toFixed(1); } catch(e2){}
+        showToast('Auto-save failed — deck is ' + mb + ' MB, over the browser storage limit. Save to a file instead.');
+      }
+      // Drop the stale entry so the startup dialog can't offer an old deck as
+      // if it were current.
+      try {
+        var stale = localStorage.getItem(AUTOSAVE_KEY);
+        if(stale){
+          var sd = JSON.parse(stale);
+          if(sd && sd.savedAt && (Date.now() - sd.savedAt) > 86400000){
+            localStorage.removeItem(AUTOSAVE_KEY);
+            console.warn('[EP] Removed stale autosave from ' + new Date(sd.savedAt).toISOString());
+          }
+        }
+      } catch(e3){}
     }
   }, AUTOSAVE_DEBOUNCE_MS);
 }
@@ -25825,14 +25853,23 @@ var STARTUP_PREF_KEY = 'epPresenterStartupPref';
   }catch(e){}
 
   var savedDraft = loadAutoSave();
+  if(savedDraft && savedDraft.savedAt){
+    var _ageH = (Date.now() - savedDraft.savedAt) / 3600000;
+    console.log('[EP] Autosave age: ' + _ageH.toFixed(1) + ' hours');
+    if(_ageH > 24){
+      console.warn('[EP] Autosave is over a day old — autosave writes are probably failing. ' +
+                   'Decks with embedded images can exceed the ~5MB browser storage limit.');
+    }
+  }
   var hasValidDraft = !!(savedDraft && savedDraft.slides && savedDraft.slides.length &&
     savedDraft.slides.some(function(s){ return (s.els && s.els.length) || (s.draws && s.draws.length); }));
 
   var pref = 'ask';
   try {
     var stored = localStorage.getItem(STARTUP_PREF_KEY);
-    if(stored === 'always-new' || stored === 'always-restore' ||
+    if(stored === 'always-new' || stored === 'always-restore' || stored === 'always-open' ||
        stored === 'always-new-landscape' || stored === 'always-new-portrait') pref = stored;
+    console.log('[EP] Startup preference:', stored || '(none — will ask)');
   } catch(e){}
 
   // Fast paths: skip the modal if the user chose a durable preference
@@ -25845,6 +25882,22 @@ var STARTUP_PREF_KEY = 'epPresenterStartupPref';
     setStageAspect('portrait');
     S.slides = [newSlide()];  // ensure slides exist with the new aspect
     finishBoot();
+    return;
+  }
+  if(pref === 'always-open'){
+    finishBoot();
+    setTimeout(function(){
+      var fi = document.createElement('input');
+      fi.type = 'file';
+      fi.accept = '.json,.pptx';
+      fi.style.display = 'none';
+      fi.addEventListener('change', function(e){
+        if(typeof window.openDeckFile === 'function') window.openDeckFile(e);
+        if(fi.parentNode) fi.parentNode.removeChild(fi);
+      });
+      document.body.appendChild(fi);
+      fi.click();
+    }, 200);
     return;
   }
   if(pref === 'always-restore' && hasValidDraft){
@@ -25945,6 +25998,8 @@ function showStartupModal(savedDraft, onDone){
       closeOverlay();
       onDone();
     } else if(action === 'open'){
+      // This branch never honoured "remember" — the only option that didn't.
+      if(remember){ try { localStorage.setItem(STARTUP_PREF_KEY, 'always-open'); } catch(e){} }
       // Close overlay first, then trigger file picker
       closeOverlay();
       onDone();
