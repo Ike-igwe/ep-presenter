@@ -135,7 +135,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
 /* ========= CANVAS ========= */
 .canvas-wrap{flex:1;display:flex;overflow:hidden;background:#0a0a0c}
 .canvas-stage{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
-.canvas{position:relative;background:#111;box-shadow:0 12px 40px rgba(0,0,0,0.5);border-radius:4px;overflow:hidden}
+/* A visible edge and surrounding shadow so the slide boundary is obvious —
+   previously the canvas and the workspace were near-identical dark greys,
+   which made content look like it ran into the panel. */
+.canvas{position:relative;background:#111;box-shadow:0 0 0 1px rgba(255,255,255,0.10),0 16px 50px rgba(0,0,0,0.65);border-radius:4px;overflow:hidden}
+.canvas-stage{background:#08080a}
 .draw-canvas{position:absolute;inset:0;pointer-events:none;z-index:100}
 .draw-canvas.active{pointer-events:auto;cursor:none}
 .draw-canvas.active.lasso{cursor:crosshair}
@@ -206,7 +210,11 @@ input[type=range].draw-size-slider::-moz-range-track,input[type=range].draw-opac
 .ep-anchor:hover{background:#7ed957;transform:translate(-9px,-9px) scale(1.5);box-shadow:0 0 14px rgba(126,217,87,0.9)}
 .line-hit{stroke:transparent;stroke-width:18;cursor:move;pointer-events:stroke}
 .txt-box{display:flex;padding:10px 14px;overflow:hidden}
-.txt-box span,.txt-box textarea{width:100%;line-height:1.3;white-space:pre-wrap;word-wrap:break-word}
+/* flex-shrink:0 / flex-grow:0 stops the span stretching to the full box
+   height. Stretched, its own text sat at the TOP of that stretched area, so
+   `align-items:center` on the parent had no visible effect — the box was
+   centred but the words weren't. */
+.txt-box span,.txt-box textarea{width:100%;line-height:1.3;white-space:pre-wrap;word-wrap:break-word;flex:0 0 auto}
 .txt-box textarea{background:transparent;border:none;outline:none;resize:none;font-family:'Outfit'}
 .note{font-family:'Outfit';transition:box-shadow 0.18s ease}
 .note.note-lifted:hover{box-shadow:0 2px 2px rgba(0,0,0,0.14), 0 12px 26px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.5) !important}
@@ -3269,6 +3277,7 @@ var S = {
   stageScale:1,
   clipboard:null,
   snapEnabled:true,
+  snapCentersOnly:false,   // ignore edge-to-edge matches when true
   // Phase 4g: visual grid overlay + snap-to-grid. Independent from object-to-object snap.
   gridVisible:false,
   gridSnapEnabled:false,
@@ -12830,21 +12839,34 @@ function computeSnap(movingIds, proposedDx, proposedDy){
         var d = stickyX - p;
         if(Math.abs(d) < releaseThreshold){
           if(!bestX || Math.abs(d) < Math.abs(bestX.d)){
-            bestX = {d:d, tx:stickyX, kind:'object'};
+            bestX = {d:d, tx:stickyX, kind:'object', score:Math.abs(d)};
           }
         }
       });
     }
     if(!bestX){
-      // No sticky engagement — try fresh engagement at the smaller threshold
+      // Fresh engagement. Centre-to-centre wins ties: aligning the middle of
+      // what you're dragging with the middle of the slide (or of another
+      // element) is nearly always the intent, and previously an edge match at
+      // the same distance could win instead — which is why the guide often
+      // appeared somewhere that looked arbitrary.
       xTargets.forEach(function(tx, ti){
+        var isStageCenter = (ti === 1);              // xTargets[1] = STAGE_W/2
+        var isObjCenter   = (ti >= stageTargetCount) && ((ti - stageTargetCount) % 3 === 1);
         var th = engageThreshold + (ti < stageTargetCount ? bonus : 0);
-        [mx1, mcx, mx2].forEach(function(p){
-          var d = tx - p;
-          if(Math.abs(d) < th){
-            if(!bestX || Math.abs(d) < Math.abs(bestX.d)){
-              bestX = {d:d, tx:tx, kind:'object'};
-            }
+        [{p:mx1,k:'edge'}, {p:mcx,k:'center'}, {p:mx2,k:'edge'}].forEach(function(o){
+          // Centres-only mode: skip edge-to-edge matches entirely. Edge
+          // alignment is correct behaviour but constantly wins when you're
+          // trying to centre something, which reads as the snap misbehaving.
+          if(S.snapCentersOnly && o.k !== 'center') return;
+          var d = tx - o.p;
+          if(Math.abs(d) >= th) return;
+          var centerMatch = (o.k === 'center') && (isStageCenter || isObjCenter);
+          // Weight centre matches so they beat an equally-close edge match.
+          var score = Math.abs(d) - (centerMatch ? bonus : 0);
+          if(!bestX || score < bestX.score){
+            bestX = { d:d, tx:tx, kind:'object', score:score,
+                      label: centerMatch ? (isStageCenter ? 'slide-center' : 'center') : 'edge' };
           }
         });
       });
@@ -12855,20 +12877,25 @@ function computeSnap(movingIds, proposedDx, proposedDy){
         var d = stickyY - p;
         if(Math.abs(d) < releaseThreshold){
           if(!bestY || Math.abs(d) < Math.abs(bestY.d)){
-            bestY = {d:d, ty:stickyY, kind:'object'};
+            bestY = {d:d, ty:stickyY, kind:'object', score:Math.abs(d)};
           }
         }
       });
     }
     if(!bestY){
       yTargets.forEach(function(ty, ti){
+        var isStageMiddle = (ti === 1);             // yTargets[1] = STAGE_H/2
+        var isObjMiddle   = (ti >= stageTargetCount) && ((ti - stageTargetCount) % 3 === 1);
         var thy = engageThreshold + (ti < stageTargetCount ? bonus : 0);
-        [my1, mcy, my2].forEach(function(p){
-          var d = ty - p;
-          if(Math.abs(d) < thy){
-            if(!bestY || Math.abs(d) < Math.abs(bestY.d)){
-              bestY = {d:d, ty:ty, kind:'object'};
-            }
+        [{p:my1,k:'edge'}, {p:mcy,k:'center'}, {p:my2,k:'edge'}].forEach(function(o){
+          if(S.snapCentersOnly && o.k !== 'center') return;
+          var d = ty - o.p;
+          if(Math.abs(d) >= thy) return;
+          var centerMatch = (o.k === 'center') && (isStageMiddle || isObjMiddle);
+          var score = Math.abs(d) - (centerMatch ? bonus : 0);
+          if(!bestY || score < bestY.score){
+            bestY = { d:d, ty:ty, kind:'object', score:score,
+                      label: centerMatch ? (isStageMiddle ? 'slide-center' : 'center') : 'edge' };
           }
         });
       });
@@ -12884,10 +12911,10 @@ function computeSnap(movingIds, proposedDx, proposedDy){
     var snapToGridX = Math.round(mx1 / g) * g - mx1;
     var snapToGridY = Math.round(my1 / g) * g - my1;
     if(!bestX || Math.abs(snapToGridX) < Math.abs(bestX.d)){
-      bestX = {d:snapToGridX, tx:mx1 + snapToGridX, kind:'grid'};
+      bestX = {d:snapToGridX, tx:mx1 + snapToGridX, kind:'grid', score:Math.abs(snapToGridX)};
     }
     if(!bestY || Math.abs(snapToGridY) < Math.abs(bestY.d)){
-      bestY = {d:snapToGridY, ty:my1 + snapToGridY, kind:'grid'};
+      bestY = {d:snapToGridY, ty:my1 + snapToGridY, kind:'grid', score:Math.abs(snapToGridY)};
     }
   }
 
@@ -12902,8 +12929,38 @@ function computeSnap(movingIds, proposedDx, proposedDy){
   finalDx = Math.round(finalDx);
   finalDy = Math.round(finalDy);
 
-  if(bestX && bestX.kind === 'object') guides.push({type:'v', x:bestX.tx});
-  if(bestY && bestY.kind === 'object') guides.push({type:'h', y:bestY.ty});
+  // Carry the match type through so the guide can be drawn differently for a
+  // slide-centre alignment vs an edge — otherwise every guide looks identical
+  // and there's no way to tell WHAT it snapped to.
+  // Classify by VALUE, not by index. The index arithmetic assumed a fixed
+  // target ordering and mislabelled slide-centre matches as edges — which is
+  // why the centre guide still rendered pink.
+  function _classifyX(tx){
+    if(Math.abs(tx - STAGE_W/2) < 0.5) return 'slide-center';
+    var slideNow = cs();
+    if(slideNow && slideNow.els){
+      for(var i = 0; i < slideNow.els.length; i++){
+        if(movingIds.indexOf(slideNow.els[i].id) >= 0) continue;
+        var b = getElBounds(slideNow.els[i]);
+        if(Math.abs(tx - (b.x + b.w/2)) < 0.5) return 'center';
+      }
+    }
+    return 'edge';
+  }
+  function _classifyY(ty){
+    if(Math.abs(ty - STAGE_H/2) < 0.5) return 'slide-center';
+    var slideNow = cs();
+    if(slideNow && slideNow.els){
+      for(var i = 0; i < slideNow.els.length; i++){
+        if(movingIds.indexOf(slideNow.els[i].id) >= 0) continue;
+        var b = getElBounds(slideNow.els[i]);
+        if(Math.abs(ty - (b.y + b.h/2)) < 0.5) return 'center';
+      }
+    }
+    return 'edge';
+  }
+  if(bestX && bestX.kind === 'object') guides.push({type:'v', x:bestX.tx, label:_classifyX(bestX.tx)});
+  if(bestY && bestY.kind === 'object') guides.push({type:'h', y:bestY.ty, label:_classifyY(bestY.ty)});
 
   return {dx:finalDx, dy:finalDy, guides:guides};
 }
@@ -20229,16 +20286,55 @@ function renderSnapGuides(){
   if(!layer) return;
   if(!S.snapGuides.length){ layer.innerHTML = ''; return; }
   var h = '';
+  var hasSlideCenterX = false, hasSlideCenterY = false;
   S.snapGuides.forEach(function(g){
+    // Slide-centre guides are green and dashed so they read differently from
+    // an edge alignment; previously every guide was an identical pink line,
+    // giving no clue what had been matched.
+    var isCenter = (g.label === 'slide-center');
+    var col = isCenter ? '#7ed957' : '#ff3366';
+    var glow = isCenter ? 'rgba(126,217,87,0.85)' : 'rgba(255,51,102,0.8)';
     if(g.type === 'v'){
-      // Vertical guide line (x-axis snap) - clamp so edge snaps still show
       var x = Math.max(1, Math.min(STAGE_W - 1, g.x));
-      h += '<div style="position:absolute;left:'+x+'px;top:-20px;width:2px;height:'+(STAGE_H+40)+'px;background:#ff3366;box-shadow:0 0 6px rgba(255,51,102,0.8);pointer-events:none;z-index:999;margin-left:-1px"></div>';
+      if(isCenter) hasSlideCenterX = true;
+      h += '<div style="position:absolute;left:'+x+'px;top:-20px;width:2px;height:'+(STAGE_H+40)+'px;' +
+           (isCenter
+             ? 'background:repeating-linear-gradient(#7ed957 0 12px,transparent 12px 22px);'
+             : 'background:#ff3366;') +
+           'box-shadow:0 0 6px '+glow+';pointer-events:none;z-index:999;margin-left:-1px"></div>';
+      // Label what matched. An unexplained line is worse than none — this is
+      // the difference between "snapping is broken" and "it aligned my left
+      // edge to that other element's left edge".
+      h += '<div style="position:absolute;left:'+x+'px;top:8px;transform:translateX(-50%);' +
+           'background:'+col+';color:#0a0a0c;font:700 10px Outfit,sans-serif;padding:2px 7px;' +
+           'border-radius:3px;white-space:nowrap;pointer-events:none;z-index:1001">' +
+           (isCenter ? 'SLIDE CENTRE' : (g.label === 'center' ? 'CENTRES ALIGNED' : 'EDGES ALIGNED')) +
+           '</div>';
     } else {
       var y = Math.max(1, Math.min(STAGE_H - 1, g.y));
-      h += '<div style="position:absolute;left:-20px;top:'+y+'px;width:'+(STAGE_W+40)+'px;height:2px;background:#ff3366;box-shadow:0 0 6px rgba(255,51,102,0.8);pointer-events:none;z-index:999;margin-top:-1px"></div>';
+      if(isCenter) hasSlideCenterY = true;
+      h += '<div style="position:absolute;left:-20px;top:'+y+'px;width:'+(STAGE_W+40)+'px;height:2px;' +
+           (isCenter
+             ? 'background:repeating-linear-gradient(90deg,#7ed957 0 12px,transparent 12px 22px);'
+             : 'background:#ff3366;') +
+           'box-shadow:0 0 6px '+glow+';pointer-events:none;z-index:999;margin-top:-1px"></div>';
+      h += '<div style="position:absolute;top:'+y+'px;left:8px;transform:translateY(-50%);' +
+           'background:'+col+';color:#0a0a0c;font:700 10px Outfit,sans-serif;padding:2px 7px;' +
+           'border-radius:3px;white-space:nowrap;pointer-events:none;z-index:1001">' +
+           (isCenter ? 'SLIDE MIDDLE' : (g.label === 'center' ? 'CENTRES ALIGNED' : 'EDGES ALIGNED')) +
+           '</div>';
     }
   });
+  // Dead-centre marker: both axes on the slide centre means the element is
+  // exactly centred, which is worth confirming explicitly.
+  if(hasSlideCenterX && hasSlideCenterY){
+    h += '<div style="position:absolute;left:'+(STAGE_W/2)+'px;top:'+(STAGE_H/2)+'px;' +
+         'width:34px;height:34px;margin:-17px 0 0 -17px;border:2px solid #7ed957;border-radius:50%;' +
+         'box-shadow:0 0 14px rgba(126,217,87,0.9);pointer-events:none;z-index:1000"></div>';
+    h += '<div style="position:absolute;left:'+(STAGE_W/2)+'px;top:'+(STAGE_H/2 - 46)+'px;' +
+         'transform:translateX(-50%);background:#7ed957;color:#0a0a0c;font:700 11px Outfit,sans-serif;' +
+         'padding:3px 9px;border-radius:4px;pointer-events:none;z-index:1000;white-space:nowrap">CENTERED</div>';
+  }
   layer.innerHTML = h;
 }
 
@@ -20376,10 +20472,11 @@ function render(){
   // v1.0.22: lasso tool now shares the same right-side properties panel as
   // the select tool, so reserve panel width whenever either tool has any
   // selection (elements OR ink strokes).
-  var propsW = (
-    (S.tool === 'select' && S.selIds.length) ||
-    (S.tool === 'lasso' && (S.selIds.length || (S.lassoIds || []).length))
-  ) ? 240 : 0;
+  // The panel is rendered whenever the select or lasso tool is active — with
+  // nothing selected it shows SLIDE properties. This only reserved width when
+  // an ELEMENT was selected, so in slide-properties mode the stage was scaled
+  // as if the panel weren't there and the slide ran underneath it.
+  var propsW = (S.tool === 'select' || S.tool === 'lasso') ? 240 : 0;
   var stageAreaW = window.innerWidth - panelW - propsW;
   var stageAreaH = windowH - 56;
   S.stageScale = Math.max(0.1, Math.min((stageAreaW - 40) / STAGE_W, (stageAreaH - 40) / STAGE_H));
@@ -22060,6 +22157,31 @@ function renderPropsPanel(el){
 
   // Common actions
   h += '<div class="ps"><div class="ps-t">Actions</div>';
+  // ---- Align to slide -------------------------------------------------
+  // Dragging to centre depends on the element's BOX centre, which for a text
+  // element is often nowhere near the visible words (the box is usually much
+  // wider than the text). These place the element exactly, no aiming required.
+  h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:10px 0 5px">Align to slide</div>';
+  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:4px">';
+  h += '<button class="sp-btn" style="font-size:10px;padding:5px 2px" onclick="alignElToSlide(\''+el.id+'\',\'left\')" data-tip="Left edge">&#8676;</button>';
+  h += '<button class="sp-btn" style="font-size:10px;padding:5px 2px" onclick="alignElToSlide(\''+el.id+'\',\'hcenter\')" data-tip="Centre horizontally">&#8596;</button>';
+  h += '<button class="sp-btn" style="font-size:10px;padding:5px 2px" onclick="alignElToSlide(\''+el.id+'\',\'right\')" data-tip="Right edge">&#8677;</button>';
+  h += '<button class="sp-btn" style="font-size:10px;padding:5px 2px" onclick="alignElToSlide(\''+el.id+'\',\'top\')" data-tip="Top edge">&#8672;</button>';
+  h += '<button class="sp-btn" style="font-size:10px;padding:5px 2px" onclick="alignElToSlide(\''+el.id+'\',\'vcenter\')" data-tip="Centre vertically">&#8597;</button>';
+  h += '<button class="sp-btn" style="font-size:10px;padding:5px 2px" onclick="alignElToSlide(\''+el.id+'\',\'bottom\')" data-tip="Bottom edge">&#8674;</button>';
+  h += '</div>';
+  h += '<button class="sp-btn" style="width:100%;margin-bottom:4px;font-size:10px;border-color:var(--g);color:var(--g)" ' +
+       'onclick="alignElToSlide(\''+el.id+'\',\'center\')">&#8853; Centre on slide</button>';
+  h += '<button class="sp-btn" style="width:100%;margin-bottom:4px;font-size:10px' +
+       (S.snapCentersOnly ? ';background:rgba(126,217,87,0.18);border-color:var(--g);color:var(--g)' : '') + '" ' +
+       'onclick="toggleSnapCentersOnly()" data-tip="Ignore edge-to-edge snapping while dragging">' +
+       'Snap: ' + (S.snapCentersOnly ? 'centres only' : 'centres + edges') + '</button>';
+  if(el.type === 'text'){
+    h += '<button class="sp-btn" style="width:100%;margin-bottom:8px;font-size:10px" ' +
+         'onclick="fitTextBox(\''+el.id+'\')" data-tip="Shrink the box to the text so centring matches what you see">' +
+         'Fit box to text</button>';
+  }
+
   // ---- Style presets -------------------------------------------------
   // Only for elements that actually carry styling fields.
   if(el.bw !== undefined || el.shadow !== undefined){
@@ -23051,7 +23173,7 @@ function renderFileMenu(){
      + '<span class="menu-icon" style="color:var(--o)">'+I.folder+'</span>'
      + '<span class="menu-label">Open Deck&hellip;</span>'
      + '<span class="menu-shortcut"></span>'
-     + '<input type="file" id="menuOpenInput" accept=".json" class="hidden" onchange="loadPresentation(event)">'
+     + '<input type="file" id="menuOpenInput" accept=".json,.pptx" class="hidden" onchange="openDeckFile(event)">'
      + '</div>';
   h += '<div class="menu-divider"></div>';
   h += '<div class="menu-group-label">Import & Export</div>';
@@ -25832,10 +25954,17 @@ function showStartupModal(savedDraft, onDone){
       setTimeout(function(){
         var fi = document.createElement('input');
         fi.type = 'file';
-        fi.accept = '.json';
+        // Accept PowerPoint here too. Drag-and-drop already handled .pptx, so
+        // "Open from File" refusing it was an inconsistency rather than a
+        // capability gap.
+        fi.accept = '.json,.pptx';
         fi.style.display = 'none';
         fi.addEventListener('change', function(e){
-          if(typeof window.loadPresentation === 'function'){
+          var f = e.target.files && e.target.files[0];
+          var nm = f ? (f.name || '').toLowerCase() : '';
+          if(nm.endsWith('.pptx')){
+            if(typeof window.handlePptxImport === 'function') window.handlePptxImport(e);
+          } else if(typeof window.loadPresentation === 'function'){
             window.loadPresentation(e);
           }
           // Clean up the temporary input after handling
@@ -26156,6 +26285,90 @@ window.applyStylePresetToSlide = function(pid){
   if(typeof invalidateRecCache === 'function') invalidateRecCache();
   render();
   showToast('Applied "' + preset.name + '" to ' + n + ' element(s)');
+};
+
+// Place an element exactly against the slide, rather than aiming by hand.
+// Single entry point for File > Open, so .json and .pptx both work from the
+// same dialog — previously only drag-and-drop handled PowerPoint.
+window.openDeckFile = function(evt){
+  var f = evt.target.files && evt.target.files[0];
+  if(!f) return;
+  var nm = (f.name || '').toLowerCase();
+  if(nm.endsWith('.pptx')){
+    if(typeof window.handlePptxImport === 'function') window.handlePptxImport(evt);
+    else showToast('PowerPoint import unavailable');
+  } else {
+    if(typeof window.loadPresentation === 'function') window.loadPresentation(evt);
+  }
+};
+
+// Toggle edge snapping off, keeping centre alignment. Bound to a panel button.
+window.toggleSnapCentersOnly = function(){
+  S.snapCentersOnly = !S.snapCentersOnly;
+  try { localStorage.setItem('ep-snap-centers-only', S.snapCentersOnly ? '1' : '0'); } catch(e){}
+  showToast(S.snapCentersOnly ? 'Snapping: centres only' : 'Snapping: centres and edges');
+  render();
+};
+try {
+  var _sco = localStorage.getItem('ep-snap-centers-only');
+  if(_sco !== null) S.snapCentersOnly = (_sco === '1');
+} catch(e){}
+
+window.alignElToSlide = function(id, how){
+  var slide = cs();
+  if(!slide) return;
+  var el = slide.els.filter(function(e){ return e.id === id; })[0];
+  if(!el) return;
+  var b = getElBounds(el);
+  var nx = el.x, ny = el.y;
+  if(how === 'left'    || how === 'center') nx = (how === 'center') ? Math.round((STAGE_W - b.w)/2) : 0;
+  if(how === 'right')   nx = STAGE_W - b.w;
+  if(how === 'hcenter') nx = Math.round((STAGE_W - b.w)/2);
+  if(how === 'top'     || how === 'center') ny = (how === 'center') ? Math.round((STAGE_H - b.h)/2) : 0;
+  if(how === 'bottom')  ny = STAGE_H - b.h;
+  if(how === 'vcenter') ny = Math.round((STAGE_H - b.h)/2);
+  moveElTo(el, nx, ny);
+  S.dirty = true;
+  pushHist();
+  if(typeof invalidateRecCache === 'function') invalidateRecCache();
+  render();
+  showToast(how === 'center' ? 'Centred on slide' : 'Aligned');
+};
+
+// Shrink a text element's box to the text it contains. A text box is usually
+// far wider than its words, so "centre the element" centres the BOX and the
+// visible text can still look off to one side — this makes the two agree.
+window.fitTextBox = function(id){
+  var node = document.querySelector('.el [data-elid="' + id + '"]');
+  var slide = cs();
+  if(!slide) return;
+  var el = slide.els.filter(function(e){ return e.id === id; })[0];
+  if(!el) return;
+
+  // Measure the rendered text at its real size.
+  var probe = document.createElement('div');
+  probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre-wrap;' +
+    'font-family:' + (el.ff || 'Outfit') + ',sans-serif;' +
+    'font-size:' + (el.fs || 24) + 'px;font-weight:' + (el.fw || 400) + ';' +
+    'line-height:1.2;max-width:' + STAGE_W + 'px;padding:0';
+  probe.textContent = el.text || '';
+  document.body.appendChild(probe);
+  var w = Math.ceil(probe.getBoundingClientRect().width) + 8;
+  var hgt = Math.ceil(probe.getBoundingClientRect().height) + 8;
+  probe.remove();
+  if(!w || !hgt){ showToast('Nothing to measure'); return; }
+
+  // Keep the element's visual centre where it was.
+  var b = getElBounds(el);
+  var cx = b.x + b.w/2, cy = b.y + b.h/2;
+  el.w = Math.min(w, STAGE_W);
+  el.h = Math.min(hgt, STAGE_H);
+  el.x = Math.round(cx - el.w/2);
+  el.y = Math.round(cy - el.h/2);
+  S.dirty = true;
+  pushHist();
+  render();
+  showToast('Box fitted to text (' + el.w + '\u00D7' + el.h + ')');
 };
 
 window.resetStartupPreference = function(){
